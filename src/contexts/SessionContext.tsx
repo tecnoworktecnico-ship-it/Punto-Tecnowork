@@ -20,102 +20,88 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<any | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Iniciar loading como true
   const navigate = useNavigate();
 
   useEffect(() => {
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
-        setSession(currentSession);
-        setUser(currentSession?.user || null);
-        setLoading(false);
+    let isMounted = true; // Para prevenir actualizaciones de estado en componentes desmontados
 
-        if (currentSession?.user) {
-          // Fetch user profile
-          const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', currentSession.user.id)
-            .single();
+    const handleSession = async (currentSession: Session | null) => {
+      if (!isMounted) return;
 
-          if (profileError) {
-            console.error('Error fetching profile:', profileError);
-            showError('Error al cargar el perfil del usuario.');
-            setProfile(null);
-            // If profile fetch fails for an authenticated user, redirect to login
-            navigate('/login', { replace: true });
-          } else {
-            setProfile(profileData);
-            // Redirect based on role
-            if (profileData?.role === 'admin') {
-              navigate('/admin/dashboard', { replace: true });
-            } else if (profileData?.role === 'local') {
-              navigate('/local/dashboard', { replace: true });
-            } else if (profileData?.role === 'client') {
-              navigate('/client', { replace: true });
-            } else {
-              // Fallback for unrecognized roles, redirect to client dashboard as a safe default
-              navigate('/client', { replace: true });
-            }
-            showSuccess(`Bienvenido, ${profileData?.first_name || currentSession.user.email}!`);
-          }
-        } else {
+      setSession(currentSession);
+      setUser(currentSession?.user || null);
+
+      if (currentSession?.user) {
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', currentSession.user.id)
+          .single();
+
+        if (!isMounted) return;
+
+        if (profileError) {
+          console.error('Error fetching profile:', profileError);
+          showError('Error al cargar el perfil del usuario.');
           setProfile(null);
-          // Only navigate to /login if the current path is not already /login or /
-          // This prevents unnecessary redirects if the user is already on the login page
-          // or the landing page (which will then show the login button).
-          if (window.location.pathname !== '/login' && window.location.pathname !== '/') {
-            navigate('/login', { replace: true });
+          // Si falla la obtención del perfil para un usuario autenticado, redirigir al login
+          navigate('/login', { replace: true });
+        } else {
+          setProfile(profileData);
+          // Redirigir según el rol, solo si no está ya en la ruta correcta
+          const currentPath = window.location.pathname;
+          if (profileData?.role === 'admin' && !currentPath.startsWith('/admin')) {
+            navigate('/admin/dashboard', { replace: true });
+          } else if (profileData?.role === 'local' && !currentPath.startsWith('/local')) {
+            navigate('/local/dashboard', { replace: true });
+          } else if (profileData?.role === 'client' && !currentPath.startsWith('/client') && currentPath !== '/') {
+            navigate('/client', { replace: true });
           }
+          // Mostrar toast de éxito solo si no está ya en el dashboard correcto
+          if (!currentPath.includes(profileData?.role) && currentPath !== '/') { // Simplificado
+             showSuccess(`Bienvenido, ${profileData?.first_name || currentSession.user.email}!`);
+          }
+        }
+      } else {
+        setProfile(null);
+        // Solo navegar a /login si la ruta actual no es ya /login o /
+        const currentPath = window.location.pathname;
+        if (currentPath !== '/login' && currentPath !== '/') {
+          navigate('/login', { replace: true });
+        }
+      }
+      if (isMounted) setLoading(false); // Establecer loading a false después de todas las comprobaciones
+    };
+
+    // Comprobación de sesión inicial
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      handleSession(initialSession);
+    });
+
+    // Escuchar cambios en el estado de autenticación
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (event, currentSession) => {
+        if (event === 'SIGNED_OUT') {
+          if (isMounted) {
+            setSession(null);
+            setUser(null);
+            setProfile(null);
+            setLoading(false); // Asegurar que loading sea false al cerrar sesión
+            navigate('/login', { replace: true });
+            showSuccess('Sesión cerrada correctamente.');
+          }
+        } else if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'USER_UPDATED') {
+          handleSession(currentSession);
         }
       }
     );
 
-    // Initial session check
-    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
-      setSession(initialSession);
-      setUser(initialSession?.user || null);
-      setLoading(false);
-      if (initialSession?.user) {
-        // Fetch profile for initial session
-        supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', initialSession.user.id)
-          .single()
-          .then(({ data: profileData, error: profileError }) => {
-            if (profileError) {
-              console.error('Error fetching initial profile:', profileError);
-              showError('Error al cargar el perfil inicial.');
-              setProfile(null);
-              navigate('/login', { replace: true });
-            } else {
-              setProfile(profileData);
-              // Redirect based on role for initial session
-              if (profileData?.role === 'admin') {
-                navigate('/admin/dashboard', { replace: true });
-              } else if (profileData?.role === 'local') {
-                navigate('/local/dashboard', { replace: true });
-              } else if (profileData?.role === 'client') {
-                navigate('/client', { replace: true });
-              } else {
-                // Fallback for unrecognized roles, redirect to client dashboard as a safe default
-                navigate('/client', { replace: true });
-              }
-            }
-          });
-      } else {
-        // Only navigate to /login if the current path is not already /login or /
-        if (window.location.pathname !== '/login' && window.location.pathname !== '/') {
-          navigate('/login', { replace: true });
-        }
-      }
-    });
-
     return () => {
+      isMounted = false;
       authListener.subscription.unsubscribe();
     };
-  }, [navigate]);
+  }, [navigate]); // `navigate` es estable, por lo que está bien como dependencia.
 
   const signOut = async () => {
     setLoading(true);
@@ -124,13 +110,12 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
       console.error('Error signing out:', error);
       showError('Error al cerrar sesión.');
     } else {
-      showSuccess('Sesión cerrada correctamente.');
-      setSession(null);
-      setUser(null);
-      setProfile(null);
-      navigate('/login', { replace: true });
+      // El estado será limpiado por el evento 'SIGNED_OUT' de onAuthStateChange
+      // El toast de éxito y la navegación ya se manejan en el listener
     }
-    setLoading(false);
+    // Asegurar que loading sea false después del intento de cierre de sesión
+    // (el listener ya lo maneja para SIGNED_OUT, pero esto cubre otros casos si los hubiera)
+    if (isMounted) setLoading(false); 
   };
 
   return (
