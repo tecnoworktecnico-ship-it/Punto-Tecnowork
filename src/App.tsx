@@ -11,6 +11,7 @@ import AuthGuard from "./components/AuthGuard";
 import ClientDashboard from "./pages/client/Dashboard";
 import LocalDashboard from "./pages/local/Dashboard";
 import AdminDashboard from "./pages/admin/Dashboard";
+import BrandingSettings from "./pages/admin/BrandingSettings"; // Importar la nueva página
 
 const queryClient = new QueryClient();
 
@@ -40,6 +41,7 @@ const App = () => (
             {/* Protected Admin Routes */}
             <Route element={<AuthGuard allowedRoles={['admin']} />}>
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
+              <Route path="/admin/branding" element={<BrandingSettings />} /> {/* Nueva ruta para branding */}
               {/* Add other admin routes here */}
             </Route>
 

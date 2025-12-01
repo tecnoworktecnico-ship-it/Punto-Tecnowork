@@ -63,6 +63,9 @@ const AdminDashboard = () => {
               <Button asChild variant="outline" className="w-full">
                 <Link to="/admin/global-prices">Gestionar Precios Globales</Link>
               </Button>
+              <Button asChild variant="outline" className="w-full">
+                <Link to="/admin/branding">Configurar Branding</Link> {/* Nuevo enlace */}
+              </Button>
             </CardContent>
           </Card>
         </div>
