@@ -3,7 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
+import LandingPage from "./pages/LandingPage"; // Importar LandingPage
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import { SessionContextProvider } from "./contexts/SessionContext";
@@ -11,7 +11,7 @@ import AuthGuard from "./components/AuthGuard";
 import ClientDashboard from "./pages/client/Dashboard";
 import LocalDashboard from "./pages/local/Dashboard";
 import AdminDashboard from "./pages/admin/Dashboard";
-import BrandingSettings from "./pages/admin/BrandingSettings"; // Importar la nueva página
+import BrandingSettings from "./pages/admin/BrandingSettings";
 
 const queryClient = new QueryClient();
 
@@ -23,8 +23,8 @@ const App = () => (
       <BrowserRouter>
         <SessionContextProvider>
           <Routes>
+            <Route path="/" element={<LandingPage />} /> {/* Ruta raíz a LandingPage */}
             <Route path="/login" element={<Login />} />
-            <Route path="/" element={<Index />} /> {/* Public landing page or redirect */}
 
             {/* Protected Client Routes */}
             <Route element={<AuthGuard allowedRoles={['client']} />}>
@@ -41,7 +41,7 @@ const App = () => (
             {/* Protected Admin Routes */}
             <Route element={<AuthGuard allowedRoles={['admin']} />}>
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
-              <Route path="/admin/branding" element={<BrandingSettings />} /> {/* Nueva ruta para branding */}
+              <Route path="/admin/branding" element={<BrandingSettings />} />
               {/* Add other admin routes here */}
             </Route>
 

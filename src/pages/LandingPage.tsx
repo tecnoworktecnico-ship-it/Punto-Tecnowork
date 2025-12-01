@@ -6,11 +6,12 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import BrandingDisplay from "@/components/BrandingDisplay";
 
-const Index = () => {
-  const { session, loading } = useSession();
+const LandingPage = () => {
+  const { loading, session } = useSession();
 
-  // Show loading state if session is being loaded
-  if (loading) {
+  // Si está cargando o si ya hay una sesión activa, mostramos un indicador de carga.
+  // La redirección a los dashboards se manejará en SessionContext.
+  if (loading || session) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
         <p className="text-white text-xl">Cargando...</p>
@@ -18,17 +19,7 @@ const Index = () => {
     );
   }
 
-  // If a session exists and is not loading, SessionContext should have already redirected.
-  // This page should only render its public content if there is no active session.
-  if (session) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
-        <p className="text-white text-xl">Redirigiendo a tu dashboard...</p>
-      </div>
-    );
-  }
-
-  // Only render the public landing page if no session
+  // Solo renderizamos el contenido de la página de aterrizaje si no hay sesión y no está cargando.
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move text-text-on-color">
       <div className="text-center bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
@@ -48,4 +39,4 @@ const Index = () => {
   );
 };
 
-export default Index;
+export default LandingPage;
