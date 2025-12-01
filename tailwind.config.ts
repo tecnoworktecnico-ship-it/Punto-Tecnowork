@@ -62,6 +62,13 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        // Custom Project Colors
+        "primary-blue": "var(--primary-blue)",
+        "emphasis-red": "var(--emphasis-red)",
+        "secondary-yellow": "var(--secondary-yellow)",
+        "success-green": "var(--success-green)",
+        "text-carbon": "var(--text-carbon)",
+        "text-on-color": "var(--text-on-color)",
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -85,10 +92,16 @@ export default {
             height: "0",
           },
         },
+        "gradient-move": {
+          "0%": { backgroundPosition: "0% 50%" },
+          "50%": { backgroundPosition: "100% 50%" },
+          "100%": { backgroundPosition: "0% 50%" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "gradient-move": "gradient-move 10s ease infinite",
       },
     },
   },
