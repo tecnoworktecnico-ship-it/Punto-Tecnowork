@@ -2,36 +2,28 @@
 
 import { MadeWithDyad } from "@/components/made-with-dyad";
 import { useSession } from "@/contexts/SessionContext";
-import { Link, useNavigate } from "react-router-dom"; // Import useNavigate
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import BrandingDisplay from "@/components/BrandingDisplay";
-import { useEffect } from "react"; // Import useEffect
 
 const Index = () => {
-  const { session, loading, profile } = useSession();
-  const navigate = useNavigate(); // Get navigate hook
+  const { session, loading } = useSession();
 
-  useEffect(() => {
-    if (!loading && session && profile) {
-      // If session exists and profile is loaded, redirect based on role
-      if (profile.role === 'admin') {
-        navigate('/admin/dashboard', { replace: true });
-      } else if (profile.role === 'local') {
-        navigate('/local/dashboard', { replace: true });
-      } else if (profile.role === 'client') {
-        navigate('/client', { replace: true });
-      } else {
-        // Fallback for unrecognized roles, redirect to client dashboard as a safe default
-        navigate('/client', { replace: true });
-      }
-    }
-  }, [loading, session, profile, navigate]); // Depend on loading, session, profile, navigate
-
-  // Show loading state if session is being loaded or if a redirection is pending
-  if (loading || (session && profile)) {
+  // Show loading state if session is being loaded
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
         <p className="text-white text-xl">Cargando...</p>
+      </div>
+    );
+  }
+
+  // If a session exists and is not loading, SessionContext should have already redirected.
+  // This page should only render its public content if there is no active session.
+  if (session) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
+        <p className="text-white text-xl">Redirigiendo a tu dashboard...</p>
       </div>
     );
   }
