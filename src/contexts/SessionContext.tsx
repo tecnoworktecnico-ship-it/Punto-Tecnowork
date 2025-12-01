@@ -42,23 +42,26 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
             console.error('Error fetching profile:', profileError);
             showError('Error al cargar el perfil del usuario.');
             setProfile(null);
+            // If profile fetch fails for an authenticated user, redirect to login
+            navigate('/login', { replace: true });
           } else {
             setProfile(profileData);
             // Redirect based on role
             if (profileData?.role === 'admin') {
-              navigate('/admin/dashboard');
+              navigate('/admin/dashboard', { replace: true });
             } else if (profileData?.role === 'local') {
-              navigate('/local/dashboard');
+              navigate('/local/dashboard', { replace: true });
             } else if (profileData?.role === 'client') {
-              navigate('/client');
+              navigate('/client', { replace: true });
             } else {
-              navigate('/'); // Fallback
+              // Fallback for unrecognized roles, redirect to client dashboard as a safe default
+              navigate('/client', { replace: true });
             }
             showSuccess(`Bienvenido, ${profileData?.first_name || currentSession.user.email}!`);
           }
         } else {
           setProfile(null);
-          navigate('/login');
+          navigate('/login', { replace: true });
         }
       }
     );
@@ -80,22 +83,24 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
               console.error('Error fetching initial profile:', profileError);
               showError('Error al cargar el perfil inicial.');
               setProfile(null);
+              navigate('/login', { replace: true });
             } else {
               setProfile(profileData);
               // Redirect based on role for initial session
               if (profileData?.role === 'admin') {
-                navigate('/admin/dashboard');
+                navigate('/admin/dashboard', { replace: true });
               } else if (profileData?.role === 'local') {
-                navigate('/local/dashboard');
+                navigate('/local/dashboard', { replace: true });
               } else if (profileData?.role === 'client') {
-                navigate('/client');
+                navigate('/client', { replace: true });
               } else {
-                navigate('/'); // Fallback
+                // Fallback for unrecognized roles, redirect to client dashboard as a safe default
+                navigate('/client', { replace: true });
               }
             }
           });
       } else {
-        navigate('/login');
+        navigate('/login', { replace: true });
       }
     });
 
@@ -115,7 +120,7 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
       setSession(null);
       setUser(null);
       setProfile(null);
-      navigate('/login');
+      navigate('/login', { replace: true });
     }
     setLoading(false);
   };
