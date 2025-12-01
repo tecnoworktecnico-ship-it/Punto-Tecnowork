@@ -12,26 +12,25 @@ interface BrandingDisplayProps {
 const BrandingDisplay: React.FC<BrandingDisplayProps> = ({ type, className }) => {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // No necesitamos un estado de error explícito para la UI si siempre mostramos el fallback
+  // pero mantenemos el console.error para depuración.
 
   useEffect(() => {
     const fetchBranding = async () => {
       setLoading(true);
-      setError(null);
       const { data, error } = await supabase
         .from('branding')
         .select(type === 'main' ? 'main_logo_url' : 'powered_by_logo_url')
         .single();
 
-      if (error) {
+      if (error && error.code !== 'PGRST116') { // PGRST116 significa que no se encontraron filas, lo cual es esperado si no hay branding
         console.error('Error fetching branding:', error);
-        setError('Error al cargar el logo.');
-        setLogoUrl(null);
+        setLogoUrl(null); // Asegurarse de que sea null para activar el fallback
       } else if (data) {
         const url = type === 'main' ? data.main_logo_url : data.powered_by_logo_url;
         setLogoUrl(url);
       } else {
-        setLogoUrl(null);
+        setLogoUrl(null); // No hay datos o error PGRST116, así que no hay logo
       }
       setLoading(false);
     };
@@ -43,15 +42,17 @@ const BrandingDisplay: React.FC<BrandingDisplayProps> = ({ type, className }) =>
     return <Skeleton className={`h-12 w-32 ${className}`} />;
   }
 
-  if (error) {
-    return <div className={`text-red-500 text-sm ${className}`}>{error}</div>;
-  }
-
   if (logoUrl) {
     return <img src={logoUrl} alt={type === 'main' ? "Main Logo" : "Powered By Logo"} className={className} />;
   }
 
-  return null; // No logo to display
+  // Si no hay logoUrl (ya sea porque no se ha subido o hubo un error de carga),
+  // mostramos "Tecnowork" como fallback.
+  return (
+    <div className={`flex items-center justify-center font-bold text-text-carbon text-xl ${className}`}>
+      Tecnowork
+    </div>
+  );
 };
 
 export default BrandingDisplay;
