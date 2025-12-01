@@ -1,5 +1,3 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
@@ -17,46 +15,41 @@ import React from "react";
 const queryClient = new QueryClient();
 
 const App = () => (
-  <React.Fragment> {/* El componente App devuelve un único fragmento */}
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <SessionContextProvider>
-          <TooltipProvider>
-            {/* Routes es el único hijo de TooltipProvider */}
-            <Routes>
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/login" element={<Login />} />
+  <QueryClientProvider client={queryClient}>
+    <BrowserRouter>
+      <SessionContextProvider>
+        <TooltipProvider>
+          {/* Routes es el único hijo de TooltipProvider */}
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<Login />} />
 
-              {/* Protected Client Routes */}
-              <Route element={<AuthGuard allowedRoles={['client']} />}>
-                <Route path="/client" element={<ClientDashboard />} />
-                {/* Add other client routes here */}
-              </Route>
+            {/* Protected Client Routes */}
+            <Route element={<AuthGuard allowedRoles={['client']} />}>
+              <Route path="/client" element={<ClientDashboard />} />
+              {/* Add other client routes here */}
+            </Route>
 
-              {/* Protected Local Routes */}
-              <Route element={<AuthGuard allowedRoles={['local']} />}>
-                <Route path="/local/dashboard" element={<LocalDashboard />} />
-                {/* Add other local routes here */}
-              </Route>
+            {/* Protected Local Routes */}
+            <Route element={<AuthGuard allowedRoles={['local']} />}>
+              <Route path="/local/dashboard" element={<LocalDashboard />} />
+              {/* Add other local routes here */}
+            </Route>
 
-              {/* Protected Admin Routes */}
-              <Route element={<AuthGuard allowedRoles={['admin']} />}>
-                <Route path="/admin/dashboard" element={<AdminDashboard />} />
-                <Route path="/admin/branding" element={<BrandingSettings />} />
-                {/* Add other admin routes here */}
-              </Route>
+            {/* Protected Admin Routes */}
+            <Route element={<AuthGuard allowedRoles={['admin']} />}>
+              <Route path="/admin/dashboard" element={<AdminDashboard />} />
+              <Route path="/admin/branding" element={<BrandingSettings />} />
+              {/* Add other admin routes here */}
+            </Route>
 
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </TooltipProvider>
-        </SessionContextProvider>
-      </BrowserRouter>
-    </QueryClientProvider>
-    {/* Toaster y Sonner son elementos de UI globales, renderizados como hermanos del árbol principal de proveedores */}
-    <Toaster />
-    <Sonner />
-  </React.Fragment>
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </TooltipProvider>
+      </SessionContextProvider>
+    </BrowserRouter>
+  </QueryClientProvider>
 );
 
 export default App;
