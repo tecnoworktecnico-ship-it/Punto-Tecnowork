@@ -12,18 +12,21 @@ import ClientDashboard from "./pages/client/Dashboard";
 import LocalDashboard from "./pages/local/Dashboard";
 import AdminDashboard from "./pages/admin/Dashboard";
 import BrandingSettings from "./pages/admin/BrandingSettings";
-import React from "react"; // Importar React para usar React.Fragment
+import React from "react";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      {/* Envolvemos Toaster y Sonner en un fragmento para que TooltipProvider reciba un solo hijo */}
-      <React.Fragment>
-        <Toaster />
-        <Sonner />
-      </React.Fragment>
+    {/* Envolvemos todos los componentes principales en un fragmento para QueryClientProvider */}
+    <React.Fragment>
+      <TooltipProvider>
+        {/* Toaster y Sonner ya están envueltos en un fragmento para TooltipProvider */}
+        <React.Fragment>
+          <Toaster />
+          <Sonner />
+        </React.Fragment>
+      </TooltipProvider>
       <BrowserRouter>
         <SessionContextProvider>
           <Routes>
@@ -54,7 +57,7 @@ const App = () => (
           </Routes>
         </SessionContextProvider>
       </BrowserRouter>
-    </TooltipProvider>
+    </React.Fragment>
   </QueryClientProvider>
 );
 
