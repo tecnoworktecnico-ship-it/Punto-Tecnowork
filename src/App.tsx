@@ -3,7 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import LandingPage from "./pages/LandingPage"; // Importar LandingPage
+import LandingPage from "./pages/LandingPage";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import { SessionContextProvider } from "./contexts/SessionContext";
@@ -12,18 +12,22 @@ import ClientDashboard from "./pages/client/Dashboard";
 import LocalDashboard from "./pages/local/Dashboard";
 import AdminDashboard from "./pages/admin/Dashboard";
 import BrandingSettings from "./pages/admin/BrandingSettings";
+import React from "react"; // Importar React para usar React.Fragment
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
+      {/* Envolvemos Toaster y Sonner en un fragmento para que TooltipProvider reciba un solo hijo */}
+      <React.Fragment>
+        <Toaster />
+        <Sonner />
+      </React.Fragment>
       <BrowserRouter>
         <SessionContextProvider>
           <Routes>
-            <Route path="/" element={<LandingPage />} /> {/* Ruta raíz a LandingPage */}
+            <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<Login />} />
 
             {/* Protected Client Routes */}
