@@ -18,17 +18,14 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    {/* Envolvemos todos los componentes principales en un fragmento para QueryClientProvider */}
-    <React.Fragment>
-      <TooltipProvider>
-        {/* Toaster y Sonner ya están envueltos en un fragmento para TooltipProvider */}
-        <React.Fragment>
-          <Toaster />
-          <Sonner />
-        </React.Fragment>
-      </TooltipProvider>
-      <BrowserRouter>
-        <SessionContextProvider>
+    <BrowserRouter>
+      <SessionContextProvider>
+        <TooltipProvider>
+          {/* Toaster y Sonner envueltos en un fragmento para TooltipProvider */}
+          <React.Fragment>
+            <Toaster />
+            <Sonner />
+          </React.Fragment>
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<Login />} />
@@ -55,9 +52,9 @@ const App = () => (
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </SessionContextProvider>
-      </BrowserRouter>
-    </React.Fragment>
+        </TooltipProvider>
+      </SessionContextProvider>
+    </BrowserRouter>
   </QueryClientProvider>
 );
 
