@@ -10,7 +10,7 @@ import ClientDashboard from "./pages/client/Dashboard";
 import LocalDashboard from "./pages/local/Dashboard";
 import AdminDashboard from "./pages/admin/Dashboard";
 import BrandingSettings from "./pages/admin/BrandingSettings";
-import React from "react"; // Necesario para React.Fragment
+import React from "react"; // Necesario para JSX, aunque no para React.Fragment si usamos div
 import { Toaster } from "@/components/ui/toaster"; // Importar Toaster
 import { Toaster as Sonner } from "@/components/ui/sonner"; // Importar Sonner
 
@@ -21,8 +21,8 @@ const App = () => (
     <BrowserRouter>
       <SessionContextProvider>
         <TooltipProvider>
-          {/* Envolvemos los componentes globales y las rutas en un Fragment */}
-          <React.Fragment>
+          {/* Reemplazamos React.Fragment con un div para asegurar un único elemento DOM concreto */}
+          <div>
             <Toaster />
             <Sonner />
             <Routes>
@@ -51,7 +51,7 @@ const App = () => (
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </React.Fragment>
+          </div>
         </TooltipProvider>
       </SessionContextProvider>
     </BrowserRouter>
