@@ -7,7 +7,7 @@ import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { useSession } from '@/contexts/SessionContext';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import BrandingDisplay from '@/components/BrandingDisplay';
-import { supabase } from '@/integrations/supabase/client'; // Importar el cliente de Supabase
+import { supabase } from '@/integrations/supabase/client';
 
 function Login() {
   const navigate = useNavigate();
@@ -15,8 +15,7 @@ function Login() {
 
   useEffect(() => {
     if (session && !loading) {
-      // La redirección se maneja en SessionContext, esta página solo debe ser accesible si no está autenticado.
-      // Si hay sesión, el usuario ya está siendo redirigido.
+      // La redirección se maneja en SessionContext
     }
   }, [session, loading, navigate]);
 
@@ -37,19 +36,104 @@ function Login() {
         </div>
         <Auth
           supabaseClient={supabase}
-          providers={[]} // Puedes añadir proveedores como 'google', 'github' aquí si los configuras en Supabase
+          providers={[]}
           appearance={{
             theme: ThemeSupa,
             variables: {
               default: {
                 colors: {
-                  brand: 'hsl(var(--primary-blue))', // Usar tu color primario
-                  brandAccent: 'hsl(var(--primary-blue))', // Usar tu color primario
+                  brand: '#4285F4',
+                  brandAccent: '#3367D6',
+                  brandButtonText: 'white',
+                  defaultButtonBackground: '#4285F4',
+                  defaultButtonBackgroundHover: '#3367D6',
+                  defaultButtonBorder: '#4285F4',
+                  defaultButtonText: 'white',
+                  inputBackground: 'white',
+                  inputBorder: '#d1d5db',
+                  inputBorderHover: '#4285F4',
+                  inputBorderFocus: '#4285F4',
+                  inputText: '#323232',
+                  inputLabelText: '#323232',
+                  inputPlaceholder: '#9ca3af',
                 },
+                space: {
+                  buttonPadding: '10px 15px',
+                  inputPadding: '10px 15px',
+                },
+                fontSizes: {
+                  baseButtonSize: '16px',
+                  baseInputSize: '16px',
+                },
+                radii: {
+                  borderRadiusButton: '6px',
+                  buttonBorderRadius: '6px',
+                  inputBorderRadius: '6px',
+                },
+              },
+            },
+            style: {
+              button: {
+                background: '#4285F4',
+                color: 'white',
+                borderRadius: '6px',
+                padding: '10px 15px',
+                fontWeight: '600',
+              },
+              anchor: {
+                color: '#4285F4',
+                textDecoration: 'underline',
+              },
+              container: {
+                width: '100%',
+              },
+              label: {
+                color: '#323232',
+                fontWeight: '500',
+                marginBottom: '6px',
+              },
+              input: {
+                background: 'white',
+                color: '#323232',
+                borderColor: '#d1d5db',
+                borderRadius: '6px',
+                padding: '10px 15px',
               },
             },
           }}
           theme="light"
+          localization={{
+            variables: {
+              sign_in: {
+                email_label: 'Correo electrónico',
+                password_label: 'Contraseña',
+                email_input_placeholder: 'Tu correo electrónico',
+                password_input_placeholder: 'Tu contraseña',
+                button_label: 'Iniciar sesión',
+                loading_button_label: 'Iniciando sesión...',
+                social_provider_text: 'Iniciar sesión con {{provider}}',
+                link_text: '¿Ya tienes una cuenta? Inicia sesión',
+              },
+              sign_up: {
+                email_label: 'Correo electrónico',
+                password_label: 'Contraseña',
+                email_input_placeholder: 'Tu correo electrónico',
+                password_input_placeholder: 'Tu contraseña',
+                button_label: 'Registrarse',
+                loading_button_label: 'Registrándose...',
+                social_provider_text: 'Registrarse con {{provider}}',
+                link_text: '¿No tienes una cuenta? Regístrate',
+              },
+              forgotten_password: {
+                email_label: 'Correo electrónico',
+                password_label: 'Contraseña',
+                email_input_placeholder: 'Tu correo electrónico',
+                button_label: 'Enviar instrucciones',
+                loading_button_label: 'Enviando instrucciones...',
+                link_text: '¿Olvidaste tu contraseña?',
+              },
+            },
+          }}
         />
       </div>
       <MadeWithDyad />
