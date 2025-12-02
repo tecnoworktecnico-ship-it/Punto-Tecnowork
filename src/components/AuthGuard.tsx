@@ -26,15 +26,13 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ allowedRoles }) => {
   }
 
   if (!profile) {
-    // This case should ideally not happen if profile creation is synchronous
-    // but as a fallback, redirect to login or a profile setup page
     showError('Perfil de usuario no encontrado. Por favor, inicia sesión de nuevo.');
     return <Navigate to="/login" replace />;
   }
 
   if (!allowedRoles.includes(profile.role)) {
     showError('No tienes permiso para acceder a esta página.');
-    // Redirect based on their actual role if they try to access a forbidden route
+    
     if (profile.role === 'admin') {
       return <Navigate to="/admin/dashboard" replace />;
     } else if (profile.role === 'local') {
@@ -42,10 +40,14 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ allowedRoles }) => {
     } else if (profile.role === 'client') {
       return <Navigate to="/client" replace />;
     }
-    return <Navigate to="/" replace />; // Fallback if role is unknown
+    return <Navigate to="/" replace />;
   }
 
-  return <Outlet />;
+  return (
+    <React.Fragment>
+      <Outlet />
+    </React.Fragment>
+  );
 };
 
 export default AuthGuard;
