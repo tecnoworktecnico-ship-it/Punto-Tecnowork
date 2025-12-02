@@ -11,6 +11,8 @@ import AdminDashboard from "./pages/admin/Dashboard";
 import LocalDashboard from "./pages/local/Dashboard";
 import ClientDashboard from "./pages/client/Dashboard";
 import BrandingSettings from "./pages/admin/BrandingSettings";
+import Locals from "./pages/admin/Locals";
+import GlobalPrices from "./pages/admin/GlobalPrices";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +40,22 @@ const App = () => (
               element={
                 <AuthGuard allowedRoles={['admin']}>
                   <BrandingSettings />
+                </AuthGuard>
+              } 
+            />
+            <Route 
+              path="/admin/locals" 
+              element={
+                <AuthGuard allowedRoles={['admin']}>
+                  <Locals />
+                </AuthGuard>
+              } 
+            />
+            <Route 
+              path="/admin/global-prices" 
+              element={
+                <AuthGuard allowedRoles={['admin']}>
+                  <GlobalPrices />
                 </AuthGuard>
               } 
             />
