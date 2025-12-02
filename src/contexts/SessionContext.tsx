@@ -9,7 +9,7 @@ import { showSuccess, showError } from '@/utils/toast';
 interface SessionContextType {
   session: Session | null;
   user: User | null;
-  profile: any | null; // You might want to define a more specific type for profile
+  profile: any | null;
   loading: boolean;
   signOut: () => Promise<void>;
 }
@@ -20,11 +20,11 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<any | null>(null);
-  const [loading, setLoading] = useState(true); // Iniciar loading como true
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    let isMounted = true; // Para prevenir actualizaciones de estado en componentes desmontados
+    let isMounted = true;
 
     const handleSession = async (currentSession: Session | null) => {
       if (!isMounted) return;
@@ -45,11 +45,9 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           console.error('Error fetching profile:', profileError);
           showError('Error al cargar el perfil del usuario.');
           setProfile(null);
-          // Si falla la obtención del perfil para un usuario autenticado, redirigir al login
           navigate('/login', { replace: true });
         } else {
           setProfile(profileData);
-          // Redirigir según el rol, solo si no está ya en la ruta correcta
           const currentPath = window.location.pathname;
           if (profileData?.role === 'admin' && !currentPath.startsWith('/admin')) {
             navigate('/admin/dashboard', { replace: true });
@@ -58,28 +56,24 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           } else if (profileData?.role === 'client' && !currentPath.startsWith('/client') && currentPath !== '/') {
             navigate('/client', { replace: true });
           }
-          // Mostrar toast de éxito solo si no está ya en el dashboard correcto
-          if (!currentPath.includes(profileData?.role) && currentPath !== '/') { // Simplificado
+          if (!currentPath.includes(profileData?.role) && currentPath !== '/') {
              showSuccess(`Bienvenido, ${profileData?.first_name || currentSession.user.email}!`);
           }
         }
       } else {
         setProfile(null);
-        // Solo navegar a /login si la ruta actual no es ya /login o /
         const currentPath = window.location.pathname;
         if (currentPath !== '/login' && currentPath !== '/') {
           navigate('/login', { replace: true });
         }
       }
-      if (isMounted) setLoading(false); // Establecer loading a false después de todas las comprobaciones
+      if (isMounted) setLoading(false);
     };
 
-    // Comprobación de sesión inicial
     supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
       handleSession(initialSession);
     });
 
-    // Escuchar cambios en el estado de autenticación
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
         if (event === 'SIGNED_OUT') {
@@ -87,7 +81,7 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
             setSession(null);
             setUser(null);
             setProfile(null);
-            setLoading(false); // Asegurar que loading sea false al cerrar sesión
+            setLoading(false);
             navigate('/login', { replace: true });
             showSuccess('Sesión cerrada correctamente.');
           }
@@ -101,7 +95,7 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
       isMounted = false;
       authListener.subscription.unsubscribe();
     };
-  }, [navigate]); // `navigate` es estable, por lo que está bien como dependencia.
+  }, [navigate]);
 
   const signOut = async () => {
     setLoading(true);
@@ -109,13 +103,8 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
     if (error) {
       console.error('Error signing out:', error);
       showError('Error al cerrar sesión.');
-    } else {
-      // El estado será limpiado por el evento 'SIGNED_OUT' de onAuthStateChange
-      // El toast de éxito y la navegación ya se manejan en el listener
+      setLoading(false);
     }
-    // Asegurar que loading sea false después del intento de cierre de sesión
-    // (el listener ya lo maneja para SIGNED_OUT, pero esto cubre otros casos si los hubiera)
-    if (isMounted) setLoading(false); 
   };
 
   return (
