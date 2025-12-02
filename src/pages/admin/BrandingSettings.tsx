@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { showSuccess, showError } from '@/utils/toast';
 import { useNavigate } from 'react-router-dom';
-import BrandingDisplay from '@/components/BrandingDisplay';
+import { ArrowLeft } from 'lucide-react';
 
 const BrandingSettings = () => {
   const { profile, loading: sessionLoading } = useSession();
@@ -21,7 +21,7 @@ const BrandingSettings = () => {
   useEffect(() => {
     if (!sessionLoading && profile?.role !== 'admin') {
       showError('No tienes permiso para acceder a esta página.');
-      navigate('/admin/dashboard'); // Redirigir si no es admin
+      navigate('/admin/dashboard');
     }
 
     const fetchBranding = async () => {
@@ -31,7 +31,7 @@ const BrandingSettings = () => {
         .select('main_logo_url, powered_by_logo_url')
         .single();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
+      if (error && error.code !== 'PGRST116') {
         console.error('Error fetching branding settings:', error);
         showError('Error al cargar la configuración de branding.');
       } else if (data) {
@@ -87,13 +87,23 @@ const BrandingSettings = () => {
   }
 
   if (profile?.role !== 'admin') {
-    return null; // Should be redirected by useEffect
+    return null;
   }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move text-text-on-color">
       <Card className="w-full max-w-2xl p-6 bg-white rounded-lg shadow-lg">
         <CardHeader>
+          <div className="flex items-center justify-between mb-4">
+            <Button
+              variant="ghost"
+              onClick={() => navigate('/admin/dashboard')}
+              className="flex items-center gap-2 text-text-carbon hover:text-primary-blue"
+            >
+              <ArrowLeft className="h-5 w-5" />
+              Volver al Dashboard
+            </Button>
+          </div>
           <CardTitle className="text-3xl font-bold text-text-carbon text-center">Configuración de Branding</CardTitle>
         </CardHeader>
         <CardContent>
@@ -109,9 +119,11 @@ const BrandingSettings = () => {
                 className="w-full p-3 border border-gray-300 rounded-md focus:ring-primary-blue focus:border-primary-blue"
               />
               {mainLogoUrl && (
-                <div className="mt-4 text-center">
-                  <p className="text-sm text-gray-600 mb-2">Vista previa del Logo Principal:</p>
-                  <BrandingDisplay type="main" className="h-20 mx-auto" />
+                <div className="mt-4 p-4 border border-gray-200 rounded-md bg-gray-50">
+                  <p className="text-sm text-gray-600 mb-2 font-medium">Vista previa del Logo Principal:</p>
+                  <div className="flex justify-center">
+                    <img src={mainLogoUrl} alt="Logo Principal" className="h-20 object-contain" />
+                  </div>
                 </div>
               )}
             </div>
@@ -127,9 +139,11 @@ const BrandingSettings = () => {
                 className="w-full p-3 border border-gray-300 rounded-md focus:ring-primary-blue focus:border-primary-blue"
               />
               {poweredByLogoUrl && (
-                <div className="mt-4 text-center">
-                  <p className="text-sm text-gray-600 mb-2">Vista previa del Logo "Powered By":</p>
-                  <BrandingDisplay type="poweredBy" className="h-12 mx-auto" />
+                <div className="mt-4 p-4 border border-gray-200 rounded-md bg-gray-50">
+                  <p className="text-sm text-gray-600 mb-2 font-medium">Vista previa del Logo "Powered By":</p>
+                  <div className="flex justify-center">
+                    <img src={poweredByLogoUrl} alt="Powered By Logo" className="h-12 object-contain" />
+                  </div>
                 </div>
               )}
             </div>
