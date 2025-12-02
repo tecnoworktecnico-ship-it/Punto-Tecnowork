@@ -1,4 +1,3 @@
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import LandingPage from "./pages/LandingPage";
@@ -21,37 +20,34 @@ const App = () => (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <SessionContextProvider>
-          <TooltipProvider>
-            {/* Envolvemos Routes en un div para satisfacer la estricta validación de TooltipProvider */}
-            <div>
-              <Routes>
-                <Route path="/" element={<LandingPage />} />
-                <Route path="/login" element={<Login />} />
+          {/* TooltipProvider y su div envolvente han sido eliminados temporalmente para depuración.
+              Si el error desaparece, TooltipProvider es el culpable. */}
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<Login />} />
 
-                {/* Protected Client Routes */}
-                <Route element={<AuthGuard allowedRoles={['client']} />}>
-                  <Route path="/client" element={<ClientDashboard />} />
-                  {/* Add other client routes here */}
-                </Route>
+            {/* Protected Client Routes */}
+            <Route element={<AuthGuard allowedRoles={['client']} />}>
+              <Route path="/client" element={<ClientDashboard />} />
+              {/* Add other client routes here */}
+            </Route>
 
-                {/* Protected Local Routes */}
-                <Route element={<AuthGuard allowedRoles={['local']} />}>
-                  <Route path="/local/dashboard" element={<LocalDashboard />} />
-                  {/* Add other local routes here */}
-                </Route>
+            {/* Protected Local Routes */}
+            <Route element={<AuthGuard allowedRoles={['local']} />}>
+              <Route path="/local/dashboard" element={<LocalDashboard />} />
+              {/* Add other local routes here */}
+            </Route>
 
-                {/* Protected Admin Routes */}
-                <Route element={<AuthGuard allowedRoles={['admin']} />}>
-                  <Route path="/admin/dashboard" element={<AdminDashboard />} />
-                  <Route path="/admin/branding" element={<BrandingSettings />} />
-                  {/* Add other admin routes here */}
-                </Route>
+            {/* Protected Admin Routes */}
+            <Route element={<AuthGuard allowedRoles={['admin']} />}>
+              <Route path="/admin/dashboard" element={<AdminDashboard />} />
+              <Route path="/admin/branding" element={<BrandingSettings />} />
+              {/* Add other admin routes here */}
+            </Route>
 
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </div>
-          </TooltipProvider>
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
         </SessionContextProvider>
       </BrowserRouter>
     </QueryClientProvider>
