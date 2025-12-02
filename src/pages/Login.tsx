@@ -2,9 +2,12 @@
 
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Auth } from '@supabase/auth-ui-react';
+import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { useSession } from '@/contexts/SessionContext';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import BrandingDisplay from '@/components/BrandingDisplay';
+import { supabase } from '@/integrations/supabase/client'; // Importar el cliente de Supabase
 
 function Login() {
   const navigate = useNavigate();
@@ -30,9 +33,24 @@ function Login() {
       <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-lg">
         <div className="mb-6">
           <BrandingDisplay type="main" className="h-20 mx-auto mb-4" />
-          <h2 className="text-3xl font-bold text-center text-text-carbon">Página de Inicio de Sesión</h2>
+          <h2 className="text-3xl font-bold text-center text-text-carbon">Iniciar Sesión / Registrarse</h2>
         </div>
-        <p className="text-center text-gray-600">Aquí iría el formulario de inicio de sesión.</p>
+        <Auth
+          supabaseClient={supabase}
+          providers={[]} // Puedes añadir proveedores como 'google', 'github' aquí si los configuras en Supabase
+          appearance={{
+            theme: ThemeSupa,
+            variables: {
+              default: {
+                colors: {
+                  brand: 'hsl(var(--primary-blue))', // Usar tu color primario
+                  brandAccent: 'hsl(var(--primary-blue))', // Usar tu color primario
+                },
+              },
+            },
+          }}
+          theme="light"
+        />
       </div>
       <MadeWithDyad />
     </div>
