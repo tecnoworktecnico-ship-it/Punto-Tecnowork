@@ -5,6 +5,7 @@ import { useSession } from '@/contexts/SessionContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
+import { Building2, DollarSign, Settings, Users } from 'lucide-react';
 
 const AdminDashboard = () => {
   const { user, profile, signOut } = useSession();
@@ -21,51 +22,79 @@ const AdminDashboard = () => {
         </div>
         <p className="text-xl text-gray-600 mb-6">Bienvenido, {profile?.first_name || user?.email}! Tienes control total sobre la plataforma.</p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Card className="bg-gray-50 shadow-md">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader>
-              <CardTitle className="text-primary-blue">Gestión de Usuarios</CardTitle>
-              <CardDescription>Administra las cuentas de clientes y locales.</CardDescription>
+              <div className="flex items-center gap-3">
+                <Building2 className="h-8 w-8 text-primary-blue" />
+                <CardTitle className="text-primary-blue">Gestión de Locales</CardTitle>
+              </div>
+              <CardDescription>Administra los locales y sus configuraciones.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col space-y-2">
-              <Button variant="outline" className="w-full" onClick={() => navigate('/admin/users')}>
-                Ver Usuarios
-              </Button>
-              <Button variant="outline" className="w-full" onClick={() => navigate('/admin/roles')}>
-                Gestionar Roles
+              <Button 
+                variant="outline" 
+                className="w-full justify-start" 
+                onClick={() => navigate('/admin/locals')}
+              >
+                Ver y Gestionar Locales
               </Button>
             </CardContent>
           </Card>
 
-          <Card className="bg-gray-50 shadow-md">
+          <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader>
-              <CardTitle className="text-primary-blue">Gestión de Pedidos</CardTitle>
-              <CardDescription>Supervisa y gestiona todos los pedidos del sistema.</CardDescription>
+              <div className="flex items-center gap-3">
+                <DollarSign className="h-8 w-8 text-primary-blue" />
+                <CardTitle className="text-primary-blue">Precios Globales</CardTitle>
+              </div>
+              <CardDescription>Define los precios base para todos los servicios.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col space-y-2">
-              <Button variant="outline" className="w-full" onClick={() => navigate('/admin/orders')}>
-                Ver Todos los Pedidos
-              </Button>
-              <Button variant="outline" className="w-full" onClick={() => navigate('/admin/order-status')}>
-                Actualizar Estados
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gray-50 shadow-md">
-            <CardHeader>
-              <CardTitle className="text-primary-blue">Configuración General</CardTitle>
-              <CardDescription>Ajustes de la aplicación y precios globales.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col space-y-2">
-              <Button variant="outline" className="w-full" onClick={() => navigate('/admin/settings')}>
-                Ajustes de la App
-              </Button>
-              <Button variant="outline" className="w-full" onClick={() => navigate('/admin/global-prices')}>
+              <Button 
+                variant="outline" 
+                className="w-full justify-start" 
+                onClick={() => navigate('/admin/global-prices')}
+              >
                 Gestionar Precios Globales
               </Button>
-              <Button variant="outline" className="w-full" onClick={() => navigate('/admin/branding')}>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <Settings className="h-8 w-8 text-primary-blue" />
+                <CardTitle className="text-primary-blue">Configuración</CardTitle>
+              </div>
+              <CardDescription>Ajustes generales de la aplicación.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col space-y-2">
+              <Button 
+                variant="outline" 
+                className="w-full justify-start" 
+                onClick={() => navigate('/admin/branding')}
+              >
                 Configurar Branding
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <Users className="h-8 w-8 text-primary-blue" />
+                <CardTitle className="text-primary-blue">Usuarios</CardTitle>
+              </div>
+              <CardDescription>Gestiona usuarios y sus roles.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col space-y-2">
+              <Button 
+                variant="outline" 
+                className="w-full justify-start" 
+                disabled
+              >
+                Gestionar Usuarios (Próximamente)
               </Button>
             </CardContent>
           </Card>
