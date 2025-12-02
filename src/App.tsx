@@ -25,23 +25,42 @@ const App = () => (
             <Route path="/login" element={<Login />} />
 
             {/* Rutas protegidas para Admin */}
-            <Route path="/admin" element={<AuthGuard allowedRoles={['admin']} />}>
-              <Route path="dashboard" element={<AdminDashboard />} /> {/* Ruta relativa: /admin/dashboard */}
-              <Route path="branding" element={<BrandingSettings />} /> {/* Ruta relativa: /admin/branding */}
-              {/* Agrega más rutas de admin aquí con path="nombre-ruta" */}
-            </Route>
+            <Route 
+              path="/admin/dashboard" 
+              element={
+                <AuthGuard allowedRoles={['admin']}>
+                  <AdminDashboard />
+                </AuthGuard>
+              } 
+            />
+            <Route 
+              path="/admin/branding" 
+              element={
+                <AuthGuard allowedRoles={['admin']}>
+                  <BrandingSettings />
+                </AuthGuard>
+              } 
+            />
 
             {/* Rutas protegidas para Local */}
-            <Route path="/local" element={<AuthGuard allowedRoles={['local']} />}>
-              <Route path="dashboard" element={<LocalDashboard />} /> {/* Ruta relativa: /local/dashboard */}
-              {/* Agrega más rutas de local aquí con path="nombre-ruta" */}
-            </Route>
+            <Route 
+              path="/local/dashboard" 
+              element={
+                <AuthGuard allowedRoles={['local']}>
+                  <LocalDashboard />
+                </AuthGuard>
+              } 
+            />
 
             {/* Rutas protegidas para Client */}
-            <Route path="/client" element={<AuthGuard allowedRoles={['client']} />}>
-              <Route index element={<ClientDashboard />} /> {/* Ruta index: se renderiza en /client */}
-              {/* Agrega más rutas de cliente aquí con path="nombre-ruta" */}
-            </Route>
+            <Route 
+              path="/client" 
+              element={
+                <AuthGuard allowedRoles={['client']}>
+                  <ClientDashboard />
+                </AuthGuard>
+              } 
+            />
 
             {/* Ruta para 404 Not Found */}
             <Route path="*" element={<NotFound />} />

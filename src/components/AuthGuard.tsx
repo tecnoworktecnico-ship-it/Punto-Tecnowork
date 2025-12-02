@@ -1,15 +1,16 @@
 "use client";
 
 import React from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { useSession } from '@/contexts/SessionContext';
 import { showError } from '@/utils/toast';
 
 interface AuthGuardProps {
   allowedRoles: string[];
+  children: React.ReactNode;
 }
 
-const AuthGuard: React.FC<AuthGuardProps> = ({ allowedRoles }) => {
+const AuthGuard: React.FC<AuthGuardProps> = ({ allowedRoles, children }) => {
   const { session, user, profile, loading } = useSession();
 
   if (loading) {
@@ -43,11 +44,7 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ allowedRoles }) => {
     return <Navigate to="/" replace />;
   }
 
-  return (
-    <React.Fragment>
-      <Outlet />
-    </React.Fragment>
-  );
+  return <>{children}</>;
 };
 
 export default AuthGuard;
