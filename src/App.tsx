@@ -19,12 +19,12 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <BrowserRouter>
-      {/* BrowserRouter ahora tiene un único hijo: un div */}
-      <div>
-        <Toaster />
-        <Sonner />
-        <SessionContextProvider>
-          {/* SessionContextProvider ahora tiene un único hijo: TooltipProvider */}
+      {/* BrowserRouter ahora tiene un único hijo: SessionContextProvider */}
+      <SessionContextProvider>
+        {/* SessionContextProvider ahora tiene un único hijo: un div */}
+        <div>
+          <Toaster />
+          <Sonner />
           <TooltipProvider>
             {/* TooltipProvider ahora tiene un único hijo: Routes */}
             <Routes>
@@ -54,8 +54,8 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
           </TooltipProvider>
-        </SessionContextProvider>
-      </div>
+        </div>
+      </SessionContextProvider>
     </BrowserRouter>
   </QueryClientProvider>
 );
