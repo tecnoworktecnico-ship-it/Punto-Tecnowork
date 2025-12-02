@@ -11,22 +11,20 @@ import LocalDashboard from "./pages/local/Dashboard";
 import AdminDashboard from "./pages/admin/Dashboard";
 import BrandingSettings from "./pages/admin/BrandingSettings";
 import React from "react"; // Necesario para JSX
-import { Toaster } from "@/components/ui/toaster"; // Importar Toaster
-import { Toaster as Sonner } from "@/components/ui/sonner"; // Importar Sonner
+import { Toaster } from "@/components/ui/toaster"; // Importar Toaster de shadcn/ui
+import { Toaster as Sonner } from "@/components/ui/sonner"; // Importar Toaster de sonner
 
 const queryClient = new QueryClient();
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <BrowserRouter>
-      {/* BrowserRouter ahora tiene un único hijo: SessionContextProvider */}
-      <SessionContextProvider>
-        {/* SessionContextProvider ahora tiene un único hijo: un div */}
-        <div>
-          <Toaster />
-          <Sonner />
+  // Usamos React.Fragment para agrupar múltiples elementos en el nivel superior del componente App.
+  // Esto permite que los Toaster sean hermanos de la cadena de proveedores principal.
+  <React.Fragment>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <SessionContextProvider>
           <TooltipProvider>
-            {/* TooltipProvider ahora tiene un único hijo: Routes */}
+            {/* Routes es el único hijo directo de TooltipProvider */}
             <Routes>
               <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<Login />} />
@@ -54,10 +52,14 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
           </TooltipProvider>
-        </div>
-      </SessionContextProvider>
-    </BrowserRouter>
-  </QueryClientProvider>
+        </SessionContextProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
+    {/* Los componentes Toaster se renderizan aquí, fuera de la cadena de proveedores principal.
+        No necesitan envolver otros componentes para funcionar. */}
+    <Toaster />
+    <Sonner />
+  </React.Fragment>
 );
 
 export default App;
