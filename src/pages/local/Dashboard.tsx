@@ -4,10 +4,11 @@ import React from 'react';
 import { useSession } from '@/contexts/SessionContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 const LocalDashboard = () => {
   const { user, profile, signOut } = useSession();
+  const navigate = useNavigate();
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move text-text-on-color">
@@ -27,11 +28,11 @@ const LocalDashboard = () => {
               <CardDescription>Revisa y actualiza el estado de los pedidos de tu local.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col space-y-2">
-              <Button asChild variant="outline" className="w-full">
-                <Link to="/local/orders">Ver Pedidos Pendientes</Link>
+              <Button variant="outline" className="w-full" onClick={() => navigate('/local/orders')}>
+                Ver Pedidos Pendientes
               </Button>
-              <Button asChild variant="outline" className="w-full">
-                <Link to="/local/order-history">Historial de Pedidos</Link>
+              <Button variant="outline" className="w-full" onClick={() => navigate('/local/order-history')}>
+                Historial de Pedidos
               </Button>
             </CardContent>
           </Card>
@@ -42,11 +43,11 @@ const LocalDashboard = () => {
               <CardDescription>Gestiona los precios específicos de tu local.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col space-y-2">
-              <Button asChild variant="outline" className="w-full">
-                <Link to="/local/prices">Gestionar Precios Locales</Link>
+              <Button variant="outline" className="w-full" onClick={() => navigate('/local/prices')}>
+                Gestionar Precios Locales
               </Button>
-              <Button asChild variant="outline" className="w-full">
-                <Link to="/local/services">Configurar Servicios</Link>
+              <Button variant="outline" className="w-full" onClick={() => navigate('/local/services')}>
+                Configurar Servicios
               </Button>
             </CardContent>
           </Card>

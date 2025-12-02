@@ -4,10 +4,11 @@ import React from 'react';
 import { useSession } from '@/contexts/SessionContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 const ClientDashboard = () => {
   const { user, profile, signOut } = useSession();
+  const navigate = useNavigate();
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move text-text-on-color">
@@ -27,11 +28,11 @@ const ClientDashboard = () => {
               <CardDescription>Revisa el estado de tus pedidos y tu historial.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col space-y-2">
-              <Button asChild className="w-full">
-                <Link to="/client/new-order">Realizar Nuevo Pedido</Link>
+              <Button className="w-full" onClick={() => navigate('/client/new-order')}>
+                Realizar Nuevo Pedido
               </Button>
-              <Button asChild variant="outline" className="w-full">
-                <Link to="/client/orders">Ver Mis Pedidos</Link>
+              <Button variant="outline" className="w-full" onClick={() => navigate('/client/orders')}>
+                Ver Mis Pedidos
               </Button>
             </CardContent>
           </Card>
@@ -42,11 +43,11 @@ const ClientDashboard = () => {
               <CardDescription>Consulta tus puntos y canjea recompensas.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col space-y-2">
-              <Button asChild variant="outline" className="w-full">
-                <Link to="/client/rewards">Ver Recompensas</Link>
+              <Button variant="outline" className="w-full" onClick={() => navigate('/client/rewards')}>
+                Ver Recompensas
               </Button>
-              <Button asChild variant="outline" className="w-full">
-                <Link to="/client/points">Mis Puntos</Link>
+              <Button variant="outline" className="w-full" onClick={() => navigate('/client/points')}>
+                Mis Puntos
               </Button>
             </CardContent>
           </Card>
