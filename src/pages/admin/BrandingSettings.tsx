@@ -16,6 +16,7 @@ const BrandingSettings = () => {
   const navigate = useNavigate();
   const [mainLogoUrl, setMainLogoUrl] = useState('');
   const [poweredByLogoUrl, setPoweredByLogoUrl] = useState('');
+  const [poweredByLogoUrl2, setPoweredByLogoUrl2] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,7 +29,7 @@ const BrandingSettings = () => {
       setLoading(true);
       const { data, error } = await supabase
         .from('branding')
-        .select('main_logo_url, powered_by_logo_url')
+        .select('main_logo_url, powered_by_logo_url, powered_by_logo_url_2')
         .single();
 
       if (error && error.code !== 'PGRST116') {
@@ -37,6 +38,7 @@ const BrandingSettings = () => {
       } else if (data) {
         setMainLogoUrl(data.main_logo_url || '');
         setPoweredByLogoUrl(data.powered_by_logo_url || '');
+        setPoweredByLogoUrl2(data.powered_by_logo_url_2 || '');
       }
       setLoading(false);
     };
@@ -59,13 +61,22 @@ const BrandingSettings = () => {
     if (existingBranding) {
       const { error: updateError } = await supabase
         .from('branding')
-        .update({ main_logo_url: mainLogoUrl, powered_by_logo_url: poweredByLogoUrl, updated_at: new Date().toISOString() })
+        .update({ 
+          main_logo_url: mainLogoUrl, 
+          powered_by_logo_url: poweredByLogoUrl,
+          powered_by_logo_url_2: poweredByLogoUrl2,
+          updated_at: new Date().toISOString() 
+        })
         .eq('id', existingBranding.id);
       error = updateError;
     } else {
       const { error: insertError } = await supabase
         .from('branding')
-        .insert({ main_logo_url: mainLogoUrl, powered_by_logo_url: poweredByLogoUrl });
+        .insert({ 
+          main_logo_url: mainLogoUrl, 
+          powered_by_logo_url: poweredByLogoUrl,
+          powered_by_logo_url_2: poweredByLogoUrl2
+        });
       error = insertError;
     }
 
@@ -129,20 +140,40 @@ const BrandingSettings = () => {
             </div>
 
             <div>
-              <Label htmlFor="poweredByLogoUrl" className="text-lg font-medium text-text-carbon mb-2 block">URL del Logo "Powered By"</Label>
+              <Label htmlFor="poweredByLogoUrl" className="text-lg font-medium text-text-carbon mb-2 block">URL del Logo "Powered By" #1</Label>
               <Input
                 id="poweredByLogoUrl"
                 type="url"
                 value={poweredByLogoUrl}
                 onChange={(e) => setPoweredByLogoUrl(e.target.value)}
-                placeholder="https://ejemplo.com/powered_by_logo.png"
+                placeholder="https://ejemplo.com/powered_by_logo_1.png"
                 className="w-full p-3 border border-gray-300 rounded-md focus:ring-primary-blue focus:border-primary-blue"
               />
               {poweredByLogoUrl && (
                 <div className="mt-4 p-4 border border-gray-200 rounded-md bg-gray-50">
-                  <p className="text-sm text-gray-600 mb-2 font-medium">Vista previa del Logo "Powered By":</p>
+                  <p className="text-sm text-gray-600 mb-2 font-medium">Vista previa del Logo "Powered By" #1:</p>
                   <div className="flex justify-center">
-                    <img src={poweredByLogoUrl} alt="Powered By Logo" className="h-12 object-contain" />
+                    <img src={poweredByLogoUrl} alt="Powered By Logo 1" className="h-12 object-contain" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="poweredByLogoUrl2" className="text-lg font-medium text-text-carbon mb-2 block">URL del Logo "Powered By" #2</Label>
+              <Input
+                id="poweredByLogoUrl2"
+                type="url"
+                value={poweredByLogoUrl2}
+                onChange={(e) => setPoweredByLogoUrl2(e.target.value)}
+                placeholder="https://ejemplo.com/powered_by_logo_2.png"
+                className="w-full p-3 border border-gray-300 rounded-md focus:ring-primary-blue focus:border-primary-blue"
+              />
+              {poweredByLogoUrl2 && (
+                <div className="mt-4 p-4 border border-gray-200 rounded-md bg-gray-50">
+                  <p className="text-sm text-gray-600 mb-2 font-medium">Vista previa del Logo "Powered By" #2:</p>
+                  <div className="flex justify-center">
+                    <img src={poweredByLogoUrl2} alt="Powered By Logo 2" className="h-12 object-contain" />
                   </div>
                 </div>
               )}
