@@ -19,40 +19,43 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <BrowserRouter>
-      <SessionContextProvider>
-        {/* Toaster y Sonner se mueven aquí, como hermanos de TooltipProvider */}
+      {/* BrowserRouter ahora tiene un único hijo: un div */}
+      <div>
         <Toaster />
         <Sonner />
-        <TooltipProvider>
-          {/* Routes es ahora el hijo directo y único de TooltipProvider */}
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<Login />} />
+        <SessionContextProvider>
+          {/* SessionContextProvider ahora tiene un único hijo: TooltipProvider */}
+          <TooltipProvider>
+            {/* TooltipProvider ahora tiene un único hijo: Routes */}
+            <Routes>
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/login" element={<Login />} />
 
-            {/* Protected Client Routes */}
-            <Route element={<AuthGuard allowedRoles={['client']} />}>
-              <Route path="/client" element={<ClientDashboard />} />
-              {/* Add other client routes here */}
-            </Route>
+              {/* Protected Client Routes */}
+              <Route element={<AuthGuard allowedRoles={['client']} />}>
+                <Route path="/client" element={<ClientDashboard />} />
+                {/* Add other client routes here */}
+              </Route>
 
-            {/* Protected Local Routes */}
-            <Route element={<AuthGuard allowedRoles={['local']} />}>
-              <Route path="/local/dashboard" element={<LocalDashboard />} />
-              {/* Add other local routes here */}
-            </Route>
+              {/* Protected Local Routes */}
+              <Route element={<AuthGuard allowedRoles={['local']} />}>
+                <Route path="/local/dashboard" element={<LocalDashboard />} />
+                {/* Add other local routes here */}
+              </Route>
 
-            {/* Protected Admin Routes */}
-            <Route element={<AuthGuard allowedRoles={['admin']} />}>
-              <Route path="/admin/dashboard" element={<AdminDashboard />} />
-              <Route path="/admin/branding" element={<BrandingSettings />} />
-              {/* Add other admin routes here */}
-            </Route>
+              {/* Protected Admin Routes */}
+              <Route element={<AuthGuard allowedRoles={['admin']} />}>
+                <Route path="/admin/dashboard" element={<AdminDashboard />} />
+                <Route path="/admin/branding" element={<BrandingSettings />} />
+                {/* Add other admin routes here */}
+              </Route>
 
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </TooltipProvider>
-      </SessionContextProvider>
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </TooltipProvider>
+        </SessionContextProvider>
+      </div>
     </BrowserRouter>
   </QueryClientProvider>
 );
