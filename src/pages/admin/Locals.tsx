@@ -83,37 +83,53 @@ const Locals = () => {
     e.preventDefault();
     setLoading(true);
 
-    if (editingLocal) {
-      const { error } = await supabase
-        .from('locals')
-        .update(formData)
-        .eq('id', editingLocal.id);
+    try {
+      const localData = {
+        name: formData.name.trim(),
+        address: formData.address.trim() || null,
+        has_photo_print: formData.has_photo_print,
+        can_edit_prices: formData.can_edit_prices,
+        manager_id: null, // Por ahora sin manager asignado
+      };
 
-      if (error) {
-        console.error('Error updating local:', error);
-        showError('Error al actualizar el local.');
-      } else {
-        showSuccess('Local actualizado correctamente.');
-        setDialogOpen(false);
-        setEditingLocal(null);
-        resetForm();
-        fetchLocals();
-      }
-    } else {
-      const { error } = await supabase
-        .from('locals')
-        .insert([formData]);
+      if (editingLocal) {
+        const { error } = await supabase
+          .from('locals')
+          .update(localData)
+          .eq('id', editingLocal.id);
 
-      if (error) {
-        console.error('Error creating local:', error);
-        showError('Error al crear el local.');
+        if (error) {
+          console.error('Error updating local:', error);
+          showError(`Error al actualizar el local: ${error.message}`);
+        } else {
+          showSuccess('Local actualizado correctamente.');
+          setDialogOpen(false);
+          setEditingLocal(null);
+          resetForm();
+          fetchLocals();
+        }
       } else {
-        showSuccess('Local creado correctamente.');
-        setDialogOpen(false);
-        resetForm();
-        fetchLocals();
+        const { data, error } = await supabase
+          .from('locals')
+          .insert([localData])
+          .select();
+
+        if (error) {
+          console.error('Error creating local:', error);
+          showError(`Error al crear el local: ${error.message}`);
+        } else {
+          console.log('Local creado:', data);
+          showSuccess('Local creado correctamente.');
+          setDialogOpen(false);
+          resetForm();
+          fetchLocals();
+        }
       }
+    } catch (err) {
+      console.error('Unexpected error:', err);
+      showError('Error inesperado al procesar la solicitud.');
     }
+
     setLoading(false);
   };
 
@@ -128,7 +144,7 @@ const Locals = () => {
 
     if (error) {
       console.error('Error deleting local:', error);
-      showError('Error al eliminar el local.');
+      showError(`Error al eliminar el local: ${error.message}`);
     } else {
       showSuccess('Local eliminado correctamente.');
       fetchLocals();
@@ -271,9 +287,10 @@ const Locals = () => {
                       </Button>
                       <Button
                         type="submit"
+                        disabled={loading}
                         className="bg-primary-blue hover:bg-blue-700 text-white"
                       >
-                        {editingLocal ? 'Actualizar' : 'Crear'}
+                        {loading ? 'Procesando...' : (editingLocal ? 'Actualizar' : 'Crear')}
                       </Button>
                     </div>
                   </form>
