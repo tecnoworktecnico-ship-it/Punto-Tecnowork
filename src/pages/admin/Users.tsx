@@ -37,14 +37,12 @@ import {
 
 interface User {
   id: string;
-  email?: string;
+  email: string;
   role: string;
   first_name?: string;
   last_name?: string;
   manager_id?: string;
-  locals?: {
-    name: string;
-  };
+  local_name?: string;
 }
 
 const Users = () => {
@@ -77,45 +75,18 @@ const Users = () => {
     setLoading(true);
 
     try {
-      // Obtener perfiles de la base de datos con información de locales
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select(`
-          *,
-          locals!locals_manager_id_fkey (
-            name
-          )
-        `)
-        .order('role', { ascending: true });
+      // Llamar a la función RPC para obtener usuarios con emails
+      const { data: usersData, error: usersError } = await supabase
+        .rpc('get_users_with_emails');
 
-      if (profilesError) {
-        console.error('Error fetching profiles:', profilesError);
-        showError('Error al cargar perfiles de usuarios.');
+      if (usersError) {
+        console.error('Error fetching users:', usersError);
+        showError('Error al cargar usuarios.');
         setLoading(false);
         return;
       }
 
-      // Para cada perfil, intentar obtener el email desde auth.users
-      const usersWithEmails = await Promise.all(
-        (profilesData || []).map(async (profile) => {
-          // Si es el usuario actual, usar su email de la sesión
-          if (profile.id === user?.id) {
-            return {
-              ...profile,
-              email: user.email,
-            };
-          }
-          
-          // Para otros usuarios, no tenemos acceso directo al email
-          // pero podemos mostrar el ID o un placeholder
-          return {
-            ...profile,
-            email: undefined,
-          };
-        })
-      );
-
-      setUsers(usersWithEmails);
+      setUsers(usersData || []);
 
       // Obtener locales sin manager asignado
       const { data: localsData, error: localsError } = await supabase
@@ -423,7 +394,7 @@ const Users = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Correo / ID</TableHead>
+                    <TableHead>Correo</TableHead>
                     <TableHead>Nombre</TableHead>
                     <TableHead>Rol</TableHead>
                     <TableHead>Local Asignado</TableHead>
@@ -434,11 +405,7 @@ const Users = () => {
                   {users.map((userItem) => (
                     <TableRow key={userItem.id}>
                       <TableCell className="font-medium">
-                        {userItem.email || (
-                          <span className="text-gray-400 text-xs font-mono">
-                            {userItem.id.substring(0, 8)}...
-                          </span>
-                        )}
+                        {userItem.email || 'Sin correo'}
                         {userItem.id === user?.id && (
                           <Badge variant="outline" className="ml-2 text-xs">
                             Tú
@@ -468,7 +435,7 @@ const Users = () => {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {userItem.locals?.name || 'No asignado'}
+                        {userItem.local_name || 'No asignado'}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
