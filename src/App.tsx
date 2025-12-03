@@ -15,6 +15,8 @@ import Locals from "./pages/admin/Locals";
 import GlobalPrices from "./pages/admin/GlobalPrices";
 import LocalPrices from "./pages/local/LocalPrices";
 import LocalOrders from "./pages/local/Orders";
+import NewOrder from "./pages/client/NewOrder";
+import ClientOrders from "./pages/client/Orders";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -94,6 +96,22 @@ const App = () => (
               element={
                 <AuthGuard allowedRoles={['client']}>
                   <ClientDashboard />
+                </AuthGuard>
+              } 
+            />
+            <Route 
+              path="/client/new-order" 
+              element={
+                <AuthGuard allowedRoles={['client']}>
+                  <NewOrder />
+                </AuthGuard>
+              } 
+            />
+            <Route 
+              path="/client/orders" 
+              element={
+                <AuthGuard allowedRoles={['client']}>
+                  <ClientOrders />
                 </AuthGuard>
               } 
             />
