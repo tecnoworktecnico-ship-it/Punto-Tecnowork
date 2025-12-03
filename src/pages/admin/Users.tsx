@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/select';
 import { showSuccess, showError } from '@/utils/toast';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, UserPlus, Edit, Trash2 } from 'lucide-react';
+import { ArrowLeft, UserPlus, Trash2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -37,7 +37,7 @@ import {
 
 interface User {
   id: string;
-  email: string;
+  email?: string;
   role: string;
   first_name?: string;
   last_name?: string;
@@ -48,13 +48,12 @@ interface User {
 }
 
 const Users = () => {
-  const { profile, loading: sessionLoading } = useSession();
+  const { profile, user, loading: sessionLoading } = useSession();
   const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
   const [locals, setLocals] = useState<{id: string, name: string, manager_id: string | null}[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
   const [formData, setFormData] = useState({
     email: '',
     role: 'client',
@@ -78,20 +77,16 @@ const Users = () => {
     setLoading(true);
 
     try {
-      // Obtener todos los usuarios de auth.users
-      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
-
-      if (authError) {
-        console.error('Error fetching auth users:', authError);
-        showError('Error al cargar usuarios de autenticación.');
-        setLoading(false);
-        return;
-      }
-
-      // Obtener perfiles de la base de datos
+      // Obtener perfiles de la base de datos con información de locales
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
-        .select('*');
+        .select(`
+          *,
+          locals!locals_manager_id_fkey (
+            name
+          )
+        `)
+        .order('role', { ascending: true });
 
       if (profilesError) {
         console.error('Error fetching profiles:', profilesError);
@@ -100,36 +95,39 @@ const Users = () => {
         return;
       }
 
-      // Obtener información de locales asignados
+      // Para cada perfil, intentar obtener el email desde auth.users
+      const usersWithEmails = await Promise.all(
+        (profilesData || []).map(async (profile) => {
+          // Si es el usuario actual, usar su email de la sesión
+          if (profile.id === user?.id) {
+            return {
+              ...profile,
+              email: user.email,
+            };
+          }
+          
+          // Para otros usuarios, no tenemos acceso directo al email
+          // pero podemos mostrar el ID o un placeholder
+          return {
+            ...profile,
+            email: undefined,
+          };
+        })
+      );
+
+      setUsers(usersWithEmails);
+
+      // Obtener locales sin manager asignado
       const { data: localsData, error: localsError } = await supabase
         .from('locals')
-        .select('id, name, manager_id');
+        .select('id, name, manager_id')
+        .is('manager_id', null);
 
       if (localsError) {
         console.error('Error fetching locals:', localsError);
+      } else {
+        setLocals(localsData || []);
       }
-
-      // Combinar datos de auth.users con profiles
-      const combinedUsers = authUsers.users.map(authUser => {
-        const userProfile = profilesData?.find(p => p.id === authUser.id);
-        const userLocal = localsData?.find(l => l.manager_id === authUser.id);
-
-        return {
-          id: authUser.id,
-          email: authUser.email || 'Sin correo',
-          role: userProfile?.role || 'client',
-          first_name: userProfile?.first_name || '',
-          last_name: userProfile?.last_name || '',
-          manager_id: userProfile?.manager_id,
-          locals: userLocal ? { name: userLocal.name } : undefined,
-        };
-      });
-
-      setUsers(combinedUsers);
-
-      // Obtener locales sin manager asignado
-      const availableLocals = localsData?.filter(l => !l.manager_id) || [];
-      setLocals(availableLocals);
 
     } catch (error) {
       console.error('Unexpected error fetching data:', error);
@@ -168,6 +166,9 @@ const Users = () => {
         setLoading(false);
         return;
       }
+
+      // Esperar un momento para que se cree el perfil automáticamente
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Actualizar perfil con el rol
       const { error: profileError } = await supabase
@@ -210,12 +211,30 @@ const Users = () => {
   };
 
   const handleDelete = async (userId: string) => {
-    if (!confirm('¿Estás seguro de que deseas eliminar este usuario?')) return;
+    if (userId === user?.id) {
+      showError('No puedes eliminar tu propio usuario.');
+      return;
+    }
+
+    if (!confirm('¿Estás seguro de que deseas eliminar este usuario? Esta acción no se puede deshacer.')) return;
 
     setLoading(true);
     
-    // Eliminar usuario de auth.users
-    const { error } = await supabase.auth.admin.deleteUser(userId);
+    // Primero, desasignar el local si tiene uno
+    const { error: localError } = await supabase
+      .from('locals')
+      .update({ manager_id: null })
+      .eq('manager_id', userId);
+
+    if (localError) {
+      console.error('Error unassigning local:', localError);
+    }
+
+    // Eliminar el perfil (esto también eliminará el usuario de auth debido a la cascada)
+    const { error } = await supabase
+      .from('profiles')
+      .delete()
+      .eq('id', userId);
 
     if (error) {
       console.error('Error deleting user:', error);
@@ -239,7 +258,6 @@ const Users = () => {
   };
 
   const openCreateDialog = () => {
-    setEditingUser(null);
     resetForm();
     setDialogOpen(true);
   };
@@ -284,7 +302,7 @@ const Users = () => {
                   <DialogHeader>
                     <DialogTitle>Crear Nuevo Usuario</DialogTitle>
                     <DialogDescription>
-                      Completa los datos para crear un nuevo usuario.
+                      Completa los datos para crear un nuevo usuario. Se enviará un correo de verificación.
                     </DialogDescription>
                   </DialogHeader>
                   <form onSubmit={handleSubmit} className="space-y-4">
@@ -363,6 +381,12 @@ const Users = () => {
                         </Select>
                       </div>
                     )}
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+                      <p className="text-sm text-yellow-800">
+                        <strong>Nota:</strong> La contraseña temporal será "TempPass123!". 
+                        El usuario deberá cambiarla en su primer inicio de sesión.
+                      </p>
+                    </div>
                     <div className="flex gap-2 justify-end">
                       <Button
                         type="button"
@@ -399,7 +423,7 @@ const Users = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Correo</TableHead>
+                    <TableHead>Correo / ID</TableHead>
                     <TableHead>Nombre</TableHead>
                     <TableHead>Rol</TableHead>
                     <TableHead>Local Asignado</TableHead>
@@ -407,41 +431,53 @@ const Users = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell className="font-medium">{user.email}</TableCell>
+                  {users.map((userItem) => (
+                    <TableRow key={userItem.id}>
+                      <TableCell className="font-medium">
+                        {userItem.email || (
+                          <span className="text-gray-400 text-xs font-mono">
+                            {userItem.id.substring(0, 8)}...
+                          </span>
+                        )}
+                        {userItem.id === user?.id && (
+                          <Badge variant="outline" className="ml-2 text-xs">
+                            Tú
+                          </Badge>
+                        )}
+                      </TableCell>
                       <TableCell>
-                        {user.first_name || user.last_name 
-                          ? `${user.first_name || ''} ${user.last_name || ''}`.trim()
+                        {userItem.first_name || userItem.last_name 
+                          ? `${userItem.first_name || ''} ${userItem.last_name || ''}`.trim()
                           : 'Sin nombre'}
                       </TableCell>
                       <TableCell>
                         <Badge 
                           variant={
-                            user.role === 'admin' 
+                            userItem.role === 'admin' 
                               ? 'destructive' 
-                              : user.role === 'local' 
+                              : userItem.role === 'local' 
                               ? 'default' 
                               : 'secondary'
                           }
                         >
-                          {user.role === 'admin' 
+                          {userItem.role === 'admin' 
                             ? 'Administrador' 
-                            : user.role === 'local' 
+                            : userItem.role === 'local' 
                             ? 'Local' 
                             : 'Cliente'}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {user.locals?.name || 'No asignado'}
+                        {userItem.locals?.name || 'No asignado'}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleDelete(user.id)}
-                            className="text-emphasis-red hover:text-red-700"
+                            onClick={() => handleDelete(userItem.id)}
+                            disabled={userItem.id === user?.id}
+                            className="text-emphasis-red hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
