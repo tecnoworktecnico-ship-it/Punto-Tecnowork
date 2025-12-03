@@ -17,6 +17,8 @@ import LocalPrices from "./pages/local/LocalPrices";
 import LocalOrders from "./pages/local/Orders";
 import NewOrder from "./pages/client/NewOrder";
 import ClientOrders from "./pages/client/Orders";
+import ClientRewards from "./pages/client/Rewards";
+import ClientPoints from "./pages/client/Points";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -112,6 +114,22 @@ const App = () => (
               element={
                 <AuthGuard allowedRoles={['client']}>
                   <ClientOrders />
+                </AuthGuard>
+              } 
+            />
+            <Route 
+              path="/client/rewards" 
+              element={
+                <AuthGuard allowedRoles={['client']}>
+                  <ClientRewards />
+                </AuthGuard>
+              } 
+            />
+            <Route 
+              path="/client/points" 
+              element={
+                <AuthGuard allowedRoles={['client']}>
+                  <ClientPoints />
                 </AuthGuard>
               } 
             />
