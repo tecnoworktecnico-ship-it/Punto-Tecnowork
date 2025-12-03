@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { 
   Select, 
   SelectContent, 
@@ -387,7 +388,7 @@ const Users = () => {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {user.locals?.name || 'No asignado'}
+                        {user.local?.name || 'No asignado'}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
