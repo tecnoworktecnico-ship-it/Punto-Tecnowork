@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { showSuccess, showError } from '@/utils/toast';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Edit, Trash2 } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, UserCog } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -20,6 +20,13 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Table,
   TableBody,
   TableCell,
@@ -27,6 +34,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 
 interface Local {
   id: string;
@@ -36,15 +44,28 @@ interface Local {
   manager_id: string | null;
   can_edit_prices: boolean;
   created_at: string;
+  manager_email?: string;
+  manager_name?: string;
+}
+
+interface LocalUser {
+  id: string;
+  email: string;
+  first_name?: string;
+  last_name?: string;
 }
 
 const Locals = () => {
   const { profile, loading: sessionLoading } = useSession();
   const navigate = useNavigate();
   const [locals, setLocals] = useState<Local[]>([]);
+  const [localUsers, setLocalUsers] = useState<LocalUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [editingLocal, setEditingLocal] = useState<Local | null>(null);
+  const [selectedLocalForAssign, setSelectedLocalForAssign] = useState<Local | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [formData, setFormData] = useState({
     name: '',
     address: '',
@@ -59,23 +80,52 @@ const Locals = () => {
     }
 
     if (!sessionLoading && profile?.role === 'admin') {
-      fetchLocals();
+      fetchData();
     }
   }, [sessionLoading, profile, navigate]);
 
-  const fetchLocals = async () => {
+  const fetchData = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+
+    // Obtener locales con información del manager
+    const { data: localsData, error: localsError } = await supabase
+      .rpc('get_users_with_emails');
+
+    if (localsError) {
+      console.error('Error fetching users:', localsError);
+    }
+
+    // Obtener locales
+    const { data: localsRawData, error: localsRawError } = await supabase
       .from('locals')
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching locals:', error);
+    if (localsRawError) {
+      console.error('Error fetching locals:', localsRawError);
       showError('Error al cargar los locales.');
-    } else {
-      setLocals(data || []);
+      setLoading(false);
+      return;
     }
+
+    // Combinar datos de locales con información de managers
+    const localsWithManagers = localsRawData?.map(local => {
+      const manager = localsData?.find((u: any) => u.id === local.manager_id);
+      return {
+        ...local,
+        manager_email: manager?.email,
+        manager_name: manager?.first_name || manager?.last_name 
+          ? `${manager?.first_name || ''} ${manager?.last_name || ''}`.trim()
+          : undefined,
+      };
+    });
+
+    setLocals(localsWithManagers || []);
+
+    // Obtener usuarios con rol 'local' que no tienen local asignado
+    const usersWithLocal = localsData?.filter((u: any) => u.role === 'local') || [];
+    setLocalUsers(usersWithLocal);
+
     setLoading(false);
   };
 
@@ -89,7 +139,7 @@ const Locals = () => {
         address: formData.address.trim() || null,
         has_photo_print: formData.has_photo_print,
         can_edit_prices: formData.can_edit_prices,
-        manager_id: null, // Por ahora sin manager asignado
+        manager_id: null,
       };
 
       if (editingLocal) {
@@ -106,7 +156,7 @@ const Locals = () => {
           setDialogOpen(false);
           setEditingLocal(null);
           resetForm();
-          fetchLocals();
+          fetchData();
         }
       } else {
         const { data, error } = await supabase
@@ -122,12 +172,71 @@ const Locals = () => {
           showSuccess('Local creado correctamente.');
           setDialogOpen(false);
           resetForm();
-          fetchLocals();
+          fetchData();
         }
       }
     } catch (err) {
       console.error('Unexpected error:', err);
       showError('Error inesperado al procesar la solicitud.');
+    }
+
+    setLoading(false);
+  };
+
+  const handleAssignManager = async () => {
+    if (!selectedLocalForAssign || !selectedUserId) {
+      showError('Por favor selecciona un usuario.');
+      return;
+    }
+
+    setLoading(true);
+
+    // Primero, desasignar el usuario de cualquier otro local
+    const { error: unassignError } = await supabase
+      .from('locals')
+      .update({ manager_id: null })
+      .eq('manager_id', selectedUserId);
+
+    if (unassignError) {
+      console.error('Error unassigning user:', unassignError);
+    }
+
+    // Asignar el usuario al local seleccionado
+    const { error } = await supabase
+      .from('locals')
+      .update({ manager_id: selectedUserId })
+      .eq('id', selectedLocalForAssign.id);
+
+    if (error) {
+      console.error('Error assigning manager:', error);
+      showError(`Error al asignar manager: ${error.message}`);
+    } else {
+      showSuccess('Manager asignado correctamente al local.');
+      setAssignDialogOpen(false);
+      setSelectedLocalForAssign(null);
+      setSelectedUserId('');
+      fetchData();
+    }
+
+    setLoading(false);
+  };
+
+  const handleUnassignManager = async (localId: string) => {
+    if (!confirm('¿Estás seguro de que deseas desasignar el manager de este local?')) return;
+
+    setLoading(true);
+
+    const { error } = await supabase
+      .from('locals')
+      .update({ manager_id: null })
+      .eq('id', localId);
+
+    if (error) {
+      console.error('Error unassigning manager:', error);
+      showError(`Error al desasignar manager: ${error.message}`);
+    } else {
+      showSuccess('Manager desasignado correctamente.');
+      fetchData();
     }
 
     setLoading(false);
@@ -147,7 +256,7 @@ const Locals = () => {
       showError(`Error al eliminar el local: ${error.message}`);
     } else {
       showSuccess('Local eliminado correctamente.');
-      fetchLocals();
+      fetchData();
     }
     setLoading(false);
   };
@@ -176,6 +285,21 @@ const Locals = () => {
     setEditingLocal(null);
     resetForm();
     setDialogOpen(true);
+  };
+
+  const openAssignDialog = (local: Local) => {
+    setSelectedLocalForAssign(local);
+    setSelectedUserId(local.manager_id || '');
+    setAssignDialogOpen(true);
+  };
+
+  const getAvailableUsers = () => {
+    // Usuarios que no tienen local asignado o que tienen el local actual
+    const assignedManagerIds = locals
+      .filter(l => l.manager_id && l.id !== selectedLocalForAssign?.id)
+      .map(l => l.manager_id);
+    
+    return localUsers.filter(u => !assignedManagerIds.includes(u.id));
   };
 
   if (sessionLoading || loading) {
@@ -312,6 +436,7 @@ const Locals = () => {
                   <TableRow>
                     <TableHead>Nombre</TableHead>
                     <TableHead>Dirección</TableHead>
+                    <TableHead>Manager</TableHead>
                     <TableHead>Impresión Fotos</TableHead>
                     <TableHead>Editar Precios</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
@@ -322,6 +447,22 @@ const Locals = () => {
                     <TableRow key={local.id}>
                       <TableCell className="font-medium">{local.name}</TableCell>
                       <TableCell>{local.address || 'N/A'}</TableCell>
+                      <TableCell>
+                        {local.manager_id ? (
+                          <div className="flex flex-col">
+                            <span className="font-medium text-sm">
+                              {local.manager_name || 'Sin nombre'}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {local.manager_email || 'Sin correo'}
+                            </span>
+                          </div>
+                        ) : (
+                          <Badge variant="outline" className="text-gray-500">
+                            Sin asignar
+                          </Badge>
+                        )}
+                      </TableCell>
                       <TableCell>
                         {local.has_photo_print ? (
                           <span className="text-success-green">Sí</span>
@@ -338,6 +479,14 @@ const Locals = () => {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openAssignDialog(local)}
+                            title="Asignar/Cambiar Manager"
+                          >
+                            <UserCog className="h-4 w-4" />
+                          </Button>
                           <Button
                             variant="outline"
                             size="sm"
@@ -362,6 +511,79 @@ const Locals = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Dialog para asignar manager */}
+        <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Asignar Manager al Local</DialogTitle>
+              <DialogDescription>
+                Selecciona un usuario con rol "local" para asignar como manager de {selectedLocalForAssign?.name}.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="manager">Usuario Manager</Label>
+                <Select
+                  value={selectedUserId}
+                  onValueChange={setSelectedUserId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona un usuario" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin asignar</SelectItem>
+                    {getAvailableUsers().map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.first_name || user.last_name
+                          ? `${user.first_name || ''} ${user.last_name || ''}`.trim()
+                          : user.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {getAvailableUsers().length === 0 && (
+                  <p className="text-sm text-gray-500 mt-2">
+                    No hay usuarios con rol "local" disponibles. Crea uno desde Gestión de Usuarios.
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setAssignDialogOpen(false);
+                    setSelectedLocalForAssign(null);
+                    setSelectedUserId('');
+                  }}
+                >
+                  Cancelar
+                </Button>
+                {selectedLocalForAssign?.manager_id && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      handleUnassignManager(selectedLocalForAssign.id);
+                      setAssignDialogOpen(false);
+                    }}
+                    className="text-emphasis-red hover:text-red-700"
+                  >
+                    Desasignar
+                  </Button>
+                )}
+                <Button
+                  onClick={handleAssignManager}
+                  disabled={loading || !selectedUserId || selectedUserId === 'none'}
+                  className="bg-primary-blue hover:bg-blue-700 text-white"
+                >
+                  {loading ? 'Asignando...' : 'Asignar'}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
