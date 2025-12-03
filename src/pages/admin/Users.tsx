@@ -41,7 +41,8 @@ interface User {
   role: string;
   first_name?: string;
   last_name?: string;
-  local?: {
+  manager_id?: string;
+  locals?: {
     name: string;
   };
 }
@@ -76,29 +77,63 @@ const Users = () => {
   const fetchData = async () => {
     setLoading(true);
 
-    // Fetch users with their local info
-    const { data: usersData, error: usersError } = await supabase
-      .from('profiles')
-      .select(`
-        *,
-        locals (
-          name
-        )
-      `)
-      .order('role', { ascending: true });
+    try {
+      // Obtener todos los usuarios de auth.users
+      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
 
-    // Fetch locals without a manager
-    const { data: localsData, error: localsError } = await supabase
-      .from('locals')
-      .select('id, name, manager_id')
-      .is('manager_id', null);
+      if (authError) {
+        console.error('Error fetching auth users:', authError);
+        showError('Error al cargar usuarios de autenticación.');
+        setLoading(false);
+        return;
+      }
 
-    if (usersError || localsError) {
-      console.error('Error fetching data:', usersError || localsError);
-      showError('Error al cargar usuarios y locales.');
-    } else {
-      setUsers(usersData || []);
-      setLocals(localsData || []);
+      // Obtener perfiles de la base de datos
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('*');
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+        showError('Error al cargar perfiles de usuarios.');
+        setLoading(false);
+        return;
+      }
+
+      // Obtener información de locales asignados
+      const { data: localsData, error: localsError } = await supabase
+        .from('locals')
+        .select('id, name, manager_id');
+
+      if (localsError) {
+        console.error('Error fetching locals:', localsError);
+      }
+
+      // Combinar datos de auth.users con profiles
+      const combinedUsers = authUsers.users.map(authUser => {
+        const userProfile = profilesData?.find(p => p.id === authUser.id);
+        const userLocal = localsData?.find(l => l.manager_id === authUser.id);
+
+        return {
+          id: authUser.id,
+          email: authUser.email || 'Sin correo',
+          role: userProfile?.role || 'client',
+          first_name: userProfile?.first_name || '',
+          last_name: userProfile?.last_name || '',
+          manager_id: userProfile?.manager_id,
+          locals: userLocal ? { name: userLocal.name } : undefined,
+        };
+      });
+
+      setUsers(combinedUsers);
+
+      // Obtener locales sin manager asignado
+      const availableLocals = localsData?.filter(l => !l.manager_id) || [];
+      setLocals(availableLocals);
+
+    } catch (error) {
+      console.error('Unexpected error fetching data:', error);
+      showError('Error inesperado al cargar datos.');
     }
 
     setLoading(false);
@@ -109,13 +144,14 @@ const Users = () => {
     setLoading(true);
 
     try {
-      // Crear usuario en auth.users y profiles
+      // Crear usuario en auth.users
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
-        password: 'TempPass123!', // Temporal password, user should change
+        password: 'TempPass123!', // Contraseña temporal
         options: {
           data: {
-            role: formData.role
+            first_name: formData.first_name,
+            last_name: formData.last_name,
           }
         }
       });
@@ -127,7 +163,13 @@ const Users = () => {
         return;
       }
 
-      // Insertar en profiles con información adicional
+      if (!signUpData.user) {
+        showError('No se pudo crear el usuario.');
+        setLoading(false);
+        return;
+      }
+
+      // Actualizar perfil con el rol
       const { error: profileError } = await supabase
         .from('profiles')
         .update({
@@ -135,24 +177,24 @@ const Users = () => {
           last_name: formData.last_name,
           role: formData.role
         })
-        .eq('id', signUpData.user?.id);
+        .eq('id', signUpData.user.id);
+
+      if (profileError) {
+        console.error('Error updating profile:', profileError);
+        showError('Error al actualizar perfil de usuario.');
+      }
 
       // Si es un usuario local, asignar al local
       if (formData.role === 'local' && formData.local_id) {
         const { error: localError } = await supabase
           .from('locals')
-          .update({ manager_id: signUpData.user?.id })
+          .update({ manager_id: signUpData.user.id })
           .eq('id', formData.local_id);
 
         if (localError) {
           console.error('Error assigning local:', localError);
           showError('Error al asignar local al usuario.');
         }
-      }
-
-      if (profileError) {
-        console.error('Error updating profile:', profileError);
-        showError('Error al actualizar perfil de usuario.');
       }
 
       showSuccess('Usuario creado correctamente. Se ha enviado un correo de verificación.');
@@ -334,9 +376,10 @@ const Users = () => {
                       </Button>
                       <Button
                         type="submit"
+                        disabled={loading}
                         className="bg-primary-blue hover:bg-blue-700 text-white"
                       >
-                        Crear Usuario
+                        {loading ? 'Creando...' : 'Crear Usuario'}
                       </Button>
                     </div>
                   </form>
@@ -366,9 +409,11 @@ const Users = () => {
                 <TableBody>
                   {users.map((user) => (
                     <TableRow key={user.id}>
-                      <TableCell>{user.email}</TableCell>
+                      <TableCell className="font-medium">{user.email}</TableCell>
                       <TableCell>
-                        {user.first_name} {user.last_name}
+                        {user.first_name || user.last_name 
+                          ? `${user.first_name || ''} ${user.last_name || ''}`.trim()
+                          : 'Sin nombre'}
                       </TableCell>
                       <TableCell>
                         <Badge 
@@ -388,19 +433,10 @@ const Users = () => {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {user.local?.name || 'No asignado'}
+                        {user.locals?.name || 'No asignado'}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              // Implementar edición de usuario
-                            }}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
                           <Button
                             variant="outline"
                             size="sm"
