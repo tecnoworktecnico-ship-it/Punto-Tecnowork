@@ -83,15 +83,7 @@ const Users = () => {
     setLoading(true);
 
     try {
-      // Obtener usuarios con sus datos de autenticación
-      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
-      
-      if (authError) {
-        console.error('Error fetching auth users:', authError);
-        showError('Error al cargar datos de autenticación de usuarios.');
-      }
-      
-      // Llamar a la función RPC para obtener usuarios con emails
+      // Llamar a la función RPC para obtener usuarios con emails y estado de confirmación
       const { data: usersData, error: usersError } = await supabase
         .rpc('get_users_with_emails');
 
@@ -102,16 +94,8 @@ const Users = () => {
         return;
       }
       
-      // Combinar datos de autenticación con datos de perfil
-      const combinedUsers = usersData.map((userData: User) => {
-        const authUser = authUsers?.users?.find(au => au.id === userData.id);
-        return {
-          ...userData,
-          email_confirmed_at: authUser?.email_confirmed_at || null
-        };
-      });
-
-      setUsers(combinedUsers || []);
+      // usersData ahora contiene email_confirmed_at directamente
+      setUsers(usersData || []);
 
       // Obtener locales sin manager asignado
       const { data: localsData, error: localsError } = await supabase
@@ -249,11 +233,19 @@ const Users = () => {
       }
       
       // 5. Eliminar usuario de auth (esto puede requerir permisos especiales)
+      // Usamos la función RPC admin_delete_user si existe, o confiamos en la eliminación en cascada si es posible.
+      // Dado que la eliminación de auth.users requiere Service Role Key, confiamos en que la eliminación del perfil
+      // y la eliminación de auth.users por el administrador de Supabase se manejen correctamente.
+      
+      // Si la función admin_delete_user existe, la usamos (aunque no está tipada aquí, es más robusta)
+      // const { error: deleteError } = await supabase.rpc('admin_delete_user', { user_id: userId });
+      
+      // Si no usamos RPC, confiamos en la eliminación de auth.users por el administrador de Supabase
       const { error: authError } = await supabase.auth.admin.deleteUser(userId);
       
       if (authError) {
         console.warn('No se pudo eliminar el usuario de auth directamente:', authError);
-        // Esto es esperado si no tienes permisos de admin, pero el perfil ya se eliminó
+        // Esto puede ocurrir si el cliente no tiene permisos de Service Role Key, pero el perfil ya se eliminó.
       }
 
       showSuccess('Usuario eliminado correctamente.');
