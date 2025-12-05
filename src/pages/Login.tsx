@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { useSession } from '@/contexts/SessionContext';
@@ -11,13 +11,32 @@ import { supabase } from '@/integrations/supabase/client';
 
 function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { session, loading } = useSession();
+  const [email, setEmail] = useState<string>('');
 
   useEffect(() => {
+    // Verificar si hay errores en la URL (por ejemplo, de verificación de correo)
+    const hashParams = new URLSearchParams(location.hash.substring(1));
+    const error = hashParams.get('error');
+    const errorCode = hashParams.get('error_code');
+    
+    if (error && (errorCode === 'otp_expired' || error === 'access_denied')) {
+      navigate('/verification-error');
+    }
+
     if (session && !loading) {
       // La redirección se maneja en SessionContext
     }
-  }, [session, loading, navigate]);
+  }, [session, loading, navigate, location]);
+
+  // Guardar el email cuando cambia para usarlo en caso de error de verificación
+  const handleEmailChange = (email: string) => {
+    setEmail(email);
+    if (email) {
+      localStorage.setItem('verificationEmail', email);
+    }
+  };
 
   if (loading) {
     return (
@@ -134,6 +153,7 @@ function Login() {
               },
             },
           }}
+          onEmailInputChange={(e) => handleEmailChange(e.target.value)}
         />
       </div>
       <MadeWithDyad />

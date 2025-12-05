@@ -7,6 +7,7 @@ import AuthGuard from "@/components/AuthGuard";
 import LandingPage from "@/pages/LandingPage";
 import Login from "@/pages/Login";
 import NotFound from "@/pages/NotFound";
+import EmailVerificationError from "@/pages/EmailVerificationError";
 
 // Admin Pages
 import AdminDashboard from "@/pages/admin/Dashboard";
@@ -35,6 +36,7 @@ function App() {
           {/* Public Routes */}
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/verification-error" element={<EmailVerificationError />} />
 
           {/* Admin Routes */}
           <Route
