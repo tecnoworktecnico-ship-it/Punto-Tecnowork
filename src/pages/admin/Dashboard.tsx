@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -10,12 +10,37 @@ import {
   DollarSign, 
   Settings, 
   Users as UsersIcon, 
-  Store 
+  Store,
+  Clock
 } from 'lucide-react';
+import { showError, showSuccess } from '@/utils/toast';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { profile, signOut } = useSession();
+  const [isConfiguring, setIsConfiguring] = useState(false);
+
+  // Función para mostrar instrucciones sobre cómo extender el tiempo de verificación
+  const showVerificationTimeInstructions = () => {
+    setIsConfiguring(true);
+    
+    setTimeout(() => {
+      setIsConfiguring(false);
+      showSuccess('Instrucciones mostradas. Recuerda que necesitas acceso a la consola de Supabase.');
+    }, 1500);
+    
+    // Mostrar instrucciones detalladas
+    alert(`Para extender el tiempo de verificación de correo a 30 minutos:
+
+1. Accede a la consola de Supabase (https://app.supabase.com)
+2. Selecciona tu proyecto
+3. Ve a Authentication > Settings > Email
+4. Busca "Email Link Expiration"
+5. Cambia el valor a 1800 (segundos = 30 minutos)
+6. Guarda los cambios
+
+Nota: Esta configuración solo puede cambiarse desde la consola de Supabase y requiere permisos de administrador.`);
+  };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move text-text-on-color">
@@ -103,6 +128,26 @@ const AdminDashboard = () => {
                 onClick={() => navigate('/admin/branding')}
               >
                 Configurar Branding
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <Clock className="h-8 w-8 text-primary-blue" />
+                <CardTitle className="text-primary-blue">Tiempo de Verificación</CardTitle>
+              </div>
+              <CardDescription>Configura el tiempo de expiración para enlaces de verificación.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col space-y-2">
+              <Button 
+                variant="outline" 
+                className="w-full justify-start" 
+                onClick={showVerificationTimeInstructions}
+                disabled={isConfiguring}
+              >
+                {isConfiguring ? 'Mostrando instrucciones...' : 'Extender a 30 minutos'}
               </Button>
             </CardContent>
           </Card>

@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/select';
 import { showSuccess, showError } from '@/utils/toast';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, UserPlus, Trash2, RefreshCw } from 'lucide-react';
+import { ArrowLeft, UserPlus, Trash2, RefreshCw, Mail, CheckCircle, XCircle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -34,6 +34,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface User {
   id: string;
@@ -43,6 +49,7 @@ interface User {
   last_name?: string;
   manager_id?: string;
   local_name?: string;
+  email_confirmed_at?: string | null;
 }
 
 const Users = () => {
@@ -52,6 +59,7 @@ const Users = () => {
   const [locals, setLocals] = useState<{id: string, name: string, manager_id: string | null}[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [resendingEmail, setResendingEmail] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: '',
     role: 'client',
@@ -75,6 +83,14 @@ const Users = () => {
     setLoading(true);
 
     try {
+      // Obtener usuarios con sus datos de autenticación
+      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
+      
+      if (authError) {
+        console.error('Error fetching auth users:', authError);
+        showError('Error al cargar datos de autenticación de usuarios.');
+      }
+      
       // Llamar a la función RPC para obtener usuarios con emails
       const { data: usersData, error: usersError } = await supabase
         .rpc('get_users_with_emails');
@@ -85,8 +101,17 @@ const Users = () => {
         setLoading(false);
         return;
       }
+      
+      // Combinar datos de autenticación con datos de perfil
+      const combinedUsers = usersData.map((userData: User) => {
+        const authUser = authUsers?.users?.find(au => au.id === userData.id);
+        return {
+          ...userData,
+          email_confirmed_at: authUser?.email_confirmed_at || null
+        };
+      });
 
-      setUsers(usersData || []);
+      setUsers(combinedUsers || []);
 
       // Obtener locales sin manager asignado
       const { data: localsData, error: localsError } = await supabase
@@ -288,6 +313,30 @@ const Users = () => {
     setLoading(false);
   };
 
+  // Función para reenviar el correo de verificación
+  const resendVerificationEmail = async (userEmail: string) => {
+    setResendingEmail(userEmail);
+    
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: userEmail,
+      });
+      
+      if (error) {
+        console.error('Error resending verification email:', error);
+        showError(`Error al reenviar correo: ${error.message}`);
+      } else {
+        showSuccess(`Correo de verificación reenviado a ${userEmail}`);
+      }
+    } catch (err) {
+      console.error('Unexpected error:', err);
+      showError('Error inesperado al reenviar correo de verificación.');
+    } finally {
+      setResendingEmail(null);
+    }
+  };
+
   if (sessionLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
@@ -462,6 +511,7 @@ const Users = () => {
                     <TableHead>Correo</TableHead>
                     <TableHead>Nombre</TableHead>
                     <TableHead>Rol</TableHead>
+                    <TableHead>Verificado</TableHead>
                     <TableHead>Local Asignado</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
@@ -515,10 +565,45 @@ const Users = () => {
                         </Select>
                       </TableCell>
                       <TableCell>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center">
+                                {userItem.email_confirmed_at ? (
+                                  <CheckCircle className="h-5 w-5 text-success-green" />
+                                ) : (
+                                  <XCircle className="h-5 w-5 text-emphasis-red" />
+                                )}
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {userItem.email_confirmed_at 
+                                ? `Verificado el ${new Date(userItem.email_confirmed_at).toLocaleDateString()}` 
+                                : 'Email no verificado'}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableCell>
+                      <TableCell>
                         {userItem.local_name || 'No asignado'}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
+                          {!userItem.email_confirmed_at && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => resendVerificationEmail(userItem.email)}
+                              disabled={resendingEmail === userItem.email}
+                              className="text-primary-blue hover:text-blue-700"
+                            >
+                              {resendingEmail === userItem.email ? (
+                                <RefreshCw className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Mail className="h-4 w-4" />
+                              )}
+                            </Button>
+                          )}
                           <Button
                             variant="outline"
                             size="sm"
