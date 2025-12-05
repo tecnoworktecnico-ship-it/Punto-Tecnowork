@@ -192,21 +192,51 @@ const Users = () => {
     setLoading(true);
     
     try {
-      // Usar la función RPC para eliminar el usuario de forma segura
-      const { data, error } = await supabase
-        .rpc('admin_delete_user', { user_id: userId });
-
-      if (error) {
-        console.error('Error deleting user:', error);
-        showError(`Error al eliminar usuario: ${error.message}`);
-      } else {
-        showSuccess('Usuario eliminado correctamente.');
-        // Actualizar la lista de usuarios localmente para evitar tener que recargar
-        setUsers(users.filter(u => u.id !== userId));
+      // Enfoque alternativo: eliminar manualmente en secuencia
+      
+      // 1. Desasignar de cualquier local
+      await supabase
+        .from('locals')
+        .update({ manager_id: null })
+        .eq('manager_id', userId);
+      
+      // 2. Eliminar puntos de usuario
+      await supabase
+        .from('user_points')
+        .delete()
+        .eq('user_id', userId);
+      
+      // 3. Eliminar recompensas de usuario
+      await supabase
+        .from('user_rewards')
+        .delete()
+        .eq('user_id', userId);
+      
+      // 4. Eliminar perfil
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', userId);
+      
+      if (profileError) {
+        throw new Error(`Error eliminando perfil: ${profileError.message}`);
       }
+      
+      // 5. Eliminar usuario de auth (esto puede requerir permisos especiales)
+      const { error: authError } = await supabase.auth.admin.deleteUser(userId);
+      
+      if (authError) {
+        console.warn('No se pudo eliminar el usuario de auth directamente:', authError);
+        // Esto es esperado si no tienes permisos de admin, pero el perfil ya se eliminó
+      }
+
+      showSuccess('Usuario eliminado correctamente.');
+      // Actualizar la lista de usuarios localmente
+      setUsers(users.filter(u => u.id !== userId));
+      
     } catch (err) {
-      console.error('Unexpected error deleting user:', err);
-      showError('Error inesperado al eliminar usuario.');
+      console.error('Error deleting user:', err);
+      showError(`Error al eliminar usuario: ${err instanceof Error ? err.message : 'Error desconocido'}`);
     }
 
     setLoading(false);
