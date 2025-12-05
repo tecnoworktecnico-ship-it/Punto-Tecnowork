@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { showSuccess, showError } from '@/utils/toast';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Eye } from 'lucide-react';
+import { ArrowLeft, Eye, Store } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -47,6 +47,7 @@ const LocalOrders = () => {
   const [localId, setLocalId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [localNotFound, setLocalNotFound] = useState(false);
 
   useEffect(() => {
     if (!sessionLoading && profile?.role !== 'local') {
@@ -61,6 +62,7 @@ const LocalOrders = () => {
 
   const fetchLocalAndOrders = async () => {
     setLoading(true);
+    setLocalNotFound(false);
 
     // Obtener el local del manager
     const { data: local, error: localError } = await supabase
@@ -70,6 +72,13 @@ const LocalOrders = () => {
       .single();
 
     if (localError) {
+      // Si el error es PGRST116 (no rows found), significa que no tiene local asignado.
+      if (localError.code === 'PGRST116') {
+        setLocalNotFound(true);
+        setLoading(false);
+        return;
+      }
+      
       console.error('Error fetching local:', localError);
       showError('Error al cargar los datos del local.');
       setLoading(false);
@@ -159,6 +168,28 @@ const LocalOrders = () => {
 
   if (profile?.role !== 'local') {
     return null;
+  }
+  
+  if (localNotFound) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
+        <Card className="w-full max-w-md p-6 bg-white rounded-lg shadow-lg text-center">
+          <Store className="h-16 w-16 text-emphasis-red mx-auto mb-4" />
+          <CardTitle className="text-2xl font-bold text-text-carbon mb-2">Local No Asignado</CardTitle>
+          <CardContent>
+            <p className="text-gray-600 mb-4">
+              Tu cuenta de manager no está asignada a ningún local. Por favor, contacta al administrador para que te asigne un local.
+            </p>
+            <Button 
+              onClick={() => navigate('/local/dashboard')}
+              className="bg-primary-blue hover:bg-blue-700 text-white"
+            >
+              Volver al Dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
