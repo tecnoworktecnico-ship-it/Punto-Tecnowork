@@ -20,6 +20,7 @@ import Users from "@/pages/admin/Users";
 import LocalDashboard from "@/pages/local/Dashboard";
 import LocalPrices from "@/pages/local/LocalPrices";
 import LocalOrders from "@/pages/local/Orders";
+import LocalOrderDetail from "@/pages/local/OrderDetail"; // Importar nuevo componente
 
 // Client Pages
 import ClientDashboard from "@/pages/client/Dashboard";
@@ -102,6 +103,14 @@ function App() {
             element={
               <AuthGuard allowedRoles={["local"]}>
                 <LocalOrders />
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/local/orders/:orderId"
+            element={
+              <AuthGuard allowedRoles={["local"]}>
+                <LocalOrderDetail />
               </AuthGuard>
             }
           />
