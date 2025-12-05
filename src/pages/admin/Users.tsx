@@ -229,7 +229,16 @@ const Users = () => {
 
   // Función para actualizar manualmente el rol de un usuario
   const updateUserRole = async (userId: string, newRole: string) => {
-    if (!confirm(`¿Estás seguro de que deseas cambiar el rol de este usuario a ${newRole}?`)) return;
+    const userItem = users.find(u => u.id === userId);
+    if (!userItem) return;
+
+    if (newRole === 'local' && !userItem.local_name) {
+      showError('Para asignar el rol "Local", primero debes asignar un local a este usuario desde la sección de Gestión de Locales.');
+      navigate('/admin/locals');
+      return;
+    }
+
+    if (!confirm(`¿Estás seguro de que deseas cambiar el rol de ${userItem.email} a ${newRole}?`)) return;
     
     setLoading(true);
     
@@ -241,6 +250,10 @@ const Users = () => {
       });
         
       if (error || !data) {
+        // Manejar errores específicos de la RPC
+        if (error?.message.includes('No tienes permisos de administrador')) {
+          throw new Error('Permiso denegado. Solo los administradores pueden cambiar roles.');
+        }
         throw new Error(`Error actualizando rol: ${error?.message || 'La operación falló.'}`);
       }
       
