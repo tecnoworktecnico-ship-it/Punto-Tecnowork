@@ -148,26 +148,17 @@ const Users = () => {
         return;
       }
 
-      // Esperar un momento para que se cree el perfil automáticamente
+      // Esperar un momento para que se cree el perfil automáticamente mediante el trigger handle_new_user
       await new Promise(resolve => setTimeout(resolve, 1500));
-
-      // Actualizar perfil con el rol
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          first_name: formData.first_name,
-          last_name: formData.last_name,
-          role: formData.role
-        })
-        .eq('id', signUpData.user.id);
-
-      if (profileError) {
-        console.error('Error updating profile:', profileError);
-        showError('Error al actualizar perfil de usuario.');
-      }
 
       // Si es un usuario local, asignar al local
       if (formData.role === 'local' && formData.local_id) {
+        // Primero, desasignar el usuario de cualquier otro local (aunque es nuevo, es buena práctica)
+        await supabase
+          .from('locals')
+          .update({ manager_id: null })
+          .eq('manager_id', signUpData.user.id);
+          
         const { error: localError } = await supabase
           .from('locals')
           .update({ manager_id: signUpData.user.id })
@@ -202,50 +193,11 @@ const Users = () => {
     setLoading(true);
     
     try {
-      // Enfoque alternativo: eliminar manualmente en secuencia
+      // Usar la función RPC admin_delete_user para manejar la eliminación de forma segura y completa
+      const { error: deleteError } = await supabase.rpc('admin_delete_user', { user_id: userId });
       
-      // 1. Desasignar de cualquier local
-      await supabase
-        .from('locals')
-        .update({ manager_id: null })
-        .eq('manager_id', userId);
-      
-      // 2. Eliminar puntos de usuario
-      await supabase
-        .from('user_points')
-        .delete()
-        .eq('user_id', userId);
-      
-      // 3. Eliminar recompensas de usuario
-      await supabase
-        .from('user_rewards')
-        .delete()
-        .eq('user_id', userId);
-      
-      // 4. Eliminar perfil
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', userId);
-      
-      if (profileError) {
-        throw new Error(`Error eliminando perfil: ${profileError.message}`);
-      }
-      
-      // 5. Eliminar usuario de auth (esto puede requerir permisos especiales)
-      // Usamos la función RPC admin_delete_user si existe, o confiamos en la eliminación en cascada si es posible.
-      // Dado que la eliminación de auth.users requiere Service Role Key, confiamos en que la eliminación del perfil
-      // y la eliminación de auth.users por el administrador de Supabase se manejen correctamente.
-      
-      // Si la función admin_delete_user existe, la usamos (aunque no está tipada aquí, es más robusta)
-      // const { error: deleteError } = await supabase.rpc('admin_delete_user', { user_id: userId });
-      
-      // Si no usamos RPC, confiamos en la eliminación de auth.users por el administrador de Supabase
-      const { error: authError } = await supabase.auth.admin.deleteUser(userId);
-      
-      if (authError) {
-        console.warn('No se pudo eliminar el usuario de auth directamente:', authError);
-        // Esto puede ocurrir si el cliente no tiene permisos de Service Role Key, pero el perfil ya se eliminó.
+      if (deleteError) {
+        throw new Error(`Error eliminando usuario: ${deleteError.message}`);
       }
 
       showSuccess('Usuario eliminado correctamente.');
@@ -282,21 +234,28 @@ const Users = () => {
     setLoading(true);
     
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ role: newRole })
-        .eq('id', userId);
+      // Usar RPC function para asegurar que el rol se actualice en la DB (profiles)
+      const { data, error } = await supabase.rpc('admin_update_user_role', {
+        target_user_id: userId,
+        new_role: newRole,
+      });
         
-      if (error) {
-        throw new Error(`Error actualizando rol: ${error.message}`);
+      if (error || !data) {
+        throw new Error(`Error actualizando rol: ${error?.message || 'La operación falló.'}`);
       }
       
-      showSuccess(`Rol actualizado correctamente a ${newRole}.`);
+      showSuccess(`Rol actualizado correctamente a ${newRole}. El usuario deberá volver a iniciar sesión para que el cambio surta efecto.`);
       
       // Actualizar la lista de usuarios localmente
       setUsers(users.map(u => 
         u.id === userId ? { ...u, role: newRole } : u
       ));
+      
+      // Si el usuario actual es el que se está actualizando, forzar un refresh de sesión
+      if (userId === user?.id) {
+          await supabase.auth.refreshSession();
+      }
+      
     } catch (err) {
       console.error('Error updating role:', err);
       showError(`Error al actualizar rol: ${err instanceof Error ? err.message : 'Error desconocido'}`);
