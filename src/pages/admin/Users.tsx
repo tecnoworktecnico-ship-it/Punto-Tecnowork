@@ -191,28 +191,22 @@ const Users = () => {
 
     setLoading(true);
     
-    // Primero, desasignar el local si tiene uno
-    const { error: localError } = await supabase
-      .from('locals')
-      .update({ manager_id: null })
-      .eq('manager_id', userId);
+    try {
+      // Usar la función RPC para eliminar el usuario de forma segura
+      const { data, error } = await supabase
+        .rpc('admin_delete_user', { user_id: userId });
 
-    if (localError) {
-      console.error('Error unassigning local:', localError);
-    }
-
-    // Eliminar el perfil (esto también eliminará el usuario de auth debido a la cascada)
-    const { error } = await supabase
-      .from('profiles')
-      .delete()
-      .eq('id', userId);
-
-    if (error) {
-      console.error('Error deleting user:', error);
-      showError(`Error al eliminar usuario: ${error.message}`);
-    } else {
-      showSuccess('Usuario eliminado correctamente.');
-      fetchData();
+      if (error) {
+        console.error('Error deleting user:', error);
+        showError(`Error al eliminar usuario: ${error.message}`);
+      } else {
+        showSuccess('Usuario eliminado correctamente.');
+        // Actualizar la lista de usuarios localmente para evitar tener que recargar
+        setUsers(users.filter(u => u.id !== userId));
+      }
+    } catch (err) {
+      console.error('Unexpected error deleting user:', err);
+      showError('Error inesperado al eliminar usuario.');
     }
 
     setLoading(false);
