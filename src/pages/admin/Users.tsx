@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/select';
 import { showSuccess, showError } from '@/utils/toast';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, UserPlus, Trash2 } from 'lucide-react';
+import { ArrowLeft, UserPlus, Trash2, RefreshCw } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -121,6 +121,7 @@ const Users = () => {
           data: {
             first_name: formData.first_name,
             last_name: formData.last_name,
+            role: formData.role // Incluir el rol en los metadatos
           }
         }
       });
@@ -139,7 +140,7 @@ const Users = () => {
       }
 
       // Esperar un momento para que se cree el perfil automáticamente
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 1500));
 
       // Actualizar perfil con el rol
       const { error: profileError } = await supabase
@@ -257,6 +258,36 @@ const Users = () => {
     setDialogOpen(true);
   };
 
+  // Función para actualizar manualmente el rol de un usuario
+  const updateUserRole = async (userId: string, newRole: string) => {
+    if (!confirm(`¿Estás seguro de que deseas cambiar el rol de este usuario a ${newRole}?`)) return;
+    
+    setLoading(true);
+    
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ role: newRole })
+        .eq('id', userId);
+        
+      if (error) {
+        throw new Error(`Error actualizando rol: ${error.message}`);
+      }
+      
+      showSuccess(`Rol actualizado correctamente a ${newRole}.`);
+      
+      // Actualizar la lista de usuarios localmente
+      setUsers(users.map(u => 
+        u.id === userId ? { ...u, role: newRole } : u
+      ));
+    } catch (err) {
+      console.error('Error updating role:', err);
+      showError(`Error al actualizar rol: ${err instanceof Error ? err.message : 'Error desconocido'}`);
+    }
+    
+    setLoading(false);
+  };
+
   if (sessionLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
@@ -283,127 +314,137 @@ const Users = () => {
                 <ArrowLeft className="h-5 w-5" />
                 Volver al Dashboard
               </Button>
-              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button
-                    onClick={openCreateDialog}
-                    className="bg-primary-blue hover:bg-blue-700 text-white flex items-center gap-2"
-                  >
-                    <UserPlus className="h-5 w-5" />
-                    Nuevo Usuario
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[500px]">
-                  <DialogHeader>
-                    <DialogTitle>Crear Nuevo Usuario</DialogTitle>
-                    <DialogDescription>
-                      Completa los datos para crear un nuevo usuario. Se enviará un correo de verificación.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                      <Label htmlFor="email">Correo Electrónico *</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) =>
-                          setFormData({ ...formData, email: e.target.value })
-                        }
-                        required
-                        placeholder="usuario@ejemplo.com"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="first_name">Nombre</Label>
-                      <Input
-                        id="first_name"
-                        value={formData.first_name}
-                        onChange={(e) =>
-                          setFormData({ ...formData, first_name: e.target.value })
-                        }
-                        placeholder="Nombre"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="last_name">Apellido</Label>
-                      <Input
-                        id="last_name"
-                        value={formData.last_name}
-                        onChange={(e) =>
-                          setFormData({ ...formData, last_name: e.target.value })
-                        }
-                        placeholder="Apellido"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="role">Rol *</Label>
-                      <Select
-                        value={formData.role}
-                        onValueChange={(value) =>
-                          setFormData({ ...formData, role: value })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecciona un rol" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="client">Cliente</SelectItem>
-                          <SelectItem value="local">Local</SelectItem>
-                          <SelectItem value="admin">Administrador</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {formData.role === 'local' && locals.length > 0 && (
+              <div className="flex gap-2">
+                <Button
+                  onClick={fetchData}
+                  variant="outline"
+                  className="flex items-center gap-2"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Actualizar
+                </Button>
+                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      onClick={openCreateDialog}
+                      className="bg-primary-blue hover:bg-blue-700 text-white flex items-center gap-2"
+                    >
+                      <UserPlus className="h-5 w-5" />
+                      Nuevo Usuario
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[500px]">
+                    <DialogHeader>
+                      <DialogTitle>Crear Nuevo Usuario</DialogTitle>
+                      <DialogDescription>
+                        Completa los datos para crear un nuevo usuario. Se enviará un correo de verificación.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleSubmit} className="space-y-4">
                       <div>
-                        <Label htmlFor="local_id">Asignar Local</Label>
+                        <Label htmlFor="email">Correo Electrónico *</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={formData.email}
+                          onChange={(e) =>
+                            setFormData({ ...formData, email: e.target.value })
+                          }
+                          required
+                          placeholder="usuario@ejemplo.com"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="first_name">Nombre</Label>
+                        <Input
+                          id="first_name"
+                          value={formData.first_name}
+                          onChange={(e) =>
+                            setFormData({ ...formData, first_name: e.target.value })
+                          }
+                          placeholder="Nombre"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="last_name">Apellido</Label>
+                        <Input
+                          id="last_name"
+                          value={formData.last_name}
+                          onChange={(e) =>
+                            setFormData({ ...formData, last_name: e.target.value })
+                          }
+                          placeholder="Apellido"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="role">Rol *</Label>
                         <Select
-                          value={formData.local_id}
+                          value={formData.role}
                           onValueChange={(value) =>
-                            setFormData({ ...formData, local_id: value })
+                            setFormData({ ...formData, role: value })
                           }
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Selecciona un local" />
+                            <SelectValue placeholder="Selecciona un rol" />
                           </SelectTrigger>
                           <SelectContent>
-                            {locals.map((local) => (
-                              <SelectItem key={local.id} value={local.id}>
-                                {local.name}
-                              </SelectItem>
-                            ))}
+                            <SelectItem value="client">Cliente</SelectItem>
+                            <SelectItem value="local">Local</SelectItem>
+                            <SelectItem value="admin">Administrador</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
-                    )}
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
-                      <p className="text-sm text-yellow-800">
-                        <strong>Nota:</strong> La contraseña temporal será "TempPass123!". 
-                        El usuario deberá cambiarla en su primer inicio de sesión.
-                      </p>
-                    </div>
-                    <div className="flex gap-2 justify-end">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          setDialogOpen(false);
-                          resetForm();
-                        }}
-                      >
-                        Cancelar
-                      </Button>
-                      <Button
-                        type="submit"
-                        disabled={loading}
-                        className="bg-primary-blue hover:bg-blue-700 text-white"
-                      >
-                        {loading ? 'Creando...' : 'Crear Usuario'}
-                      </Button>
-                    </div>
-                  </form>
-                </DialogContent>
-              </Dialog>
+                      {formData.role === 'local' && locals.length > 0 && (
+                        <div>
+                          <Label htmlFor="local_id">Asignar Local</Label>
+                          <Select
+                            value={formData.local_id}
+                            onValueChange={(value) =>
+                              setFormData({ ...formData, local_id: value })
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecciona un local" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {locals.map((local) => (
+                                <SelectItem key={local.id} value={local.id}>
+                                  {local.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+                        <p className="text-sm text-yellow-800">
+                          <strong>Nota:</strong> La contraseña temporal será "TempPass123!". 
+                          El usuario deberá cambiarla en su primer inicio de sesión.
+                        </p>
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setDialogOpen(false);
+                            resetForm();
+                          }}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          type="submit"
+                          disabled={loading}
+                          className="bg-primary-blue hover:bg-blue-700 text-white"
+                        >
+                          {loading ? 'Creando...' : 'Crear Usuario'}
+                        </Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
             </div>
             <CardTitle className="text-3xl font-bold text-text-carbon">
               Gestión de Usuarios
@@ -442,21 +483,36 @@ const Users = () => {
                           : 'Sin nombre'}
                       </TableCell>
                       <TableCell>
-                        <Badge 
-                          variant={
-                            userItem.role === 'admin' 
-                              ? 'destructive' 
-                              : userItem.role === 'local' 
-                              ? 'default' 
-                              : 'secondary'
-                          }
+                        <Select
+                          value={userItem.role}
+                          onValueChange={(value) => updateUserRole(userItem.id, value)}
+                          disabled={userItem.id === user?.id}
                         >
-                          {userItem.role === 'admin' 
-                            ? 'Administrador' 
-                            : userItem.role === 'local' 
-                            ? 'Local' 
-                            : 'Cliente'}
-                        </Badge>
+                          <SelectTrigger className="w-[130px]">
+                            <SelectValue>
+                              <Badge 
+                                variant={
+                                  userItem.role === 'admin' 
+                                    ? 'destructive' 
+                                    : userItem.role === 'local' 
+                                    ? 'default' 
+                                    : 'secondary'
+                                }
+                              >
+                                {userItem.role === 'admin' 
+                                  ? 'Administrador' 
+                                  : userItem.role === 'local' 
+                                  ? 'Local' 
+                                  : 'Cliente'}
+                              </Badge>
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="client">Cliente</SelectItem>
+                            <SelectItem value="local">Local</SelectItem>
+                            <SelectItem value="admin">Administrador</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </TableCell>
                       <TableCell>
                         {userItem.local_name || 'No asignado'}
