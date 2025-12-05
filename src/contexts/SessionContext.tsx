@@ -98,11 +98,19 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
   }, [navigate]);
 
   const signOut = async () => {
-    setLoading(true);
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      console.error('Error signing out:', error);
-      showError('Error al cerrar sesión.');
+    try {
+      setLoading(true);
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Error signing out:', error);
+        showError(`Error al cerrar sesión: ${error.message}`);
+      } else {
+        // No necesitamos hacer nada aquí, el listener de onAuthStateChange
+        // manejará la redirección y la actualización del estado
+      }
+    } catch (err) {
+      console.error('Unexpected error during sign out:', err);
+      showError('Error inesperado al cerrar sesión.');
       setLoading(false);
     }
   };
