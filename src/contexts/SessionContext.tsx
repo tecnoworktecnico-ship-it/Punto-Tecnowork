@@ -99,18 +99,47 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
 
   const signOut = async () => {
     try {
-      setLoading(true);
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('Error signing out:', error);
-        showError(`Error al cerrar sesión: ${error.message}`);
-      } else {
-        // No necesitamos hacer nada aquí, el listener de onAuthStateChange
-        // manejará la redirección y la actualización del estado
+      // Verificar si hay una sesión activa antes de intentar cerrarla
+      const { data } = await supabase.auth.getSession();
+      
+      if (!data.session) {
+        // Si no hay sesión, simplemente limpiar el estado y redirigir
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+        navigate('/login', { replace: true });
+        showSuccess('Sesión cerrada correctamente.');
+        return;
       }
+      
+      // Si hay sesión, proceder con el cierre normal
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        // Si hay un error específico que no sea "Auth session missing"
+        if (error.message !== "Auth session missing!") {
+          console.error('Error signing out:', error);
+          showError(`Error al cerrar sesión: ${error.message}`);
+        } else {
+          // Si el error es "Auth session missing", manejar como si fuera exitoso
+          setSession(null);
+          setUser(null);
+          setProfile(null);
+          navigate('/login', { replace: true });
+          showSuccess('Sesión cerrada correctamente.');
+        }
+      }
+      // Si no hay error, el listener onAuthStateChange manejará la redirección
     } catch (err) {
       console.error('Unexpected error during sign out:', err);
-      showError('Error inesperado al cerrar sesión.');
+      
+      // En caso de error, forzar el cierre de sesión de todas formas
+      setSession(null);
+      setUser(null);
+      setProfile(null);
+      navigate('/login', { replace: true });
+      showSuccess('Sesión cerrada.');
+    } finally {
       setLoading(false);
     }
   };
