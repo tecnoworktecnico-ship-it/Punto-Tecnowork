@@ -7,13 +7,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
-import { DollarSign, Settings, LayoutDashboard, RefreshCw, Package, Clock, BarChart, Trophy } from 'lucide-react';
+import { DollarSign, Settings, LayoutDashboard, RefreshCw, Package, Clock, BarChart, Trophy, Gift } from 'lucide-react';
 import ProfileSettings from '@/components/ProfileSettings';
 import PasswordChangeAlert from '@/components/PasswordChangeAlert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useLocalDashboardData } from '@/hooks/useDashboardData';
 import StatCard from '@/components/dashboard/StatCard';
-import ClientRankingTable from '@/components/dashboard/ClientRankingTable'; // Importar el ranking
+import ClientRankingTable from '@/components/dashboard/ClientRankingTable';
 
 const LocalDashboard = () => {
   const { user, profile, signOut } = useSession();
@@ -22,10 +22,13 @@ const LocalDashboard = () => {
   const [localId, setLocalId] = useState<string | null>(null);
   const [loadingLocal, setLoadingLocal] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeRewardsCount, setActiveRewardsCount] = useState<number>(0);
+  const [loadingRewards, setLoadingRewards] = useState(true);
 
   useEffect(() => {
     if (profile?.role === 'local') {
       fetchLocalData();
+      fetchActiveRewards();
     }
   }, [profile]);
 
@@ -51,6 +54,23 @@ const LocalDashboard = () => {
     setLocalData(local);
     setLocalId(local.id);
     setLoadingLocal(false);
+  };
+
+  const fetchActiveRewards = async () => {
+    setLoadingRewards(true);
+
+    const { count, error } = await supabase
+      .from('rewards')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_active', true);
+
+    if (error) {
+      console.error('Error fetching active rewards:', error);
+    } else {
+      setActiveRewardsCount(count || 0);
+    }
+
+    setLoadingRewards(false);
   };
 
   const { 
@@ -89,12 +109,15 @@ const LocalDashboard = () => {
           </div>
           <div className="flex gap-3">
             <Button 
-              onClick={refreshData} 
-              disabled={loadingStats}
+              onClick={() => {
+                refreshData();
+                fetchActiveRewards();
+              }} 
+              disabled={loadingStats || loadingRewards}
               variant="outline"
               className="flex items-center gap-2"
             >
-              <RefreshCw className={`h-4 w-4 ${loadingStats ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-4 w-4 ${(loadingStats || loadingRewards) ? 'animate-spin' : ''}`} />
               Actualizar Datos
             </Button>
             <Button onClick={signOut} className="bg-emphasis-red hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
@@ -122,7 +145,7 @@ const LocalDashboard = () => {
 
           <TabsContent value="dashboard" className="mt-6 space-y-6">
             {/* Estadísticas rápidas */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <StatCard 
                 title="Ingresos (Completados)"
                 value={`$${totalRevenue.toFixed(2)}`}
@@ -144,10 +167,17 @@ const LocalDashboard = () => {
                 color="text-secondary-yellow"
                 description="Pedidos esperando ser procesados"
               />
+              <StatCard 
+                title="Premios Activos"
+                value={activeRewardsCount}
+                icon={Gift}
+                color="text-purple-600"
+                description="Recompensas disponibles para canje"
+              />
             </div>
 
-            {/* Gestión de Pedidos, Precios y Reportes */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+            {/* Gestión de Pedidos, Precios, Premios y Reportes */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 pt-4">
               <Card className="bg-primary-blue/10 border-primary-blue shadow-md">
                 <CardHeader>
                   <CardTitle className="text-primary-blue flex items-center gap-2">
@@ -179,6 +209,24 @@ const LocalDashboard = () => {
                     onClick={() => navigate('/local/reports')}
                   >
                     Ver Ranking y Reportes
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-purple-100 border-purple-600 shadow-md">
+                <CardHeader>
+                  <CardTitle className="text-purple-600 flex items-center gap-2">
+                    <Gift className="h-5 w-5" /> Catálogo de Premios
+                  </CardTitle>
+                  <CardDescription>Consulta los premios disponibles para tus clientes.</CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col space-y-2">
+                  <Button 
+                    variant="outline" 
+                    className="w-full text-purple-600 border-purple-600 hover:bg-purple-100" 
+                    onClick={() => navigate('/local/rewards')}
+                  >
+                    Ver Catálogo ({activeRewardsCount})
                   </Button>
                 </CardContent>
               </Card>
