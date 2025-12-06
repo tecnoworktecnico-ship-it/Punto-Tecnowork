@@ -34,6 +34,7 @@ const ClientRankingTable: React.FC<ClientRankingTableProps> = ({ localId, title,
     setError(null);
     
     try {
+      console.log("Fetching ranking with localId:", localId);
       const { data, error } = await supabase.rpc('get_client_points_ranking', {
         target_local_id: localId || null,
       });
@@ -43,6 +44,7 @@ const ClientRankingTable: React.FC<ClientRankingTableProps> = ({ localId, title,
         setError(error.message || 'Error al cargar el ranking de clientes.');
         setRanking([]);
       } else {
+        console.log("Ranking data received:", data);
         setRanking(data || []);
       }
     } catch (err) {
