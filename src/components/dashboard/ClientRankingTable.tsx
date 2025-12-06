@@ -19,7 +19,7 @@ interface RankingEntry {
 }
 
 interface ClientRankingTableProps {
-  localId?: string; // Opcional para ranking general (Admin)
+  localId?: string; 
   title: string;
   description: string;
 }
@@ -34,22 +34,21 @@ const ClientRankingTable: React.FC<ClientRankingTableProps> = ({ localId, title,
     setError(null);
     
     try {
-      console.log("Fetching ranking with localId:", localId);
       const { data, error } = await supabase.rpc('get_client_points_ranking', {
-        target_local_id: localId || null,
+        target_local_id: localId || null
       });
 
       if (error) {
-        console.error('Error fetching client ranking:', error);
-        setError(error.message || 'Error al cargar el ranking de clientes.');
+        console.error('Ranking fetch error:', error);
+        setError(error.message || 'Error al cargar el ranking');
         setRanking([]);
       } else {
-        console.log("Ranking data received:", data);
+        console.log('Ranking data:', data);
         setRanking(data || []);
       }
     } catch (err) {
-      console.error('Unexpected error:', err);
-      setError('Error inesperado al cargar el ranking.');
+      console.error('Unexpected ranking error:', err);
+      setError('Error inesperado al cargar el ranking');
       setRanking([]);
     } finally {
       setLoading(false);
@@ -125,7 +124,7 @@ const ClientRankingTable: React.FC<ClientRankingTableProps> = ({ localId, title,
               </TableRow>
             </TableHeader>
             <TableBody>
-              {ranking.slice(0, 10).map((entry) => (
+              {ranking.map((entry) => (
                 <TableRow key={entry.client_id}>
                   <TableCell className="font-bold">{getRankBadge(entry.rank)}</TableCell>
                   <TableCell>
