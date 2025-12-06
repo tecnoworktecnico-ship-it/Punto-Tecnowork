@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { showSuccess, showError } from '@/utils/toast';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Eye, Store } from 'lucide-react';
+import { ArrowLeft, Eye, Store, RefreshCw } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -34,10 +34,6 @@ interface Order {
   points_earned: number;
   created_at: string;
   updated_at: string;
-  profiles: {
-    first_name: string;
-    last_name: string;
-  } | null;
 }
 
 const LocalOrders = () => {
@@ -64,81 +60,85 @@ const LocalOrders = () => {
     setLoading(true);
     setLocalNotFound(false);
 
-    // Obtener el local del manager
-    const { data: local, error: localError } = await supabase
-      .from('locals')
-      .select('id')
-      .eq('manager_id', profile?.id)
-      .single();
+    try {
+      // Obtener el local del manager
+      const { data: local, error: localError } = await supabase
+        .from('locals')
+        .select('id')
+        .eq('manager_id', profile?.id)
+        .single();
 
-    if (localError) {
-      if (localError.code === 'PGRST116') {
-        setLocalNotFound(true);
+      if (localError) {
+        if (localError.code === 'PGRST116') {
+          setLocalNotFound(true);
+          setLoading(false);
+          return;
+        }
+        
+        console.error('Error fetching local:', localError);
+        showError('Error al cargar los datos del local.');
         setLoading(false);
         return;
       }
-      
-      console.error('Error fetching local:', localError);
-      showError('Error al cargar los datos del local.');
+
+      setLocalId(local.id);
+
+      // Obtener pedidos del local SIN intentar unir perfiles
+      // Esto evita problemas de RLS/unión
+      const { data: ordersData, error: ordersError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('local_id', local.id)
+        .order('created_at', { ascending: false });
+
+      if (ordersError) {
+        console.error('Error fetching orders:', ordersError);
+        showError('Error al cargar los pedidos.');
+      } else {
+        setOrders(ordersData || []);
+      }
+    } catch (error) {
+      console.error('Unexpected error:', error);
+      showError('Error inesperado al cargar datos.');
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setLocalId(local.id);
-
-    // Obtener pedidos del local con la unión de perfiles
-    // Usamos la sintaxis de columna para la unión: profiles(client_id)
-    const { data: ordersData, error: ordersError } = await supabase
-      .from('orders')
-      .select(`
-        *,
-        profiles:client_id (
-          first_name,
-          last_name
-        )
-      `)
-      .eq('local_id', local.id)
-      .order('created_at', { ascending: false });
-
-    if (ordersError) {
-      console.error('Error fetching orders:', ordersError);
-      showError('Error al cargar los pedidos.');
-    } else {
-      setOrders(ordersData as Order[] || []);
-    }
-
-    setLoading(false);
   };
 
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     setLoading(true);
 
-    const { error } = await supabase
-      .from('orders')
-      .update({ 
-        status: newStatus,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', orderId);
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ 
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId);
 
-    if (error) {
-      console.error('Error updating order status:', error);
-      showError('Error al actualizar el estado del pedido.');
-    } else {
-      showSuccess('Estado del pedido actualizado correctamente.');
-      
-      // Registrar en auditoría
-      await supabase.from('order_audit').insert({
-        order_id: orderId,
-        user_id: profile?.id,
-        action: 'status_change',
-        details: { new_status: newStatus }
-      });
+      if (error) {
+        console.error('Error updating order status:', error);
+        showError('Error al actualizar el estado del pedido.');
+      } else {
+        showSuccess('Estado del pedido actualizado correctamente.');
+        
+        // Registrar en auditoría
+        await supabase.from('order_audit').insert({
+          order_id: orderId,
+          user_id: profile?.id,
+          action: 'status_change',
+          details: { new_status: newStatus }
+        });
 
-      fetchLocalAndOrders();
+        fetchLocalAndOrders();
+      }
+    } catch (error) {
+      console.error('Unexpected error:', error);
+      showError('Error inesperado al actualizar el estado.');
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const getStatusBadge = (status: string) => {
@@ -206,19 +206,29 @@ const LocalOrders = () => {
                 <ArrowLeft className="h-5 w-5" />
                 Volver al Dashboard
               </Button>
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Filtrar por estado" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="pending">Pendientes</SelectItem>
-                  <SelectItem value="in_progress">En Proceso</SelectItem>
-                  <SelectItem value="ready">Listos</SelectItem>
-                  <SelectItem value="completed">Completados</SelectItem>
-                  <SelectItem value="cancelled">Cancelados</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={fetchLocalAndOrders}
+                  className="flex items-center gap-2"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Actualizar
+                </Button>
+                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Filtrar por estado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="pending">Pendientes</SelectItem>
+                    <SelectItem value="in_progress">En Proceso</SelectItem>
+                    <SelectItem value="ready">Listos</SelectItem>
+                    <SelectItem value="completed">Completados</SelectItem>
+                    <SelectItem value="cancelled">Cancelados</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <CardTitle className="text-3xl font-bold text-text-carbon">
               Gestión de Pedidos
@@ -236,7 +246,7 @@ const LocalOrders = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>ID</TableHead>
-                    <TableHead>Cliente</TableHead>
+                    <TableHead>ID Cliente</TableHead>
                     <TableHead>Total</TableHead>
                     <TableHead>Puntos</TableHead>
                     <TableHead>Estado</TableHead>
@@ -250,8 +260,8 @@ const LocalOrders = () => {
                       <TableCell className="font-mono text-sm">
                         {order.id.substring(0, 8)}...
                       </TableCell>
-                      <TableCell>
-                        {order.profiles?.first_name} {order.profiles?.last_name}
+                      <TableCell className="font-mono text-sm">
+                        {order.client_id.substring(0, 8)}...
                       </TableCell>
                       <TableCell className="font-bold">
                         ${order.total_price.toFixed(2)}

@@ -23,53 +23,64 @@ const LocalOrderDetail = () => {
 
     setLoading(true);
 
-    // 1. Obtener el ID del local del manager
-    const { data: local, error: localError } = await supabase
-      .from('locals')
-      .select('id')
-      .eq('manager_id', profile.id)
-      .single();
+    try {
+      // 1. Obtener el ID del local del manager
+      const { data: local, error: localError } = await supabase
+        .from('locals')
+        .select('id')
+        .eq('manager_id', profile.id)
+        .single();
 
-    if (localError) {
-      console.error('Error fetching local:', localError);
-      showError('Error al cargar los datos del local.');
-      setLoading(false);
-      return;
-    }
+      if (localError) {
+        console.error('Error fetching local:', localError);
+        showError('Error al cargar los datos del local.');
+        setLoading(false);
+        return;
+      }
 
-    const localId = local.id;
+      const localId = local.id;
 
-    // 2. Obtener el pedido, archivos, cliente y auditoría
-    // Usamos la sintaxis de columna para la unión: profiles(client_id)
-    const { data: orderData, error: orderError } = await supabase
-      .from('orders')
-      .select(`
-        *,
-        profiles:client_id (
-          first_name,
-          last_name
-        ),
-        order_files (*),
-        order_audit (*)
-      `)
-      .eq('id', orderId)
-      .eq('local_id', localId) // Asegurar que el pedido pertenece a este local
-      .single();
+      // 2. Obtener el pedido, archivos y auditoría (sin unir perfiles)
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          order_files (*),
+          order_audit (*)
+        `)
+        .eq('id', orderId)
+        .eq('local_id', localId) // Asegurar que el pedido pertenece a este local
+        .single();
 
-    if (orderError) {
-      console.error('Error fetching order details:', orderError);
-      showError('Pedido no encontrado o no tienes permiso para verlo.');
+      if (orderError) {
+        console.error('Error fetching order details:', orderError);
+        showError('Pedido no encontrado o no tienes permiso para verlo.');
+        setOrder(null);
+      } else {
+        // Asegurar que order_audit esté ordenado por created_at
+        const sortedAudit = (orderData.order_audit || []).sort((a: any, b: any) => 
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+        
+        // Crear un objeto profiles vacío para mantener la compatibilidad con la interfaz
+        const orderWithProfiles = {
+          ...orderData,
+          order_audit: sortedAudit,
+          profiles: {
+            first_name: "Cliente",
+            last_name: orderData.client_id.substring(0, 8) + "..."
+          }
+        };
+        
+        setOrder(orderWithProfiles as LocalOrder);
+      }
+    } catch (error) {
+      console.error('Unexpected error:', error);
+      showError('Error inesperado al cargar el pedido.');
       setOrder(null);
-    } else {
-      // Asegurar que order_audit esté ordenado por created_at
-      const sortedAudit = (orderData.order_audit || []).sort((a: any, b: any) => 
-        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-      );
-      
-      setOrder({ ...orderData, order_audit: sortedAudit } as LocalOrder);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }, [orderId, profile?.id]);
 
   useEffect(() => {
@@ -86,30 +97,35 @@ const LocalOrderDetail = () => {
   const handleStatusUpdate = async (newStatus: OrderStatus) => {
     if (!order) return;
 
-    const { error } = await supabase
-      .from('orders')
-      .update({ 
-        status: newStatus,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', order.id);
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ 
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', order.id);
 
-    if (error) {
-      console.error('Error updating order status:', error);
-      showError('Error al actualizar el estado del pedido.');
-      throw error;
-    } else {
-      showSuccess(`Estado del pedido actualizado a ${newStatus.replace('_', ' ')}.`);
-      
-      // Registrar en auditoría
-      await supabase.from('order_audit').insert({
-        order_id: order.id,
-        user_id: profile?.id,
-        action: 'status_change',
-        details: { new_status: newStatus }
-      });
+      if (error) {
+        console.error('Error updating order status:', error);
+        showError('Error al actualizar el estado del pedido.');
+        throw error;
+      } else {
+        showSuccess(`Estado del pedido actualizado a ${newStatus.replace('_', ' ')}.`);
+        
+        // Registrar en auditoría
+        await supabase.from('order_audit').insert({
+          order_id: order.id,
+          user_id: profile?.id,
+          action: 'status_change',
+          details: { new_status: newStatus }
+        });
 
-      fetchOrder(); // Recargar datos
+        fetchOrder(); // Recargar datos
+      }
+    } catch (error) {
+      console.error('Unexpected error:', error);
+      showError('Error inesperado al actualizar el estado.');
     }
   };
 
