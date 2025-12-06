@@ -7,22 +7,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
-import { Package, DollarSign, Clock, CheckCircle, Settings, LayoutDashboard } from 'lucide-react';
+import { DollarSign, Settings, LayoutDashboard, RefreshCw, Package, Clock, CheckCircle } from 'lucide-react';
 import ProfileSettings from '@/components/ProfileSettings';
 import PasswordChangeAlert from '@/components/PasswordChangeAlert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useLocalDashboardData } from '@/hooks/useDashboardData';
+import StatCard from '@/components/dashboard/StatCard';
+import StatusPieChart from '@/components/dashboard/StatusPieChart';
+import OrderTrendChart from '@/components/dashboard/OrderTrendChart';
 
 const LocalDashboard = () => {
   const { user, profile, signOut } = useSession();
   const navigate = useNavigate();
   const [localData, setLocalData] = useState<any>(null);
-  const [stats, setStats] = useState({
-    pending: 0,
-    in_progress: 0,
-    ready: 0,
-    completed_today: 0,
-  });
-  const [loading, setLoading] = useState(true);
+  const [localId, setLocalId] = useState<string | null>(null);
+  const [loadingLocal, setLoadingLocal] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
 
   useEffect(() => {
@@ -32,7 +31,7 @@ const LocalDashboard = () => {
   }, [profile]);
 
   const fetchLocalData = async () => {
-    setLoading(true);
+    setLoadingLocal(true);
 
     // Obtener datos del local
     const { data: local, error: localError } = await supabase
@@ -44,43 +43,32 @@ const LocalDashboard = () => {
     if (localError) {
       console.error('Error fetching local:', localError);
       showError('Error al cargar los datos del local.');
-      setLoading(false);
+      setLoadingLocal(false);
       return;
     }
 
     setLocalData(local);
-
-    // Obtener estadísticas de pedidos
-    const { data: orders, error: ordersError } = await supabase
-      .from('orders')
-      .select('status, created_at')
-      .eq('local_id', local.id);
-
-    if (!ordersError && orders) {
-      const today = new Date().toDateString();
-      setStats({
-        pending: orders.filter(o => o.status === 'pending').length,
-        in_progress: orders.filter(o => o.status === 'in_progress').length,
-        ready: orders.filter(o => o.status === 'ready').length,
-        completed_today: orders.filter(o => 
-          o.status === 'completed' && 
-          new Date(o.created_at).toDateString() === today
-        ).length,
-      });
-    }
-
-    setLoading(false);
+    setLocalId(local.id);
+    setLoadingLocal(false);
   };
+
+  const { 
+    totalOrders, 
+    totalRevenue, 
+    orderStatusStats, 
+    orderTrends, 
+    loading: loadingStats, 
+    refreshData 
+  } = useLocalDashboardData(localId);
 
   // Función para forzar la recarga del perfil después de una actualización
   const handleProfileUpdate = () => {
-    // Forzar un refresh de sesión para obtener el perfil actualizado (incluyendo password_changed)
-    // En este caso, confiamos en que SessionContext recargará el perfil.
+    // Confiar en SessionContext para recargar el perfil
   };
 
   const needsPasswordChange = profile && !profile.password_changed;
 
-  if (loading) {
+  if (loadingLocal) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
         <p className="text-white text-xl">Cargando...</p>
@@ -98,9 +86,20 @@ const LocalDashboard = () => {
               {localData?.name || 'Local'}
             </p>
           </div>
-          <Button onClick={signOut} className="bg-emphasis-red hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
-            Cerrar Sesión
-          </Button>
+          <div className="flex gap-3">
+            <Button 
+              onClick={refreshData} 
+              disabled={loadingStats}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${loadingStats ? 'animate-spin' : ''}`} />
+              Actualizar Datos
+            </Button>
+            <Button onClick={signOut} className="bg-emphasis-red hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+              Cerrar Sesión
+            </Button>
+          </div>
         </div>
         <p className="text-xl text-gray-600 mb-6">
           Bienvenido, {profile?.first_name || user?.email}! Aquí puedes gestionar tus pedidos y configuraciones.
@@ -120,59 +119,42 @@ const LocalDashboard = () => {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="dashboard" className="mt-6">
+          <TabsContent value="dashboard" className="mt-6 space-y-6">
             {/* Estadísticas rápidas */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <Card className="bg-secondary-yellow/10 border-secondary-yellow">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600">Pendientes</p>
-                      <p className="text-3xl font-bold text-text-carbon">{stats.pending}</p>
-                    </div>
-                    <Clock className="h-10 w-10 text-secondary-yellow" />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-primary-blue/10 border-primary-blue">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600">En Proceso</p>
-                      <p className="text-3xl font-bold text-text-carbon">{stats.in_progress}</p>
-                    </div>
-                    <Package className="h-10 w-10 text-primary-blue" />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-success-green/10 border-success-green">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600">Listos</p>
-                      <p className="text-3xl font-bold text-text-carbon">{stats.ready}</p>
-                    </div>
-                    <CheckCircle className="h-10 w-10 text-success-green" />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-gray-100 border-gray-300">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600">Completados Hoy</p>
-                      <p className="text-3xl font-bold text-text-carbon">{stats.completed_today}</p>
-                    </div>
-                    <CheckCircle className="h-10 w-10 text-gray-500" />
-                  </div>
-                </CardContent>
-              </Card>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <StatCard 
+                title="Ingresos (Completados)"
+                value={`$${totalRevenue.toFixed(2)}`}
+                icon={DollarSign}
+                color="text-success-green"
+                description="Pedidos completados históricamente"
+              />
+              <StatCard 
+                title="Total de Pedidos"
+                value={totalOrders}
+                icon={Package}
+                color="text-primary-blue"
+                description="Pedidos totales de este local"
+              />
+              <StatCard 
+                title="Pedidos Pendientes"
+                value={orderStatusStats.find(s => s.name === 'PENDING')?.value || 0}
+                icon={Clock}
+                color="text-secondary-yellow"
+                description="Pedidos esperando ser procesados"
+              />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Gráficos de Tendencia y Estado */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2">
+                <OrderTrendChart data={orderTrends} loading={loadingStats} />
+              </div>
+              <StatusPieChart data={orderStatusStats} loading={loadingStats} />
+            </div>
+
+            {/* Gestión de Pedidos y Precios */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
               <Card className="bg-gray-50 shadow-md">
                 <CardHeader>
                   <CardTitle className="text-primary-blue">Gestión de Pedidos</CardTitle>
