@@ -4,9 +4,10 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Trophy, Loader2, Star } from 'lucide-react';
+import { Trophy, Loader2, Star, AlertCircle, RefreshCw } from 'lucide-react';
 import { showError } from '@/utils/toast';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 interface RankingEntry {
   client_id: string;
@@ -26,22 +27,31 @@ interface ClientRankingTableProps {
 const ClientRankingTable: React.FC<ClientRankingTableProps> = ({ localId, title, description }) => {
   const [ranking, setRanking] = useState<RankingEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchRanking = useCallback(async () => {
     setLoading(true);
+    setError(null);
     
-    const { data, error } = await supabase.rpc('get_client_points_ranking', {
-      target_local_id: localId || null,
-    });
+    try {
+      const { data, error } = await supabase.rpc('get_client_points_ranking', {
+        target_local_id: localId || null,
+      });
 
-    if (error) {
-      console.error('Error fetching client ranking:', error);
-      showError('Error al cargar el ranking de clientes.');
+      if (error) {
+        console.error('Error fetching client ranking:', error);
+        setError(error.message || 'Error al cargar el ranking de clientes.');
+        setRanking([]);
+      } else {
+        setRanking(data || []);
+      }
+    } catch (err) {
+      console.error('Unexpected error:', err);
+      setError('Error inesperado al cargar el ranking.');
       setRanking([]);
-    } else {
-      setRanking(data || []);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [localId]);
 
   useEffect(() => {
@@ -59,6 +69,32 @@ const ClientRankingTable: React.FC<ClientRankingTableProps> = ({ localId, title,
     return (
       <Card className="h-64 flex items-center justify-center shadow-md">
         <Loader2 className="h-6 w-6 animate-spin text-primary-blue" />
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="shadow-md">
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold text-text-carbon flex items-center gap-2">
+            <Trophy className="h-6 w-6 text-secondary-yellow" />
+            {title}
+          </CardTitle>
+          <CardDescription>{description}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center justify-center py-8 space-y-4">
+          <AlertCircle className="h-12 w-12 text-emphasis-red" />
+          <p className="text-center text-emphasis-red font-medium">{error}</p>
+          <Button 
+            variant="outline" 
+            onClick={fetchRanking}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Reintentar
+          </Button>
+        </CardContent>
       </Card>
     );
   }
