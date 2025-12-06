@@ -8,9 +8,18 @@ import { useNavigate } from 'react-router-dom';
 import ProfileSettings from '@/components/ProfileSettings';
 import PasswordChangeAlert from '@/components/PasswordChangeAlert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Settings, LayoutDashboard, Star, Gift, ShoppingBag } from 'lucide-react';
+import { Settings, LayoutDashboard, Star, Gift, ShoppingBag, Sparkles } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
+import { Badge } from '@/components/ui/badge';
+
+interface FeaturedReward {
+  id: string;
+  name: string;
+  description: string | null;
+  points_cost: number;
+  image_url: string | null;
+}
 
 const ClientDashboard = () => {
   const { user, profile, signOut, loading: sessionLoading } = useSession();
@@ -18,6 +27,9 @@ const ClientDashboard = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [userPoints, setUserPoints] = useState<number | null>(null);
   const [loadingPoints, setLoadingPoints] = useState(true);
+  const [featuredRewards, setFeaturedRewards] = useState<FeaturedReward[]>([]);
+  const [loadingRewards, setLoadingRewards] = useState(true);
+  const [totalRewardsCount, setTotalRewardsCount] = useState(0);
 
   const fetchUserPoints = useCallback(async () => {
     if (!profile?.id) return;
@@ -39,11 +51,42 @@ const ClientDashboard = () => {
     setLoadingPoints(false);
   }, [profile?.id]);
 
+  const fetchFeaturedRewards = useCallback(async () => {
+    setLoadingRewards(true);
+
+    // Obtener los 3 premios más económicos (más accesibles)
+    const { data: rewardsData, error: rewardsError } = await supabase
+      .from('rewards')
+      .select('*')
+      .eq('is_active', true)
+      .order('points_cost', { ascending: true })
+      .limit(3);
+
+    if (rewardsError) {
+      console.error('Error fetching featured rewards:', rewardsError);
+    } else {
+      setFeaturedRewards(rewardsData || []);
+    }
+
+    // Obtener el total de premios activos
+    const { count, error: countError } = await supabase
+      .from('rewards')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_active', true);
+
+    if (!countError) {
+      setTotalRewardsCount(count || 0);
+    }
+
+    setLoadingRewards(false);
+  }, []);
+
   useEffect(() => {
     if (!sessionLoading && profile?.role === 'client') {
       fetchUserPoints();
+      fetchFeaturedRewards();
     }
-  }, [sessionLoading, profile, fetchUserPoints]);
+  }, [sessionLoading, profile, fetchUserPoints, fetchFeaturedRewards]);
 
   // Función para forzar la recarga del perfil después de una actualización
   const handleProfileUpdate = () => {
@@ -102,8 +145,79 @@ const ClientDashboard = () => {
             </TabsTrigger>
           </TabsList>
           
-          <TabsContent value="dashboard" className="mt-6">
-            <p className="text-xl text-gray-600 mb-6">Tu centro de gestión de pedidos y recompensas.</p>
+          <TabsContent value="dashboard" className="mt-6 space-y-6">
+            <p className="text-xl text-gray-600">Tu centro de gestión de pedidos y recompensas.</p>
+
+            {/* Sección de Premios Destacados */}
+            {!loadingRewards && featuredRewards.length > 0 && (
+              <Card className="bg-gradient-to-r from-purple-50 to-pink-50 border-purple-300 shadow-lg">
+                <CardHeader>
+                  <CardTitle className="text-2xl font-bold text-purple-700 flex items-center gap-2">
+                    <Sparkles className="h-6 w-6" />
+                    ¡Premios Destacados!
+                  </CardTitle>
+                  <CardDescription className="text-purple-600">
+                    Canjea tus puntos por increíbles recompensas. {totalRewardsCount > 3 && `¡Hay ${totalRewardsCount} premios disponibles!`}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {featuredRewards.map((reward) => {
+                      const canAfford = userPoints !== null && userPoints >= reward.points_cost;
+                      
+                      return (
+                        <Card 
+                          key={reward.id} 
+                          className={`overflow-hidden transition-all hover:shadow-xl ${canAfford ? 'border-success-green border-2' : 'border-gray-200'}`}
+                        >
+                          {reward.image_url && (
+                            <div className="h-32 bg-gray-100 overflow-hidden">
+                              <img 
+                                src={reward.image_url} 
+                                alt={reward.name}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          )}
+                          <CardContent className="p-4">
+                            <h4 className="font-bold text-lg text-text-carbon mb-2 line-clamp-1">
+                              {reward.name}
+                            </h4>
+                            {reward.description && (
+                              <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                                {reward.description}
+                              </p>
+                            )}
+                            <div className="flex items-center justify-between">
+                              <Badge 
+                                variant={canAfford ? "default" : "secondary"}
+                                className={`${canAfford ? 'bg-success-green' : 'bg-gray-400'} text-white`}
+                              >
+                                <Star className="h-3 w-3 mr-1" />
+                                {reward.points_cost} pts
+                              </Badge>
+                              {canAfford && (
+                                <span className="text-xs text-success-green font-semibold">
+                                  ¡Puedes canjearlo!
+                                </span>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-4 text-center">
+                    <Button 
+                      onClick={() => navigate('/client/rewards')}
+                      className="bg-purple-600 hover:bg-purple-700 text-white"
+                    >
+                      Ver Todos los Premios ({totalRewardsCount})
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Card className="bg-gray-50 shadow-md">
