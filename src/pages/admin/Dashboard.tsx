@@ -14,7 +14,8 @@ import {
   Package,
   User,
   RefreshCw,
-  BarChart
+  BarChart,
+  Loader2 // <-- Importación añadida
 } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import { useAdminDashboardData } from '@/hooks/useDashboardData';
