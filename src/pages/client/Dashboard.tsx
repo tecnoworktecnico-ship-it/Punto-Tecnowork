@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSession } from '@/contexts/SessionContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,18 +8,46 @@ import { useNavigate } from 'react-router-dom';
 import ProfileSettings from '@/components/ProfileSettings';
 import PasswordChangeAlert from '@/components/PasswordChangeAlert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Settings, LayoutDashboard } from 'lucide-react';
+import { Settings, LayoutDashboard, Star, Gift, ShoppingBag } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { showError } from '@/utils/toast';
 
 const ClientDashboard = () => {
-  const { user, profile, signOut } = useSession();
+  const { user, profile, signOut, loading: sessionLoading } = useSession();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [userPoints, setUserPoints] = useState<number | null>(null);
+  const [loadingPoints, setLoadingPoints] = useState(true);
+
+  const fetchUserPoints = useCallback(async () => {
+    if (!profile?.id) return;
+    setLoadingPoints(true);
+
+    const { data: pointsData, error: pointsError } = await supabase
+      .from('user_points')
+      .select('points')
+      .eq('user_id', profile.id)
+      .single();
+
+    if (pointsError && pointsError.code !== 'PGRST116') {
+      console.error('Error fetching user points:', pointsError);
+      showError('Error al cargar tus puntos.');
+      setUserPoints(0);
+    } else {
+      setUserPoints(pointsData?.points || 0);
+    }
+    setLoadingPoints(false);
+  }, [profile?.id]);
+
+  useEffect(() => {
+    if (!sessionLoading && profile?.role === 'client') {
+      fetchUserPoints();
+    }
+  }, [sessionLoading, profile, fetchUserPoints]);
 
   // Función para forzar la recarga del perfil después de una actualización
   const handleProfileUpdate = () => {
-    // Forzar un refresh de sesión para obtener el perfil actualizado (incluyendo password_changed)
-    // Aunque useSession ya maneja USER_UPDATED, forzamos un re-render si es necesario.
-    // En este caso, confiamos en que SessionContext recargará el perfil.
+    // Confiar en SessionContext para recargar el perfil
   };
 
   const needsPasswordChange = profile && !profile.password_changed;
@@ -38,6 +66,32 @@ const ClientDashboard = () => {
           <PasswordChangeAlert onNavigateToSettings={() => setActiveTab('settings')} />
         )}
 
+        {/* Tarjeta de Puntos Destacada */}
+        <Card className="bg-secondary-yellow/20 border-secondary-yellow shadow-xl">
+          <CardContent className="p-6 flex justify-between items-center">
+            <div>
+              <p className="text-xl font-semibold text-text-carbon mb-1">Tus Puntos Actuales</p>
+              {loadingPoints ? (
+                <div className="h-8 w-24 bg-gray-200 rounded animate-pulse"></div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Star className="h-8 w-8 text-secondary-yellow fill-secondary-yellow" />
+                  <span className="text-5xl font-extrabold text-text-carbon">
+                    {userPoints}
+                  </span>
+                </div>
+              )}
+            </div>
+            <Button 
+              onClick={() => navigate('/client/rewards')}
+              className="bg-primary-blue hover:bg-blue-700 text-white text-lg px-6 py-3 flex items-center gap-2"
+            >
+              <Gift className="h-6 w-6" />
+              Canjear Recompensas
+            </Button>
+          </CardContent>
+        </Card>
+
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2 md:w-1/3">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
@@ -49,12 +103,14 @@ const ClientDashboard = () => {
           </TabsList>
           
           <TabsContent value="dashboard" className="mt-6">
-            <p className="text-xl text-gray-600 mb-6">Este es tu dashboard de cliente. Aquí puedes gestionar tus pedidos y recompensas.</p>
+            <p className="text-xl text-gray-600 mb-6">Tu centro de gestión de pedidos y recompensas.</p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Card className="bg-gray-50 shadow-md">
                 <CardHeader>
-                  <CardTitle className="text-primary-blue">Mis Pedidos</CardTitle>
+                  <CardTitle className="text-primary-blue flex items-center gap-2">
+                    <ShoppingBag className="h-5 w-5" /> Mis Pedidos
+                  </CardTitle>
                   <CardDescription>Revisa el estado de tus pedidos y tu historial.</CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col space-y-2">
@@ -69,15 +125,17 @@ const ClientDashboard = () => {
 
               <Card className="bg-gray-50 shadow-md">
                 <CardHeader>
-                  <CardTitle className="text-primary-blue">Mis Recompensas</CardTitle>
-                  <CardDescription>Consulta tus puntos y canjea recompensas.</CardDescription>
+                  <CardTitle className="text-primary-blue flex items-center gap-2">
+                    <Star className="h-5 w-5" /> Puntos y Recompensas
+                  </CardTitle>
+                  <CardDescription>Consulta tu historial de puntos y canjes.</CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col space-y-2">
                   <Button variant="outline" className="w-full" onClick={() => navigate('/client/rewards')}>
-                    Ver Recompensas
+                    Ver Recompensas Disponibles
                   </Button>
                   <Button variant="outline" className="w-full" onClick={() => navigate('/client/points')}>
-                    Mis Puntos
+                    Historial de Puntos
                   </Button>
                 </CardContent>
               </Card>

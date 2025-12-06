@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
-import { DollarSign, Settings, LayoutDashboard, RefreshCw, Package, Clock, BarChart } from 'lucide-react';
+import { DollarSign, Settings, LayoutDashboard, RefreshCw, Package, Clock, BarChart, Trophy } from 'lucide-react';
 import ProfileSettings from '@/components/ProfileSettings';
 import PasswordChangeAlert from '@/components/PasswordChangeAlert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -147,15 +147,16 @@ const LocalDashboard = () => {
 
             {/* Gestión de Pedidos, Precios y Reportes */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
-              <Card className="bg-gray-50 shadow-md">
+              <Card className="bg-primary-blue/10 border-primary-blue shadow-md">
                 <CardHeader>
-                  <CardTitle className="text-primary-blue">Gestión de Pedidos</CardTitle>
+                  <CardTitle className="text-primary-blue flex items-center gap-2">
+                    <Package className="h-5 w-5" /> Gestión de Pedidos
+                  </CardTitle>
                   <CardDescription>Revisa y actualiza el estado de los pedidos de tu local.</CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col space-y-2">
                   <Button 
-                    variant="outline" 
-                    className="w-full" 
+                    className="w-full bg-primary-blue hover:bg-blue-700 text-white" 
                     onClick={() => navigate('/local/orders')}
                   >
                     Ver Todos los Pedidos
@@ -163,17 +164,20 @@ const LocalDashboard = () => {
                 </CardContent>
               </Card>
               
-              <Card className="bg-primary-blue/10 border-primary-blue shadow-md">
+              <Card className="bg-secondary-yellow/10 border-secondary-yellow shadow-md">
                 <CardHeader>
-                  <CardTitle className="text-primary-blue">ESTADÍSTICAS</CardTitle>
-                  <CardDescription>Análisis de rendimiento, tendencias y ranking de clientes.</CardDescription>
+                  <CardTitle className="text-secondary-yellow flex items-center gap-2">
+                    <Trophy className="h-5 w-5" /> Ranking de Clientes
+                  </CardTitle>
+                  <CardDescription>Consulta el ranking de clientes con más puntos en tu local.</CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col space-y-2">
                   <Button 
-                    className="w-full bg-primary-blue hover:bg-blue-700 text-white" 
+                    variant="outline" 
+                    className="w-full text-secondary-yellow border-secondary-yellow hover:bg-secondary-yellow/20" 
                     onClick={() => navigate('/local/reports')}
                   >
-                    Ver Reportes Detallados
+                    Ver Ranking y Reportes
                   </Button>
                 </CardContent>
               </Card>
