@@ -13,6 +13,7 @@ import PasswordChangeAlert from '@/components/PasswordChangeAlert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useLocalDashboardData } from '@/hooks/useDashboardData';
 import StatCard from '@/components/dashboard/StatCard';
+import ClientRankingTable from '@/components/dashboard/ClientRankingTable'; // Importar el ranking
 
 const LocalDashboard = () => {
   const { user, profile, signOut } = useSession();
@@ -200,6 +201,13 @@ const LocalDashboard = () => {
                 </Card>
               )}
             </div>
+            
+            {/* Ranking de Clientes */}
+            <ClientRankingTable 
+              localId={localId || undefined}
+              title={`Top 10 Clientes de ${localData?.name || 'Tu Local'}`}
+              description="Clientes con más puntos que han realizado pedidos aquí."
+            />
           </TabsContent>
 
           <TabsContent value="settings" className="mt-6">
