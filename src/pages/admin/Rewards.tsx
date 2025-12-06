@@ -84,12 +84,20 @@ const Rewards = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    const pointsCost = parseInt(formData.points_cost);
+    
+    if (isNaN(pointsCost) || pointsCost <= 0) {
+      showError('El costo en puntos debe ser un número entero positivo.');
+      return;
+    }
+    
     setLoading(true);
 
     const rewardData = {
       name: formData.name,
       description: formData.description || null,
-      points_cost: parseInt(formData.points_cost),
+      points_cost: pointsCost, // Usar el valor parseado
       image_url: formData.image_url || null,
       is_active: formData.is_active,
     };
