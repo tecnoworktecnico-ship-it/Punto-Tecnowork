@@ -15,7 +15,8 @@ import {
   User,
   RefreshCw,
   BarChart,
-  Loader2 
+  Loader2,
+  Gift // Importar Gift para el nuevo botón
 } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import { useAdminDashboardData } from '@/hooks/useDashboardData';
@@ -49,7 +50,7 @@ const AdminDashboard = () => {
     setTimeout(() => {
       setIsConfiguring(false);
       showSuccess('Instrucciones mostradas. Recuerda que necesitas acceso a la consola de Supabase.');
-    }, 1500);
+    } , 1500);
     
     // Mostrar instrucciones detalladas
     alert(`Para extender el tiempo de verificación de correo a 30 minutos:
@@ -123,7 +124,7 @@ Nota: Esta configuración solo puede cambiarse desde la consola de Supabase y re
         {/* Sección de Navegación y Configuración */}
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 mt-8">
           
-          {/* Nuevo Botón de Reportes */}
+          {/* Botón de Reportes */}
           <Card className="bg-primary-blue/10 border-primary-blue shadow-md hover:shadow-lg transition-shadow lg:col-span-2">
             <CardHeader>
               <div className="flex items-center gap-3">
@@ -202,6 +203,26 @@ Nota: Esta configuración solo puede cambiarse desde la consola de Supabase y re
                 onClick={() => navigate('/admin/global-prices')}
               >
                 Gestionar Precios
+              </Button>
+            </CardContent>
+          </Card>
+          
+          {/* Nueva Tarjeta de Recompensas */}
+          <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <Gift className="h-8 w-8 text-primary-blue" />
+                <CardTitle className="text-primary-blue">Recompensas</CardTitle>
+              </div>
+              <CardDescription>Crea y gestiona los premios canjeables.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col space-y-2">
+              <Button 
+                variant="outline" 
+                className="w-full justify-start" 
+                onClick={() => navigate('/admin/rewards')}
+              >
+                Gestionar Premios
               </Button>
             </CardContent>
           </Card>
