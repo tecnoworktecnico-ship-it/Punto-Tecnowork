@@ -15,12 +15,14 @@ import BrandingSettings from "@/pages/admin/BrandingSettings";
 import GlobalPrices from "@/pages/admin/GlobalPrices";
 import Locals from "@/pages/admin/Locals";
 import Users from "@/pages/admin/Users";
+import AdminReports from "@/pages/admin/AdminReports"; // Importar nuevo componente
 
 // Local Pages
 import LocalDashboard from "@/pages/local/Dashboard";
 import LocalPrices from "@/pages/local/LocalPrices";
 import LocalOrders from "@/pages/local/Orders";
-import LocalOrderDetail from "@/pages/local/OrderDetail"; // Importar nuevo componente
+import LocalOrderDetail from "@/pages/local/OrderDetail";
+import LocalReports from "@/pages/local/LocalReports"; // Importar nuevo componente
 
 // Client Pages
 import ClientDashboard from "@/pages/client/Dashboard";
@@ -45,6 +47,14 @@ function App() {
             element={
               <AuthGuard allowedRoles={["admin"]}>
                 <AdminDashboard />
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/admin/reports"
+            element={
+              <AuthGuard allowedRoles={["admin"]}>
+                <AdminReports />
               </AuthGuard>
             }
           />
@@ -87,6 +97,14 @@ function App() {
             element={
               <AuthGuard allowedRoles={["local"]}>
                 <LocalDashboard />
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/local/reports"
+            element={
+              <AuthGuard allowedRoles={["local"]}>
+                <LocalReports />
               </AuthGuard>
             }
           />

@@ -7,14 +7,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
-import { DollarSign, Settings, LayoutDashboard, RefreshCw, Package, Clock, CheckCircle } from 'lucide-react';
+import { DollarSign, Settings, LayoutDashboard, RefreshCw, Package, Clock, BarChart } from 'lucide-react';
 import ProfileSettings from '@/components/ProfileSettings';
 import PasswordChangeAlert from '@/components/PasswordChangeAlert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useLocalDashboardData } from '@/hooks/useDashboardData';
 import StatCard from '@/components/dashboard/StatCard';
-import StatusPieChart from '@/components/dashboard/StatusPieChart';
-import OrderTrendChart from '@/components/dashboard/OrderTrendChart';
 
 const LocalDashboard = () => {
   const { user, profile, signOut } = useSession();
@@ -43,6 +41,8 @@ const LocalDashboard = () => {
     if (localError) {
       console.error('Error fetching local:', localError);
       showError('Error al cargar los datos del local.');
+      setLocalData(null);
+      setLocalId(null);
       setLoadingLocal(false);
       return;
     }
@@ -56,7 +56,6 @@ const LocalDashboard = () => {
     totalOrders, 
     totalRevenue, 
     orderStatusStats, 
-    orderTrends, 
     loading: loadingStats, 
     refreshData 
   } = useLocalDashboardData(localId);
@@ -67,6 +66,7 @@ const LocalDashboard = () => {
   };
 
   const needsPasswordChange = profile && !profile.password_changed;
+  const pendingOrders = orderStatusStats.find(s => s.name === 'PENDING')?.value || 0;
 
   if (loadingLocal) {
     return (
@@ -138,23 +138,15 @@ const LocalDashboard = () => {
               />
               <StatCard 
                 title="Pedidos Pendientes"
-                value={orderStatusStats.find(s => s.name === 'PENDING')?.value || 0}
+                value={pendingOrders}
                 icon={Clock}
                 color="text-secondary-yellow"
                 description="Pedidos esperando ser procesados"
               />
             </div>
 
-            {/* Gráficos de Tendencia y Estado */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2">
-                <OrderTrendChart data={orderTrends} loading={loadingStats} />
-              </div>
-              <StatusPieChart data={orderStatusStats} loading={loadingStats} />
-            </div>
-
-            {/* Gestión de Pedidos y Precios */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+            {/* Gestión de Pedidos, Precios y Reportes */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
               <Card className="bg-gray-50 shadow-md">
                 <CardHeader>
                   <CardTitle className="text-primary-blue">Gestión de Pedidos</CardTitle>
@@ -167,6 +159,21 @@ const LocalDashboard = () => {
                     onClick={() => navigate('/local/orders')}
                   >
                     Ver Todos los Pedidos
+                  </Button>
+                </CardContent>
+              </Card>
+              
+              <Card className="bg-primary-blue/10 border-primary-blue shadow-md">
+                <CardHeader>
+                  <CardTitle className="text-primary-blue">ESTADÍSTICAS</CardTitle>
+                  <CardDescription>Análisis de rendimiento, tendencias y ranking de clientes.</CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col space-y-2">
+                  <Button 
+                    className="w-full bg-primary-blue hover:bg-blue-700 text-white" 
+                    onClick={() => navigate('/local/reports')}
+                  >
+                    Ver Reportes Detallados
                   </Button>
                 </CardContent>
               </Card>

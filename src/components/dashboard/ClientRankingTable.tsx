@@ -1,0 +1,116 @@
+"use client";
+
+import React, { useEffect, useState, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Trophy, Loader2, Star } from 'lucide-react';
+import { showError } from '@/utils/toast';
+import { Badge } from '@/components/ui/badge';
+
+interface RankingEntry {
+  client_id: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string;
+  points: number;
+  rank: number;
+}
+
+interface ClientRankingTableProps {
+  localId?: string; // Opcional para ranking general (Admin)
+  title: string;
+  description: string;
+}
+
+const ClientRankingTable: React.FC<ClientRankingTableProps> = ({ localId, title, description }) => {
+  const [ranking, setRanking] = useState<RankingEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchRanking = useCallback(async () => {
+    setLoading(true);
+    
+    const { data, error } = await supabase.rpc('get_client_points_ranking', {
+      target_local_id: localId || null,
+    });
+
+    if (error) {
+      console.error('Error fetching client ranking:', error);
+      showError('Error al cargar el ranking de clientes.');
+      setRanking([]);
+    } else {
+      setRanking(data || []);
+    }
+    setLoading(false);
+  }, [localId]);
+
+  useEffect(() => {
+    fetchRanking();
+  }, [fetchRanking]);
+
+  const getRankBadge = (rank: number) => {
+    if (rank === 1) return <Badge className="bg-secondary-yellow hover:bg-secondary-yellow text-text-carbon">#1 Oro</Badge>;
+    if (rank === 2) return <Badge variant="secondary">#2 Plata</Badge>;
+    if (rank === 3) return <Badge variant="outline">#3 Bronce</Badge>;
+    return <span className="text-gray-500">{rank}</span>;
+  };
+
+  if (loading) {
+    return (
+      <Card className="h-64 flex items-center justify-center shadow-md">
+        <Loader2 className="h-6 w-6 animate-spin text-primary-blue" />
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="shadow-md">
+      <CardHeader>
+        <CardTitle className="text-2xl font-bold text-text-carbon flex items-center gap-2">
+          <Trophy className="h-6 w-6 text-secondary-yellow" />
+          {title}
+        </CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {ranking.length === 0 ? (
+          <p className="text-center text-gray-500 py-8">
+            No hay clientes con puntos registrados {localId ? 'en este local' : 'aún'}.
+          </p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[80px]">Rank</TableHead>
+                <TableHead>Cliente</TableHead>
+                <TableHead className="text-right">Puntos</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {ranking.slice(0, 10).map((entry) => (
+                <TableRow key={entry.client_id}>
+                  <TableCell className="font-bold">{getRankBadge(entry.rank)}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-col">
+                      <span className="font-medium">
+                        {entry.first_name || entry.last_name 
+                          ? `${entry.first_name || ''} ${entry.last_name || ''}`.trim()
+                          : 'Cliente sin nombre'}
+                      </span>
+                      <span className="text-xs text-gray-500">{entry.email}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right font-bold text-secondary-yellow flex items-center justify-end gap-1">
+                    {entry.points} <Star className="h-4 w-4" />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+export default ClientRankingTable;

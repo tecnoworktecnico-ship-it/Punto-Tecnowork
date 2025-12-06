@@ -15,13 +15,11 @@ import {
   User,
   RefreshCw,
   BarChart,
-  Loader2 // <-- Importación añadida
+  Loader2 
 } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import { useAdminDashboardData } from '@/hooks/useDashboardData';
 import StatCard from '@/components/dashboard/StatCard';
-import StatusPieChart from '@/components/dashboard/StatusPieChart';
-import OrderTrendChart from '@/components/dashboard/OrderTrendChart';
 import {
   Table,
   TableBody,
@@ -38,8 +36,6 @@ const AdminDashboard = () => {
     totalOrders, 
     totalRevenue, 
     totalClients, 
-    orderStatusStats, 
-    orderTrends, 
     localPerformance, 
     loading, 
     refreshData 
@@ -124,57 +120,28 @@ Nota: Esta configuración solo puede cambiarse desde la consola de Supabase y re
           />
         </div>
 
-        {/* Gráficos de Tendencia y Estado */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
-            <OrderTrendChart data={orderTrends} loading={loading} />
-          </div>
-          <StatusPieChart data={orderStatusStats} loading={loading} />
-        </div>
-
-        {/* Rendimiento por Local */}
-        <Card className="shadow-md">
-          <CardHeader>
-            <CardTitle className="text-2xl font-bold text-text-carbon flex items-center gap-2">
-              <BarChart className="h-6 w-6 text-primary-blue" />
-              Rendimiento de Locales
-            </CardTitle>
-            <CardDescription>Ingresos y pedidos completados por cada local.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="text-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary-blue" />
-              </div>
-            ) : localPerformance.length === 0 ? (
-              <p className="text-gray-500">No hay locales registrados.</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Local</TableHead>
-                    <TableHead>Ingresos Totales</TableHead>
-                    <TableHead>Pedidos Completados</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {localPerformance.map((local, index) => (
-                    <TableRow key={index}>
-                      <TableCell className="font-medium">{local.local_name}</TableCell>
-                      <TableCell className="font-bold text-success-green">
-                        ${local.total_revenue.toFixed(2)}
-                      </TableCell>
-                      <TableCell>{local.completed_orders}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-
         {/* Sección de Navegación y Configuración */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 mt-8">
+          
+          {/* Nuevo Botón de Reportes */}
+          <Card className="bg-primary-blue/10 border-primary-blue shadow-md hover:shadow-lg transition-shadow lg:col-span-2">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <BarChart className="h-8 w-8 text-primary-blue" />
+                <CardTitle className="text-primary-blue">ESTADÍSTICAS Y REPORTES</CardTitle>
+              </div>
+              <CardDescription>Análisis detallado de rendimiento, tendencias y ranking de clientes.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col space-y-2">
+              <Button 
+                className="w-full bg-primary-blue hover:bg-blue-700 text-white" 
+                onClick={() => navigate('/admin/reports')}
+              >
+                Ver Reportes Detallados
+              </Button>
+            </CardContent>
+          </Card>
+
           <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader>
               <div className="flex items-center gap-3">
@@ -190,25 +157,6 @@ Nota: Esta configuración solo puede cambiarse desde la consola de Supabase y re
                 onClick={() => navigate('/admin/locals')}
               >
                 Gestionar Locales
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <DollarSign className="h-8 w-8 text-primary-blue" />
-                <CardTitle className="text-primary-blue">Precios Globales</CardTitle>
-              </div>
-              <CardDescription>Configura precios base para servicios.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col space-y-2">
-              <Button 
-                variant="outline" 
-                className="w-full justify-start" 
-                onClick={() => navigate('/admin/global-prices')}
-              >
-                Gestionar Precios
               </Button>
             </CardContent>
           </Card>
@@ -236,17 +184,24 @@ Nota: Esta configuración solo puede cambiarse desde la consola de Supabase y re
             <CardHeader>
               <div className="flex items-center gap-3">
                 <Settings className="h-8 w-8 text-primary-blue" />
-                <CardTitle className="text-primary-blue">Branding</CardTitle>
+                <CardTitle className="text-primary-blue">Configuración</CardTitle>
               </div>
-              <CardDescription>Configura la identidad visual.</CardDescription>
+              <CardDescription>Branding y precios globales.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col space-y-2">
               <Button 
                 variant="outline" 
-                className="w-full justify-start" 
+                className="w-full justify-start mb-2" 
                 onClick={() => navigate('/admin/branding')}
               >
                 Configurar Branding
+              </Button>
+              <Button 
+                variant="outline" 
+                className="w-full justify-start" 
+                onClick={() => navigate('/admin/global-prices')}
+              >
+                Gestionar Precios
               </Button>
             </CardContent>
           </Card>
@@ -255,9 +210,9 @@ Nota: Esta configuración solo puede cambiarse desde la consola de Supabase y re
             <CardHeader>
               <div className="flex items-center gap-3">
                 <Clock className="h-8 w-8 text-primary-blue" />
-                <CardTitle className="text-primary-blue">Tiempo de Verificación</CardTitle>
+                <CardTitle className="text-primary-blue">Verificación Email</CardTitle>
               </div>
-              <CardDescription>Configura el tiempo de expiración para enlaces de verificación.</CardDescription>
+              <CardDescription>Ajustes de seguridad de autenticación.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col space-y-2">
               <Button 
@@ -266,7 +221,7 @@ Nota: Esta configuración solo puede cambiarse desde la consola de Supabase y re
                 onClick={showVerificationTimeInstructions}
                 disabled={isConfiguring}
               >
-                {isConfiguring ? 'Mostrando instrucciones...' : 'Extender a 30 minutos'}
+                {isConfiguring ? 'Mostrando instrucciones...' : 'Extender tiempo de enlace'}
               </Button>
             </CardContent>
           </Card>
