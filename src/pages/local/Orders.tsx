@@ -37,7 +37,7 @@ interface Order {
   profiles: {
     first_name: string;
     last_name: string;
-  };
+  } | null; // Permitir null temporalmente
 }
 
 const LocalOrders = () => {
@@ -88,6 +88,8 @@ const LocalOrders = () => {
     setLocalId(local.id);
 
     // Obtener pedidos del local
+    // NOTA: Hemos simplificado la consulta para aislar el error.
+    // Si esto funciona, el problema está en la unión de 'profiles'.
     const { data: ordersData, error: ordersError } = await supabase
       .from('orders')
       .select(`
@@ -102,9 +104,32 @@ const LocalOrders = () => {
 
     if (ordersError) {
       console.error('Error fetching orders:', ordersError);
-      showError('Error al cargar los pedidos.');
+      // Si el error es un problema de unión, intentamos la consulta sin la unión
+      if (ordersError.message.includes('relation') || ordersError.message.includes('column')) {
+         console.warn('Intentando cargar pedidos sin datos de perfil debido a un error de unión.');
+         const { data: fallbackOrdersData, error: fallbackError } = await supabase
+            .from('orders')
+            .select(`*`) // Solo campos de orders
+            .eq('local_id', local.id)
+            .order('created_at', { ascending: false });
+            
+         if (fallbackError) {
+            console.error('Error fetching fallback orders:', fallbackError);
+            showError('Error al cargar los pedidos.');
+         } else {
+            // Mapear datos sin perfil
+            const mappedOrders = fallbackOrdersData.map(order => ({
+                ...order,
+                profiles: { first_name: 'Error', last_name: 'Perfil' }
+            })) as Order[];
+            setOrders(mappedOrders);
+            showError('Advertencia: No se pudieron cargar los nombres de los clientes. Revisa la configuración de claves foráneas.');
+         }
+      } else {
+        showError('Error al cargar los pedidos.');
+      }
     } else {
-      setOrders(ordersData || []);
+      setOrders(ordersData as Order[] || []);
     }
 
     setLoading(false);
