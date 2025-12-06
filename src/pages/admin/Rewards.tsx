@@ -89,6 +89,7 @@ const Rewards = () => {
     
     if (isNaN(pointsCost) || pointsCost <= 0) {
       showError('El costo en puntos debe ser un número entero positivo.');
+      setLoading(false);
       return;
     }
     
@@ -102,38 +103,42 @@ const Rewards = () => {
       is_active: formData.is_active,
     };
 
-    if (editingReward) {
-      const { error } = await supabase
-        .from('rewards')
-        .update(rewardData)
-        .eq('id', editingReward.id);
+    try {
+      if (editingReward) {
+        const { error } = await supabase
+          .from('rewards')
+          .update(rewardData)
+          .eq('id', editingReward.id);
 
-      if (error) {
-        console.error('Error updating reward:', error);
-        showError('Error al actualizar la recompensa.');
-      } else {
+        if (error) {
+          throw new Error(error.message);
+        }
+        
         showSuccess('Recompensa actualizada correctamente.');
         setDialogOpen(false);
         setEditingReward(null);
         resetForm();
         fetchRewards();
-      }
-    } else {
-      const { error } = await supabase
-        .from('rewards')
-        .insert([rewardData]);
-
-      if (error) {
-        console.error('Error creating reward:', error);
-        showError('Error al crear la recompensa.');
       } else {
+        const { error } = await supabase
+          .from('rewards')
+          .insert([rewardData]);
+
+        if (error) {
+          throw new Error(error.message);
+        }
+        
         showSuccess('Recompensa creada correctamente.');
         setDialogOpen(false);
         resetForm();
         fetchRewards();
       }
+    } catch (error) {
+      console.error('Error saving reward:', error);
+      showError(`Error al guardar la recompensa: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleDelete = async (id: string) => {
