@@ -40,11 +40,12 @@ const LocalOrderDetail = () => {
     const localId = local.id;
 
     // 2. Obtener el pedido, archivos, cliente y auditoría
+    // Usamos la sintaxis explícita de FK para asegurar la unión
     const { data: orderData, error: orderError } = await supabase
       .from('orders')
       .select(`
         *,
-        profiles:client_id (
+        profiles:client_id!orders_client_id_fkey (
           first_name,
           last_name
         ),

@@ -87,11 +87,12 @@ const LocalOrders = () => {
     setLocalId(local.id);
 
     // Obtener pedidos del local con la unión de perfiles
+    // Usamos la sintaxis explícita de FK para asegurar la unión
     const { data: ordersData, error: ordersError } = await supabase
       .from('orders')
       .select(`
         *,
-        profiles:client_id (
+        profiles!orders_client_id_fkey (
           first_name,
           last_name
         )
