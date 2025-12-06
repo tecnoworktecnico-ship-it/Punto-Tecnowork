@@ -193,8 +193,10 @@ const Users = () => {
     setLoading(true);
     
     try {
-      // Usar la función RPC admin_delete_user para manejar la eliminación de forma segura y completa
-      const { error: deleteError } = await supabase.rpc('admin_delete_user', { user_id: userId });
+      // Usar la función RPC admin_delete_user con el nuevo nombre de parámetro
+      const { error: deleteError } = await supabase.rpc('admin_delete_user', { 
+        target_user_id: userId 
+      });
       
       if (deleteError) {
         throw new Error(`Error eliminando usuario: ${deleteError.message}`);
