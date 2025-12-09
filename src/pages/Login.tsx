@@ -194,7 +194,7 @@ function Login() {
       if (error) {
         showError(error.message);
       } else {
-        showSuccess('Se ha enviado un correo para restablecer tu contraseña.');
+        showSuccess('Se ha enviado un correo para restablecer tu contraseña. Por favor, revisa tu bandeja de entrada.');
         setActiveTab('sign_in');
       }
     } catch (error) {

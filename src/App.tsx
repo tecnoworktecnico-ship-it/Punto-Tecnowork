@@ -8,7 +8,8 @@ import LandingPage from "@/pages/LandingPage";
 import Login from "@/pages/Login";
 import NotFound from "@/pages/NotFound";
 import EmailVerificationError from "@/pages/EmailVerificationError";
-import AuthCallback from "@/pages/AuthCallback"; // Importar nuevo componente
+import AuthCallback from "@/pages/AuthCallback";
+import ResetPassword from "@/pages/ResetPassword"; // Importar la nueva página
 
 // Admin Pages
 import AdminDashboard from "@/pages/admin/Dashboard";
@@ -43,7 +44,8 @@ function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/verification-error" element={<EmailVerificationError />} />
-          <Route path="/auth-callback" element={<AuthCallback />} /> {/* Nuevo callback */}
+          <Route path="/auth-callback" element={<AuthCallback />} />
+          <Route path="/reset-password" element={<ResetPassword />} /> {/* Nueva ruta */}
 
           {/* Admin Routes */}
           <Route

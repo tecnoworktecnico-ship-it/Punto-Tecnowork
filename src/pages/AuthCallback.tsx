@@ -15,14 +15,22 @@ const AuthCallback = () => {
     const hashParams = new URLSearchParams(location.hash.substring(1));
     const error = hashParams.get('error');
     const errorCode = hashParams.get('error_code');
+    const type = hashParams.get('type');
     
     if (error && (errorCode === 'otp_expired' || error === 'access_denied')) {
       // Redirect to the dedicated error page
       navigate('/verification-error', { replace: true });
       return;
     }
+    
+    // 2. Check if this is a password recovery link
+    if (type === 'recovery') {
+      // Redirect to the reset password page with the hash intact
+      navigate('/reset-password' + location.hash, { replace: true });
+      return;
+    }
 
-    // 2. If session is loaded and valid, redirect based on role
+    // 3. If session is loaded and valid, redirect based on role
     if (!loading && session && profile) {
       if (profile.role === 'admin') {
         navigate('/admin/dashboard', { replace: true });
@@ -34,7 +42,7 @@ const AuthCallback = () => {
       return;
     }
     
-    // 3. If loading finishes and no session/profile is found (e.g., failed login/callback), go to login
+    // 4. If loading finishes and no session/profile is found (e.g., failed login/callback), go to login
     if (!loading && !session) {
       navigate('/login', { replace: true });
       return;
