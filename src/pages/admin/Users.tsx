@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/select';
 import { showSuccess, showError } from '@/utils/toast';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, UserPlus, Trash2, RefreshCw, Mail, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, UserPlus, Trash2, RefreshCw, Mail, CheckCircle, XCircle, Phone } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -47,6 +47,7 @@ interface User {
   role: string;
   first_name?: string;
   last_name?: string;
+  phone_number?: string; // Añadido phone_number
   manager_id?: string;
   local_name?: string;
   email_confirmed_at?: string | null;
@@ -65,6 +66,7 @@ const Users = () => {
     role: 'client',
     first_name: '',
     last_name: '',
+    phone_number: '', // Añadido phone_number al formulario
     local_id: '',
   });
 
@@ -84,6 +86,11 @@ const Users = () => {
 
     try {
       // Llamar a la función RPC para obtener usuarios con emails y estado de confirmación
+      // Nota: get_users_with_emails solo devuelve los campos que ya tenía definidos.
+      // Necesitamos actualizar la RPC en la DB para incluir phone_number.
+      
+      // Por ahora, usaremos la RPC existente y luego haremos una consulta adicional al perfil
+      // para obtener el número de teléfono, ya que la RPC no lo devuelve.
       const { data: usersData, error: usersError } = await supabase
         .rpc('get_users_with_emails');
 
@@ -94,8 +101,24 @@ const Users = () => {
         return;
       }
       
-      // usersData ahora contiene email_confirmed_at directamente
-      setUsers(usersData || []);
+      // Obtener todos los perfiles para obtener el phone_number
+      const userIds = usersData.map((u: any) => u.id);
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, phone_number');
+
+      if (profilesError) {
+        console.error('Error fetching profiles for phone numbers:', profilesError);
+      }
+      
+      const profilesMap = new Map(profilesData?.map(p => [p.id, p.phone_number]));
+
+      const combinedUsers = usersData.map((u: any) => ({
+        ...u,
+        phone_number: profilesMap.get(u.id) || '',
+      }));
+      
+      setUsers(combinedUsers || []);
 
       // Obtener locales sin manager asignado
       const { data: localsData, error: localsError } = await supabase
@@ -131,7 +154,8 @@ const Users = () => {
             first_name: formData.first_name,
             last_name: formData.last_name,
             role: formData.role, // Incluir el rol en los metadatos
-            is_admin_created: true // <-- INDICAR QUE FUE CREADO POR ADMIN
+            is_admin_created: true, // <-- INDICAR QUE FUE CREADO POR ADMIN
+            phone_number: formData.phone_number || null, // <-- Incluir número de teléfono
           }
         }
       });
@@ -221,6 +245,7 @@ const Users = () => {
       role: 'client',
       first_name: '',
       last_name: '',
+      phone_number: '',
       local_id: '',
     });
   };
@@ -393,6 +418,18 @@ const Users = () => {
                         />
                       </div>
                       <div>
+                        <Label htmlFor="phone_number">Número de Teléfono</Label>
+                        <Input
+                          id="phone_number"
+                          type="tel"
+                          value={formData.phone_number}
+                          onChange={(e) =>
+                            setFormData({ ...formData, phone_number: e.target.value })
+                          }
+                          placeholder="Ej: 555-1234"
+                        />
+                      </div>
+                      <div>
                         <Label htmlFor="role">Rol *</Label>
                         <Select
                           value={formData.role}
@@ -477,6 +514,7 @@ const Users = () => {
                   <TableRow>
                     <TableHead>Correo</TableHead>
                     <TableHead>Nombre</TableHead>
+                    <TableHead>Teléfono</TableHead> {/* Nueva columna */}
                     <TableHead>Rol</TableHead>
                     <TableHead>Verificado</TableHead>
                     <TableHead>Local Asignado</TableHead>
@@ -498,6 +536,9 @@ const Users = () => {
                         {userItem.first_name || userItem.last_name 
                           ? `${userItem.first_name || ''} ${userItem.last_name || ''}`.trim()
                           : 'Sin nombre'}
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-600">
+                        {userItem.phone_number || 'N/A'}
                       </TableCell>
                       <TableCell>
                         <Select

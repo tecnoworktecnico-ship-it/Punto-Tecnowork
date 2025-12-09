@@ -163,7 +163,7 @@ function Login() {
           }}
           onEmailInputChange={(e) => handleEmailChange(e.target.value)}
           // Configuración para campos adicionales en el registro
-          view="sign_in"
+          view="sign_up" // <-- Cambiado a sign_up para mostrar campos adicionales por defecto
           magicLink={true}
           socialLayout="horizontal"
           additionalData={{
