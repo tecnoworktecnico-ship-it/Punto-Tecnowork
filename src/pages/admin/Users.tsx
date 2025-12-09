@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/select';
 import { showSuccess, showError } from '@/utils/toast';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, UserPlus, Trash2, RefreshCw, Mail, CheckCircle, XCircle, Phone } from 'lucide-react';
+import { ArrowLeft, UserPlus, Trash2, RefreshCw, Mail, CheckCircle, XCircle, Phone, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -45,11 +45,11 @@ interface User {
   id: string;
   email: string;
   role: string;
-  first_name?: string;
-  last_name?: string;
-  phone_number?: string; // Añadido phone_number
-  manager_id?: string;
-  local_name?: string;
+  first_name: string | null;
+  last_name: string | null;
+  phone_number: string | null;
+  manager_id?: string | null;
+  local_name?: string | null;
   email_confirmed_at?: string | null;
 }
 
@@ -66,7 +66,7 @@ const Users = () => {
     role: 'client',
     first_name: '',
     last_name: '',
-    phone_number: '', // Añadido phone_number al formulario
+    phone_number: '',
     local_id: '',
   });
 
@@ -85,40 +85,51 @@ const Users = () => {
     setLoading(true);
 
     try {
-      // Llamar a la función RPC para obtener usuarios con emails y estado de confirmación
-      // Nota: get_users_with_emails solo devuelve los campos que ya tenía definidos.
-      // Necesitamos actualizar la RPC en la DB para incluir phone_number.
-      
-      // Por ahora, usaremos la RPC existente y luego haremos una consulta adicional al perfil
-      // para obtener el número de teléfono, ya que la RPC no lo devuelve.
+      // Obtener usuarios y perfiles en una sola consulta
       const { data: usersData, error: usersError } = await supabase
-        .rpc('get_users_with_emails');
+        .from('profiles')
+        .select(`
+          id,
+          first_name,
+          last_name,
+          role,
+          phone_number,
+          manager_id
+        `);
 
       if (usersError) {
-        console.error('Error fetching users:', usersError);
-        showError('Error al cargar usuarios.');
+        console.error('Error fetching profiles:', usersError);
+        showError('Error al cargar perfiles de usuarios.');
         setLoading(false);
         return;
       }
-      
-      // Obtener todos los perfiles para obtener el phone_number
-      const userIds = usersData.map((u: any) => u.id);
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, phone_number');
 
-      if (profilesError) {
-        console.error('Error fetching profiles for phone numbers:', profilesError);
+      // Obtener emails y estado de verificación de auth.users
+      const { data: authUsersData, error: authUsersError } = await supabase
+        .rpc('get_users_with_emails');
+
+      if (authUsersError) {
+        console.error('Error fetching auth users:', authUsersError);
+        showError('Error al cargar datos de autenticación.');
       }
-      
-      const profilesMap = new Map(profilesData?.map(p => [p.id, p.phone_number]));
 
-      const combinedUsers = usersData.map((u: any) => ({
-        ...u,
-        phone_number: profilesMap.get(u.id) || '',
-      }));
-      
-      setUsers(combinedUsers || []);
+      // Combinar los datos
+      const combinedUsers: User[] = usersData.map(profile => {
+        const authUser = authUsersData?.find((au: any) => au.id === profile.id);
+        return {
+          id: profile.id,
+          email: authUser?.email || 'Sin correo',
+          role: profile.role,
+          first_name: profile.first_name,
+          last_name: profile.last_name,
+          phone_number: profile.phone_number,
+          manager_id: profile.manager_id,
+          local_name: authUser?.local_name || null,
+          email_confirmed_at: authUser?.email_confirmed_at || null
+        };
+      });
+
+      setUsers(combinedUsers);
 
       // Obtener locales sin manager asignado
       const { data: localsData, error: localsError } = await supabase
@@ -145,6 +156,13 @@ const Users = () => {
     setLoading(true);
 
     try {
+      // Validar datos
+      if (!formData.email || !formData.role) {
+        showError('Por favor completa los campos obligatorios.');
+        setLoading(false);
+        return;
+      }
+
       // Crear usuario en auth.users
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
@@ -153,9 +171,9 @@ const Users = () => {
           data: {
             first_name: formData.first_name,
             last_name: formData.last_name,
-            role: formData.role, // Incluir el rol en los metadatos
-            is_admin_created: true, // <-- INDICAR QUE FUE CREADO POR ADMIN
-            phone_number: formData.phone_number || null, // <-- Incluir número de teléfono
+            role: formData.role,
+            is_admin_created: true,
+            phone_number: formData.phone_number || null,
           }
         }
       });
@@ -332,6 +350,7 @@ const Users = () => {
   if (sessionLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
+        <Loader2 className="h-8 w-8 text-white animate-spin mr-2" />
         <p className="text-white text-xl">Cargando usuarios...</p>
       </div>
     );
@@ -514,7 +533,7 @@ const Users = () => {
                   <TableRow>
                     <TableHead>Correo</TableHead>
                     <TableHead>Nombre</TableHead>
-                    <TableHead>Teléfono</TableHead> {/* Nueva columna */}
+                    <TableHead>Teléfono</TableHead>
                     <TableHead>Rol</TableHead>
                     <TableHead>Verificado</TableHead>
                     <TableHead>Local Asignado</TableHead>
