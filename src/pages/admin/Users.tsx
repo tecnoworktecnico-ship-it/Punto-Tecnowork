@@ -97,7 +97,7 @@ const Users = () => {
   // Método alternativo para obtener usuarios
   const fetchUsersAlternative = async () => {
     try {
-      // Obtener perfiles
+      // PRIMERO: Obtener perfiles directamente (esta es la fuente de verdad para el rol)
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('*');
@@ -109,7 +109,9 @@ const Users = () => {
         return;
       }
 
-      // Obtener emails y estado de verificación usando la función RPC
+      console.log('Profiles data:', profilesData); // Debug
+
+      // SEGUNDO: Obtener emails y estado de verificación usando la función RPC
       const { data: authUsersData, error: authUsersError } = await supabase
         .rpc('get_users_with_emails');
 
@@ -121,7 +123,7 @@ const Users = () => {
         const usersFromProfiles = profilesData.map(profile => ({
           id: profile.id,
           email: 'Email no disponible',
-          role: profile.role || 'client',
+          role: profile.role || 'client', // Usar el rol del perfil
           first_name: profile.first_name,
           last_name: profile.last_name,
           phone_number: profile.phone_number,
@@ -135,43 +137,31 @@ const Users = () => {
         return;
       }
 
-      // Combinar datos
+      console.log('Auth users data:', authUsersData); // Debug
+
+      // TERCERO: Combinar datos PRIORIZANDO el rol del perfil
       const combinedUsers: User[] = [];
       
-      // Primero, añadir todos los usuarios de auth con sus perfiles
-      authUsersData.forEach((authUser: any) => {
-        const profile = profilesData.find(p => p.id === authUser.id) || {};
+      // Añadir todos los perfiles con sus datos de auth
+      profilesData.forEach((profile) => {
+        const authUser = authUsersData.find((au: any) => au.id === profile.id);
+        
         combinedUsers.push({
-          id: authUser.id,
-          email: authUser.email || 'Sin correo',
-          role: profile.role || 'client',
+          id: profile.id,
+          email: authUser?.email || 'Sin correo',
+          role: profile.role || 'client', // IMPORTANTE: Usar el rol del perfil, no del auth
           first_name: profile.first_name || null,
           last_name: profile.last_name || null,
           phone_number: profile.phone_number || null,
           manager_id: profile.manager_id || null,
-          local_name: authUser.local_name || null,
-          email_confirmed_at: authUser.email_confirmed_at || null
+          local_name: authUser?.local_name || null,
+          email_confirmed_at: authUser?.email_confirmed_at || null
         });
       });
-      
-      // Luego, añadir perfiles que no estén en auth (si hay alguno)
-      profilesData.forEach(profile => {
-        if (!combinedUsers.some(u => u.id === profile.id)) {
-          combinedUsers.push({
-            id: profile.id,
-            email: 'Email no disponible',
-            role: profile.role || 'client',
-            first_name: profile.first_name,
-            last_name: profile.last_name,
-            phone_number: profile.phone_number,
-            manager_id: profile.manager_id,
-            local_name: null,
-            email_confirmed_at: null
-          });
-        }
-      });
 
-      // Obtener información de locales
+      console.log('Combined users:', combinedUsers); // Debug
+
+      // CUARTO: Obtener información de locales
       const { data: localsData, error: localsError } = await supabase
         .from('locals')
         .select('id, name, manager_id');
@@ -376,6 +366,8 @@ const Users = () => {
     setLoading(true);
     
     try {
+      console.log('Updating role for user:', userId, 'to:', newRole); // Debug
+      
       // Usar la función RPC específica para actualizar roles
       const { data: rpcResult, error: rpcError } = await supabase.rpc('admin_update_user_role', {
         target_user_id: userId,
@@ -387,35 +379,25 @@ const Users = () => {
         throw new Error(`Error actualizando rol: ${rpcError.message}`);
       }
       
-      // Actualizar también los metadatos del usuario en auth.users
-      try {
-        // Esto solo funcionará si el usuario actual es el mismo que se está actualizando
-        // o si se tienen permisos de administrador especiales
-        if (userId === user?.id) {
-          const { error: metadataError } = await supabase.auth.updateUser({
-            data: { role: newRole }
-          });
-          
-          if (metadataError) {
-            console.error('Error updating user metadata:', metadataError);
-          }
-        }
-      } catch (metaErr) {
-        console.error('Error updating user metadata:', metaErr);
-        // No lanzar error aquí, ya que la actualización principal ya se realizó
+      console.log('RPC result:', rpcResult); // Debug
+      
+      // Verificar que el rol se actualizó correctamente
+      const { data: verifyProfile, error: verifyError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single();
+        
+      console.log('Verified profile role:', verifyProfile); // Debug
+      
+      if (verifyError) {
+        console.error('Error verifying role update:', verifyError);
       }
       
       showSuccess(`Rol actualizado correctamente a ${newRole}. El usuario deberá volver a iniciar sesión para que el cambio surta efecto.`);
       
-      // Actualizar la lista de usuarios localmente
-      setUsers(users.map(u => 
-        u.id === userId ? { ...u, role: newRole } : u
-      ));
-      
-      // Si el usuario actual es el que se está actualizando, forzar un refresh de sesión
-      if (userId === user?.id) {
-        await supabase.auth.refreshSession();
-      }
+      // Recargar todos los datos para asegurar que se muestren correctamente
+      await fetchData();
       
     } catch (err) {
       console.error('Error updating role:', err);
