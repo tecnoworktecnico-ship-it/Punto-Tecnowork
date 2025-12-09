@@ -157,8 +157,8 @@ const Users = () => {
 
     try {
       // Validar datos
-      if (!formData.email || !formData.role) {
-        showError('Por favor completa los campos obligatorios.');
+      if (!formData.email || !formData.role || !formData.first_name || !formData.last_name || !formData.phone_number) {
+        showError('Por favor completa todos los campos obligatorios.');
         setLoading(false);
         return;
       }
@@ -173,7 +173,7 @@ const Users = () => {
             last_name: formData.last_name,
             role: formData.role,
             is_admin_created: true,
-            phone_number: formData.phone_number || null,
+            phone_number: formData.phone_number,
           }
         }
       });
@@ -415,29 +415,31 @@ const Users = () => {
                         />
                       </div>
                       <div>
-                        <Label htmlFor="first_name">Nombre</Label>
+                        <Label htmlFor="first_name">Nombre *</Label>
                         <Input
                           id="first_name"
                           value={formData.first_name}
                           onChange={(e) =>
                             setFormData({ ...formData, first_name: e.target.value })
                           }
+                          required
                           placeholder="Nombre"
                         />
                       </div>
                       <div>
-                        <Label htmlFor="last_name">Apellido</Label>
+                        <Label htmlFor="last_name">Apellido *</Label>
                         <Input
                           id="last_name"
                           value={formData.last_name}
                           onChange={(e) =>
                             setFormData({ ...formData, last_name: e.target.value })
                           }
+                          required
                           placeholder="Apellido"
                         />
                       </div>
                       <div>
-                        <Label htmlFor="phone_number">Número de Teléfono</Label>
+                        <Label htmlFor="phone_number">Número de Teléfono *</Label>
                         <Input
                           id="phone_number"
                           type="tel"
@@ -445,6 +447,7 @@ const Users = () => {
                           onChange={(e) =>
                             setFormData({ ...formData, phone_number: e.target.value })
                           }
+                          required
                           placeholder="Ej: 555-1234"
                         />
                       </div>

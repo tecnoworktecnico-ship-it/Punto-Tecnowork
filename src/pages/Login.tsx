@@ -97,6 +97,14 @@ function Login() {
     setIsSubmitting(true);
     
     try {
+      // Validar que todos los campos obligatorios estén completos
+      if (!registerData.email || !registerData.password || !registerData.first_name || 
+          !registerData.last_name || !registerData.phone_number) {
+        showError('Por favor completa todos los campos obligatorios.');
+        setIsSubmitting(false);
+        return;
+      }
+      
       const { data, error } = await supabase.auth.signUp({
         email: registerData.email,
         password: registerData.password,
@@ -104,7 +112,7 @@ function Login() {
           data: {
             first_name: registerData.first_name,
             last_name: registerData.last_name,
-            phone_number: registerData.phone_number || null,
+            phone_number: registerData.phone_number,
             role: 'client', // Por defecto, los usuarios registrados son clientes
           },
           emailRedirectTo: window.location.origin + '/auth-callback',
@@ -274,13 +282,14 @@ function Login() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="register-phone">Número de Teléfono (Opcional)</Label>
+                <Label htmlFor="register-phone">Número de Teléfono *</Label>
                 <Input 
                   id="register-phone" 
                   type="tel" 
                   placeholder="Ej: 555-1234" 
                   value={registerData.phone_number}
                   onChange={(e) => setRegisterData({...registerData, phone_number: e.target.value})}
+                  required
                 />
               </div>
               
