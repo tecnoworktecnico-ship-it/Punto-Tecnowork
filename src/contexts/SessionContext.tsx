@@ -12,6 +12,7 @@ interface SessionContextType {
   profile: any | null;
   loading: boolean;
   signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
@@ -23,6 +24,51 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  const fetchProfile = async (userId: string) => {
+    try {
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (profileError) {
+        console.error('Error fetching profile:', profileError);
+        showError('Error al cargar el perfil del usuario.');
+        setProfile(null);
+        return null;
+      }
+      
+      setProfile(profileData);
+      return profileData;
+    } catch (error) {
+      console.error('Unexpected error fetching profile:', error);
+      showError('Error inesperado al cargar el perfil.');
+      setProfile(null);
+      return null;
+    }
+  };
+
+  const refreshProfile = async () => {
+    if (!user) return;
+    
+    setLoading(true);
+    const profileData = await fetchProfile(user.id);
+    setLoading(false);
+    
+    // Redirigir según el rol actualizado
+    if (profileData) {
+      const currentPath = window.location.pathname;
+      if (profileData.role === 'admin' && !currentPath.startsWith('/admin')) {
+        navigate('/admin/dashboard', { replace: true });
+      } else if (profileData.role === 'local' && !currentPath.startsWith('/local')) {
+        navigate('/local/dashboard', { replace: true });
+      } else if (profileData.role === 'client' && !currentPath.startsWith('/client') && currentPath !== '/') {
+        navigate('/client', { replace: true });
+      }
+    }
+  };
+
   useEffect(() => {
     let isMounted = true;
 
@@ -33,37 +79,27 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
       setUser(currentSession?.user || null);
 
       if (currentSession?.user) {
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', currentSession.user.id)
-          .single();
-
+        const profileData = await fetchProfile(currentSession.user.id);
+        
         if (!isMounted) return;
 
-        if (profileError) {
-          console.error('Error fetching profile:', profileError);
-          showError('Error al cargar el perfil del usuario.');
-          setProfile(null);
-          navigate('/login', { replace: true });
-        } else {
-          setProfile(profileData);
+        if (profileData) {
           const currentPath = window.location.pathname;
-          if (profileData?.role === 'admin' && !currentPath.startsWith('/admin')) {
+          if (profileData.role === 'admin' && !currentPath.startsWith('/admin')) {
             navigate('/admin/dashboard', { replace: true });
-          } else if (profileData?.role === 'local' && !currentPath.startsWith('/local')) {
+          } else if (profileData.role === 'local' && !currentPath.startsWith('/local')) {
             navigate('/local/dashboard', { replace: true });
-          } else if (profileData?.role === 'client' && !currentPath.startsWith('/client') && currentPath !== '/') {
+          } else if (profileData.role === 'client' && !currentPath.startsWith('/client') && currentPath !== '/') {
             navigate('/client', { replace: true });
           }
-          if (!currentPath.includes(profileData?.role) && currentPath !== '/') {
+          if (!currentPath.includes(profileData.role) && currentPath !== '/') {
              showSuccess(`Bienvenido, ${profileData?.first_name || currentSession.user.email}!`);
           }
         }
       } else {
         setProfile(null);
         const currentPath = window.location.pathname;
-        if (currentPath !== '/login' && currentPath !== '/') {
+        if (currentPath !== '/login' && currentPath !== '/' && !currentPath.includes('/verification-error') && !currentPath.includes('/auth-callback')) {
           navigate('/login', { replace: true });
         }
       }
@@ -75,7 +111,7 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
     });
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      (event, currentSession) => {
+      async (event, currentSession) => {
         if (event === 'SIGNED_OUT') {
           if (isMounted) {
             setSession(null);
@@ -85,8 +121,16 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
             navigate('/login', { replace: true });
             showSuccess('Sesión cerrada correctamente.');
           }
-        } else if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'USER_UPDATED') {
+        } else if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
           handleSession(currentSession);
+        } else if (event === 'USER_UPDATED') {
+          // Cuando el usuario se actualiza, también actualizamos el perfil
+          setSession(currentSession);
+          setUser(currentSession?.user || null);
+          if (currentSession?.user) {
+            await fetchProfile(currentSession.user.id);
+          }
+          if (isMounted) setLoading(false);
         }
       }
     );
@@ -145,7 +189,7 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
   };
 
   return (
-    <SessionContext.Provider value={{ session, user, profile, loading, signOut }}>
+    <SessionContext.Provider value={{ session, user, profile, loading, signOut, refreshProfile }}>
       {children}
     </SessionContext.Provider>
   );
