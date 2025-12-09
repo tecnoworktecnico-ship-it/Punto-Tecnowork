@@ -85,83 +85,35 @@ const Users = () => {
     setLoading(true);
     
     try {
-      // Usar directamente el método alternativo para obtener usuarios
-      await fetchUsersAlternative();
-    } catch (error) {
-      console.error('Unexpected error fetching users:', error);
-      showError('Error inesperado al cargar usuarios.');
-      setLoading(false);
-    }
-  };
+      // Usar la función RPC para obtener todos los usuarios con sus emails
+      const { data: userData, error: userError } = await supabase
+        .rpc('get_all_users_with_emails');
 
-  // Método alternativo para obtener usuarios
-  const fetchUsersAlternative = async () => {
-    try {
-      // PRIMERO: Obtener perfiles directamente (esta es la fuente de verdad para el rol)
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('*');
-
-      if (profilesError) {
-        console.error('Error fetching profiles:', profilesError);
-        showError('Error al cargar perfiles de usuarios.');
+      if (userError) {
+        console.error('Error fetching users with RPC:', userError);
+        showError('Error al cargar usuarios: ' + userError.message);
         setLoading(false);
         return;
       }
 
-      console.log('Profiles data:', profilesData); // Debug
+      console.log('User data from RPC:', userData);
 
-      // SEGUNDO: Obtener emails y estado de verificación usando la función RPC
-      const { data: authUsersData, error: authUsersError } = await supabase
-        .rpc('get_users_with_emails');
+      // Transformar los datos a nuestro formato de usuario
+      const formattedUsers = userData.map((u: any) => ({
+        id: u.id,
+        email: u.email || 'Sin correo',
+        role: u.role || 'client',
+        first_name: u.first_name || null,
+        last_name: u.last_name || null,
+        phone_number: u.phone_number || null,
+        manager_id: u.manager_id || null,
+        local_name: u.local_name || null,
+        email_confirmed_at: u.email_confirmed_at || null
+      }));
 
-      if (authUsersError) {
-        console.error('Error fetching auth users with RPC:', authUsersError);
-        showError('Error al cargar datos de autenticación: ' + authUsersError.message);
-        
-        // Si falla la RPC, crear usuarios solo con datos de perfiles
-        const usersFromProfiles = profilesData.map(profile => ({
-          id: profile.id,
-          email: 'Email no disponible',
-          role: profile.role || 'client', // Usar el rol del perfil
-          first_name: profile.first_name,
-          last_name: profile.last_name,
-          phone_number: profile.phone_number,
-          manager_id: profile.manager_id,
-          local_name: null,
-          email_confirmed_at: null
-        }));
-        
-        setUsers(usersFromProfiles);
-        setLoading(false);
-        return;
-      }
+      setUsers(formattedUsers);
 
-      console.log('Auth users data:', authUsersData); // Debug
-
-      // TERCERO: Combinar datos PRIORIZANDO el rol del perfil
-      const combinedUsers: User[] = [];
-      
-      // Añadir todos los perfiles con sus datos de auth
-      profilesData.forEach((profile) => {
-        const authUser = authUsersData.find((au: any) => au.id === profile.id);
-        
-        combinedUsers.push({
-          id: profile.id,
-          email: authUser?.email || 'Sin correo',
-          role: profile.role || 'client', // IMPORTANTE: Usar el rol del perfil, no del auth
-          first_name: profile.first_name || null,
-          last_name: profile.last_name || null,
-          phone_number: profile.phone_number || null,
-          manager_id: profile.manager_id || null,
-          local_name: authUser?.local_name || null,
-          email_confirmed_at: authUser?.email_confirmed_at || null
-        });
-      });
-
-      console.log('Combined users:', combinedUsers); // Debug
-
-      // CUARTO: Obtener información de locales
+      // Obtener información de locales
       const { data: localsData, error: localsError } = await supabase
         .from('locals')
         .select('id, name, manager_id');
@@ -169,22 +121,12 @@ const Users = () => {
       if (localsError) {
         console.error('Error fetching locals:', localsError);
       } else {
-        // Añadir información de local a los usuarios
-        combinedUsers.forEach(user => {
-          const userLocal = localsData?.find(l => l.manager_id === user.id);
-          if (userLocal) {
-            user.local_name = userLocal.name;
-          }
-        });
-
         // Guardar locales sin manager para asignación
         setLocals(localsData?.filter(l => !l.manager_id) || []);
       }
-
-      setUsers(combinedUsers);
     } catch (error) {
-      console.error('Error in alternative user fetching:', error);
-      showError('Error al cargar usuarios con método alternativo.');
+      console.error('Unexpected error fetching users:', error);
+      showError('Error inesperado al cargar usuarios.');
     } finally {
       setLoading(false);
     }
@@ -366,38 +308,44 @@ const Users = () => {
     setLoading(true);
     
     try {
-      console.log('Updating role for user:', userId, 'to:', newRole); // Debug
-      
-      // Usar la función RPC específica para actualizar roles
-      const { data: rpcResult, error: rpcError } = await supabase.rpc('admin_update_user_role', {
-        target_user_id: userId,
-        new_role: newRole,
-      });
-      
-      if (rpcError) {
-        console.error('Error updating role with RPC:', rpcError);
-        throw new Error(`Error actualizando rol: ${rpcError.message}`);
+      // Actualizar directamente en la tabla profiles
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ 
+          role: newRole,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId);
+        
+      if (updateError) {
+        throw new Error(`Error actualizando rol: ${updateError.message}`);
       }
       
-      console.log('RPC result:', rpcResult); // Debug
-      
-      // Verificar que el rol se actualizó correctamente
-      const { data: verifyProfile, error: verifyError } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', userId)
-        .single();
+      // También intentar actualizar los metadatos del usuario en auth.users
+      try {
+        const { error: metadataError } = await supabase.auth.admin.updateUserById(
+          userId,
+          { user_metadata: { role: newRole } }
+        );
         
-      console.log('Verified profile role:', verifyProfile); // Debug
-      
-      if (verifyError) {
-        console.error('Error verifying role update:', verifyError);
+        if (metadataError) {
+          console.error('Error updating user metadata:', metadataError);
+        }
+      } catch (metaErr) {
+        console.error('Error updating user metadata:', metaErr);
       }
       
       showSuccess(`Rol actualizado correctamente a ${newRole}. El usuario deberá volver a iniciar sesión para que el cambio surta efecto.`);
       
-      // Recargar todos los datos para asegurar que se muestren correctamente
-      await fetchData();
+      // Actualizar la lista de usuarios localmente
+      setUsers(users.map(u => 
+        u.id === userId ? { ...u, role: newRole } : u
+      ));
+      
+      // Recargar los datos para asegurarnos de que todo está actualizado
+      setTimeout(() => {
+        fetchData();
+      }, 1000);
       
     } catch (err) {
       console.error('Error updating role:', err);
