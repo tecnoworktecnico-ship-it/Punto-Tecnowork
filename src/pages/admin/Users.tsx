@@ -130,7 +130,8 @@ const Users = () => {
           data: {
             first_name: formData.first_name,
             last_name: formData.last_name,
-            role: formData.role // Incluir el rol en los metadatos
+            role: formData.role, // Incluir el rol en los metadatos
+            is_admin_created: true // <-- INDICAR QUE FUE CREADO POR ADMIN
           }
         }
       });

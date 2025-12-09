@@ -16,17 +16,24 @@ function Login() {
   const [email, setEmail] = useState<string>('');
 
   useEffect(() => {
-    // Verificar si hay errores en la URL (por ejemplo, de verificación de correo)
-    const hashParams = new URLSearchParams(location.hash.substring(1));
-    const error = hashParams.get('error');
-    const errorCode = hashParams.get('error_code');
-    
-    if (error && (errorCode === 'otp_expired' || error === 'access_denied')) {
-      navigate('/verification-error');
+    // If the user lands here with a hash (e.g., from email verification),
+    // redirect them to the dedicated callback handler.
+    if (location.hash) {
+      // Check for errors first, as AuthCallback handles successful session loading
+      const hashParams = new URLSearchParams(location.hash.substring(1));
+      const error = hashParams.get('error');
+      const errorCode = hashParams.get('error_code');
+      
+      if (error && (errorCode === 'otp_expired' || error === 'access_denied')) {
+        navigate('/verification-error', { replace: true });
+      } else if (hashParams.get('type') || hashParams.get('access_token')) {
+        // If it looks like a successful auth callback (e.g., magic link, verification)
+        navigate('/auth-callback', { replace: true });
+      }
     }
 
     if (session && !loading) {
-      // La redirección se maneja en SessionContext
+      // The redirection for already signed-in users is handled in SessionContext
     }
   }, [session, loading, navigate, location]);
 
@@ -121,6 +128,7 @@ function Login() {
             },
           }}
           theme="light"
+          redirectTo={window.location.origin + '/auth-callback'} // Explicitly set redirect to use the new route
           localization={{
             variables: {
               sign_in: {

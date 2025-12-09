@@ -8,6 +8,7 @@ import LandingPage from "@/pages/LandingPage";
 import Login from "@/pages/Login";
 import NotFound from "@/pages/NotFound";
 import EmailVerificationError from "@/pages/EmailVerificationError";
+import AuthCallback from "@/pages/AuthCallback"; // Importar nuevo componente
 
 // Admin Pages
 import AdminDashboard from "@/pages/admin/Dashboard";
@@ -24,7 +25,7 @@ import LocalPrices from "@/pages/local/LocalPrices";
 import LocalOrders from "@/pages/local/Orders";
 import LocalOrderDetail from "@/pages/local/OrderDetail";
 import LocalReports from "@/pages/local/LocalReports";
-import LocalRewards from "@/pages/local/LocalRewards"; // Importar nuevo componente
+import LocalRewards from "@/pages/local/LocalRewards";
 
 // Client Pages
 import ClientDashboard from "@/pages/client/Dashboard";
@@ -42,6 +43,7 @@ function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/verification-error" element={<EmailVerificationError />} />
+          <Route path="/auth-callback" element={<AuthCallback />} /> {/* Nuevo callback */}
 
           {/* Admin Routes */}
           <Route
