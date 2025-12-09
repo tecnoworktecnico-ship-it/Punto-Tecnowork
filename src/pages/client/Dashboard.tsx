@@ -94,12 +94,14 @@ const ClientDashboard = () => {
   };
 
   const needsPasswordChange = profile && !profile.password_changed;
+  
+  const displayName = profile?.first_name || user?.email;
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move text-text-on-color">
       <div className="w-full max-w-6xl p-8 space-y-6 bg-white rounded-lg shadow-lg">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-4xl font-bold text-text-carbon">Bienvenido, {profile?.first_name || user?.email}!</h1>
+          <h1 className="text-4xl font-bold text-text-carbon">Bienvenido, {displayName}!</h1>
           <Button onClick={signOut} className="bg-emphasis-red hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
             Cerrar Sesión
           </Button>

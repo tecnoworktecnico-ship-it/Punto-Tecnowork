@@ -128,7 +128,7 @@ function Login() {
             },
           }}
           theme="light"
-          redirectTo={window.location.origin + '/auth-callback'} // Explicitly set redirect to use the new route
+          redirectTo={window.location.origin + '/auth-callback'}
           localization={{
             variables: {
               sign_in: {
@@ -162,6 +162,35 @@ function Login() {
             },
           }}
           onEmailInputChange={(e) => handleEmailChange(e.target.value)}
+          // Configuración para campos adicionales en el registro
+          view="sign_in"
+          magicLink={true}
+          socialLayout="horizontal"
+          additionalData={{
+            sign_up: [
+              {
+                name: 'first_name',
+                label: 'Nombre',
+                type: 'text',
+                required: true,
+                placeholder: 'Tu nombre',
+              },
+              {
+                name: 'last_name',
+                label: 'Apellido',
+                type: 'text',
+                required: true,
+                placeholder: 'Tu apellido',
+              },
+              {
+                name: 'phone_number',
+                label: 'Número de Teléfono',
+                type: 'tel',
+                required: false,
+                placeholder: 'Ej: 555-1234',
+              },
+            ],
+          }}
         />
       </div>
       <MadeWithDyad />

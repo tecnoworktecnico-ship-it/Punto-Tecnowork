@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { showSuccess, showError } from '@/utils/toast';
-import { User, Lock } from 'lucide-react';
+import { User, Lock, Phone } from 'lucide-react';
 
 interface ProfileSettingsProps {
   onProfileUpdate: () => void;
@@ -18,6 +18,7 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ onProfileUpdate }) =>
   const { user, profile, loading: sessionLoading } = useSession();
   const [firstName, setFirstName] = useState(profile?.first_name || '');
   const [lastName, setLastName] = useState(profile?.last_name || '');
+  const [phoneNumber, setPhoneNumber] = useState(profile?.phone_number || '');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -27,12 +28,13 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ onProfileUpdate }) =>
     setLoading(true);
 
     try {
-      // 1. Actualizar datos del perfil (first_name, last_name)
+      // 1. Actualizar datos del perfil (first_name, last_name, phone_number)
       const { error: profileError } = await supabase
         .from('profiles')
         .update({ 
           first_name: firstName.trim(), 
           last_name: lastName.trim(),
+          phone_number: phoneNumber.trim() || null,
           updated_at: new Date().toISOString()
         })
         .eq('id', user?.id);
@@ -46,6 +48,7 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ onProfileUpdate }) =>
         data: {
           first_name: firstName.trim(),
           last_name: lastName.trim(),
+          phone_number: phoneNumber.trim() || null,
         }
       });
 
@@ -86,7 +89,6 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ onProfileUpdate }) =>
 
       if (error) {
         // Supabase requiere que el usuario haya iniciado sesión recientemente para cambiar la contraseña.
-        // Si el error es 'Auth session missing' o similar, es probable que el token haya expirado.
         if (error.message.includes('must be signed in')) {
           showError('Tu sesión ha expirado. Por favor, cierra sesión y vuelve a iniciarla para cambiar la contraseña.');
         } else {
@@ -96,16 +98,6 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ onProfileUpdate }) =>
       }
 
       // Si el cambio de contraseña es exitoso, marcamos que ya no necesita cambiarla
-      // Usaremos un campo en profiles para rastrear si el usuario ha cambiado su contraseña inicial.
-      // Como no tenemos ese campo, asumiremos que si el usuario cambia la contraseña, ya no necesita el aviso.
-      
-      // Si el usuario fue creado por admin, podemos usar un campo de metadatos o profile.
-      // Para simplificar, si el cambio es exitoso, asumimos que el aviso debe desaparecer.
-      // Si el usuario fue creado por admin, su rol se establece en los metadatos.
-      
-      // Para manejar el mensaje de "cambiar contraseña", usaremos un campo en `profiles` llamado `password_changed`.
-      // Necesitamos actualizar la tabla `profiles` primero.
-      
       const { error: profileUpdateError } = await supabase
         .from('profiles')
         .update({ 
@@ -141,7 +133,7 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ onProfileUpdate }) =>
             <User className="h-6 w-6 text-primary-blue" />
             <CardTitle className="text-primary-blue">Actualizar Datos Personales</CardTitle>
           </div>
-          <CardDescription>Modifica tu nombre y apellido.</CardDescription>
+          <CardDescription>Modifica tu nombre, apellido y número de teléfono.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleProfileUpdate} className="space-y-4">
@@ -161,6 +153,18 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ onProfileUpdate }) =>
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 placeholder="Tu apellido"
+              />
+            </div>
+            <div>
+              <Label htmlFor="phoneNumber" className="flex items-center gap-1">
+                <Phone className="h-4 w-4 text-gray-500" /> Número de Teléfono (Opcional)
+              </Label>
+              <Input
+                id="phoneNumber"
+                type="tel"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                placeholder="Ej: 555-1234"
               />
             </div>
             <Button type="submit" disabled={loading} className="w-full">
