@@ -106,7 +106,7 @@ function Login() {
         return;
       }
       
-      // Intentar crear el usuario con la API de Supabase
+      // Crear el usuario con la API de Supabase
       const { data, error } = await supabase.auth.signUp({
         email: registerData.email,
         password: registerData.password,
@@ -130,6 +130,30 @@ function Login() {
           
           // Esperar un momento para que se cree el perfil automáticamente mediante el trigger handle_new_user
           await new Promise(resolve => setTimeout(resolve, 1500));
+          
+          // Crear manualmente el perfil si es necesario
+          const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', data.user.id)
+            .single();
+            
+          if (profileError && profileError.code === 'PGRST116') {
+            // El perfil no existe, crearlo manualmente
+            const { error: insertError } = await supabase
+              .from('profiles')
+              .insert({
+                id: data.user.id,
+                first_name: registerData.first_name,
+                last_name: registerData.last_name,
+                phone_number: registerData.phone_number,
+                role: 'client',
+              });
+              
+            if (insertError) {
+              console.error('Error creating profile manually:', insertError);
+            }
+          }
           
           // Verificar si se necesita verificación de correo
           if (data.user.identities && data.user.identities.length === 0) {
