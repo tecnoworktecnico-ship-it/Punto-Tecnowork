@@ -83,74 +83,10 @@ const Users = () => {
 
   const fetchData = async () => {
     setLoading(true);
-
+    
     try {
-      // Obtener todos los usuarios de auth.users directamente
-      const { data: authData, error: authError } = await supabase.auth.admin.listUsers();
-
-      if (authError) {
-        console.error('Error fetching auth users:', authError);
-        showError('Error al cargar usuarios. Asegúrate de tener permisos de administrador.');
-        
-        // Intentar obtener usuarios con el método alternativo
-        await fetchUsersAlternative();
-        return;
-      }
-
-      if (!authData || !authData.users) {
-        console.error('No users data returned from auth.admin.listUsers');
-        // Intentar obtener usuarios con el método alternativo
-        await fetchUsersAlternative();
-        return;
-      }
-
-      // Obtener perfiles para combinar con los datos de auth
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('*');
-
-      if (profilesError) {
-        console.error('Error fetching profiles:', profilesError);
-      }
-
-      // Combinar datos de auth y profiles
-      const combinedUsers: User[] = authData.users.map(authUser => {
-        const profile = profilesData?.find(p => p.id === authUser.id) || {};
-        
-        return {
-          id: authUser.id,
-          email: authUser.email || 'Sin correo',
-          role: profile.role || 'client',
-          first_name: profile.first_name || authUser.user_metadata?.first_name || null,
-          last_name: profile.last_name || authUser.user_metadata?.last_name || null,
-          phone_number: profile.phone_number || authUser.user_metadata?.phone_number || null,
-          manager_id: profile.manager_id || null,
-          email_confirmed_at: authUser.email_confirmed_at || null
-        };
-      });
-
-      // Obtener información de locales para los managers
-      const { data: localsData, error: localsError } = await supabase
-        .from('locals')
-        .select('id, name, manager_id');
-
-      if (localsError) {
-        console.error('Error fetching locals:', localsError);
-      } else {
-        // Añadir información de local a los usuarios
-        combinedUsers.forEach(user => {
-          const userLocal = localsData?.find(l => l.manager_id === user.id);
-          if (userLocal) {
-            user.local_name = userLocal.name;
-          }
-        });
-
-        // Guardar locales sin manager para asignación
-        setLocals(localsData?.filter(l => !l.manager_id) || []);
-      }
-
-      setUsers(combinedUsers);
-      setLoading(false);
+      // Usar directamente el método alternativo para obtener usuarios
+      await fetchUsersAlternative();
     } catch (error) {
       console.error('Unexpected error fetching users:', error);
       showError('Error inesperado al cargar usuarios.');
@@ -158,7 +94,7 @@ const Users = () => {
     }
   };
 
-  // Método alternativo para obtener usuarios si el método admin no funciona
+  // Método alternativo para obtener usuarios
   const fetchUsersAlternative = async () => {
     try {
       // Obtener perfiles
@@ -175,11 +111,11 @@ const Users = () => {
 
       // Obtener emails y estado de verificación usando la función RPC
       const { data: authUsersData, error: authUsersError } = await supabase
-        .rpc('get_all_users_with_emails');
+        .rpc('get_users_with_emails');
 
       if (authUsersError) {
         console.error('Error fetching auth users with RPC:', authUsersError);
-        showError('Error al cargar datos de autenticación.');
+        showError('Error al cargar datos de autenticación: ' + authUsersError.message);
         
         // Si falla la RPC, crear usuarios solo con datos de perfiles
         const usersFromProfiles = profilesData.map(profile => ({
@@ -200,19 +136,39 @@ const Users = () => {
       }
 
       // Combinar datos
-      const combinedUsers: User[] = profilesData.map(profile => {
-        const authUser = authUsersData?.find((au: any) => au.id === profile.id);
-        return {
-          id: profile.id,
-          email: authUser?.email || 'Email no disponible',
+      const combinedUsers: User[] = [];
+      
+      // Primero, añadir todos los usuarios de auth con sus perfiles
+      authUsersData.forEach((authUser: any) => {
+        const profile = profilesData.find(p => p.id === authUser.id) || {};
+        combinedUsers.push({
+          id: authUser.id,
+          email: authUser.email || 'Sin correo',
           role: profile.role || 'client',
-          first_name: profile.first_name,
-          last_name: profile.last_name,
-          phone_number: profile.phone_number,
-          manager_id: profile.manager_id,
-          local_name: authUser?.local_name || null,
-          email_confirmed_at: authUser?.email_confirmed_at || null
-        };
+          first_name: profile.first_name || null,
+          last_name: profile.last_name || null,
+          phone_number: profile.phone_number || null,
+          manager_id: profile.manager_id || null,
+          local_name: authUser.local_name || null,
+          email_confirmed_at: authUser.email_confirmed_at || null
+        });
+      });
+      
+      // Luego, añadir perfiles que no estén en auth (si hay alguno)
+      profilesData.forEach(profile => {
+        if (!combinedUsers.some(u => u.id === profile.id)) {
+          combinedUsers.push({
+            id: profile.id,
+            email: 'Email no disponible',
+            role: profile.role || 'client',
+            first_name: profile.first_name,
+            last_name: profile.last_name,
+            phone_number: profile.phone_number,
+            manager_id: profile.manager_id,
+            local_name: null,
+            email_confirmed_at: null
+          });
+        }
       });
 
       // Obtener información de locales
@@ -256,53 +212,28 @@ const Users = () => {
         return;
       }
 
-      // Crear usuario en auth.users
-      const { data: signUpData, error: signUpError } = await supabase.auth.admin.createUser({
+      // Crear usuario con el método estándar
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
         password: 'TempPass123!', // Contraseña temporal
-        email_confirm: true, // Confirmar el email automáticamente
-        user_metadata: {
-          first_name: formData.first_name,
-          last_name: formData.last_name,
-          role: formData.role,
-          is_admin_created: true,
-          phone_number: formData.phone_number,
+        options: {
+          data: {
+            first_name: formData.first_name,
+            last_name: formData.last_name,
+            role: formData.role,
+            is_admin_created: true,
+            phone_number: formData.phone_number,
+          },
+          emailRedirectTo: window.location.origin + '/auth-callback',
         }
       });
-
+      
       if (signUpError) {
-        console.error('Error signing up with admin method:', signUpError);
-        
-        // Intentar método alternativo
-        const { data: altSignUpData, error: altSignUpError } = await supabase.auth.signUp({
-          email: formData.email,
-          password: 'TempPass123!', // Contraseña temporal
-          options: {
-            data: {
-              first_name: formData.first_name,
-              last_name: formData.last_name,
-              role: formData.role,
-              is_admin_created: true,
-              phone_number: formData.phone_number,
-            }
-          }
-        });
-        
-        if (altSignUpError) {
-          showError(`Error al crear usuario: ${altSignUpError.message}`);
-          setLoading(false);
-          return;
-        }
-        
-        if (!altSignUpData.user) {
-          showError('No se pudo crear el usuario con el método alternativo.');
-          setLoading(false);
-          return;
-        }
-        
-        signUpData = altSignUpData;
+        showError(`Error al crear usuario: ${signUpError.message}`);
+        setLoading(false);
+        return;
       }
-
+      
       if (!signUpData.user) {
         showError('No se pudo crear el usuario.');
         setLoading(false);
@@ -329,6 +260,7 @@ const Users = () => {
             last_name: formData.last_name,
             phone_number: formData.phone_number,
             role: formData.role,
+            password_changed: false
           });
           
         if (insertError) {
@@ -379,20 +311,13 @@ const Users = () => {
     setLoading(true);
     
     try {
-      // Intentar eliminar con el método admin primero
-      const { error: adminDeleteError } = await supabase.auth.admin.deleteUser(userId);
+      // Usar la función RPC admin_delete_user
+      const { error: deleteError } = await supabase.rpc('admin_delete_user', { 
+        target_user_id: userId 
+      });
       
-      if (adminDeleteError) {
-        console.error('Error deleting user with admin method:', adminDeleteError);
-        
-        // Usar la función RPC admin_delete_user como alternativa
-        const { error: deleteError } = await supabase.rpc('admin_delete_user', { 
-          target_user_id: userId 
-        });
-        
-        if (deleteError) {
-          throw new Error(`Error eliminando usuario: ${deleteError.message}`);
-        }
+      if (deleteError) {
+        throw new Error(`Error eliminando usuario: ${deleteError.message}`);
       }
 
       showSuccess('Usuario eliminado correctamente.');
