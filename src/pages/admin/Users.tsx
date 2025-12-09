@@ -61,6 +61,7 @@ const Users = () => {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [resendingEmail, setResendingEmail] = useState<string | null>(null);
+  const [updatingRole, setUpdatingRole] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: '',
     role: 'client',
@@ -305,34 +306,40 @@ const Users = () => {
 
     if (!confirm(`¿Estás seguro de que deseas cambiar el rol de ${userItem.email} a ${newRole}?`)) return;
     
-    setLoading(true);
+    setUpdatingRole(userId);
     
     try {
-      // Actualizar directamente en la tabla profiles
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ 
-          role: newRole,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', userId);
-        
-      if (updateError) {
-        throw new Error(`Error actualizando rol: ${updateError.message}`);
+      console.log(`Actualizando rol de usuario ${userId} a ${newRole}`);
+      
+      // Usar la función RPC específica para actualizar roles
+      const { data: rpcResult, error: rpcError } = await supabase.rpc('admin_update_user_role', {
+        target_user_id: userId,
+        new_role: newRole,
+      });
+      
+      if (rpcError) {
+        console.error('Error updating role with RPC:', rpcError);
+        throw new Error(`Error actualizando rol: ${rpcError.message}`);
       }
       
-      // También intentar actualizar los metadatos del usuario en auth.users
-      try {
-        const { error: metadataError } = await supabase.auth.admin.updateUserById(
-          userId,
-          { user_metadata: { role: newRole } }
-        );
-        
-        if (metadataError) {
-          console.error('Error updating user metadata:', metadataError);
-        }
-      } catch (metaErr) {
-        console.error('Error updating user metadata:', metaErr);
+      console.log('Resultado de RPC admin_update_user_role:', rpcResult);
+      
+      // Verificar que el rol se actualizó correctamente
+      const { data: updatedProfile, error: verifyError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single();
+      
+      if (verifyError) {
+        console.error('Error verificando actualización de rol:', verifyError);
+        throw new Error(`Error verificando actualización: ${verifyError.message}`);
+      }
+      
+      console.log('Perfil actualizado:', updatedProfile);
+      
+      if (updatedProfile.role !== newRole) {
+        throw new Error(`El rol no se actualizó correctamente. Rol actual: ${updatedProfile.role}, Rol esperado: ${newRole}`);
       }
       
       showSuccess(`Rol actualizado correctamente a ${newRole}. El usuario deberá volver a iniciar sesión para que el cambio surta efecto.`);
@@ -350,9 +357,9 @@ const Users = () => {
     } catch (err) {
       console.error('Error updating role:', err);
       showError(`Error al actualizar rol: ${err instanceof Error ? err.message : 'Error desconocido'}`);
+    } finally {
+      setUpdatingRole(null);
     }
-    
-    setLoading(false);
   };
 
   // Función para reenviar el correo de verificación
@@ -598,25 +605,32 @@ const Users = () => {
                         <Select
                           value={userItem.role}
                           onValueChange={(value) => updateUserRole(userItem.id, value)}
-                          disabled={userItem.id === user?.id}
+                          disabled={userItem.id === user?.id || updatingRole === userItem.id}
                         >
                           <SelectTrigger className="w-[130px]">
                             <SelectValue>
-                              <Badge 
-                                variant={
-                                  userItem.role === 'admin' 
-                                    ? 'destructive' 
+                              {updatingRole === userItem.id ? (
+                                <div className="flex items-center">
+                                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                  Actualizando...
+                                </div>
+                              ) : (
+                                <Badge 
+                                  variant={
+                                    userItem.role === 'admin' 
+                                      ? 'destructive' 
+                                      : userItem.role === 'local' 
+                                      ? 'default' 
+                                      : 'secondary'
+                                  }
+                                >
+                                  {userItem.role === 'admin' 
+                                    ? 'Administrador' 
                                     : userItem.role === 'local' 
-                                    ? 'default' 
-                                    : 'secondary'
-                                }
-                              >
-                                {userItem.role === 'admin' 
-                                  ? 'Administrador' 
-                                  : userItem.role === 'local' 
-                                  ? 'Local' 
-                                  : 'Cliente'}
-                              </Badge>
+                                    ? 'Local' 
+                                    : 'Cliente'}
+                                </Badge>
+                              )}
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
