@@ -19,6 +19,7 @@ function Login() {
   const { session, loading } = useSession();
   const [activeTab, setActiveTab] = useState<string>('sign_in');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [registrationSuccess, setRegistrationSuccess] = useState(false);
   
   // Formulario de inicio de sesión
   const [loginData, setLoginData] = useState({
@@ -105,6 +106,7 @@ function Login() {
         return;
       }
       
+      // Intentar crear el usuario con la API de Supabase
       const { data, error } = await supabase.auth.signUp({
         email: registerData.email,
         password: registerData.password,
@@ -122,8 +124,31 @@ function Login() {
       if (error) {
         showError(error.message);
       } else if (data) {
-        showSuccess('Registro exitoso. Por favor, verifica tu correo electrónico.');
-        setActiveTab('sign_in');
+        // Verificar si el usuario fue creado correctamente
+        if (data.user) {
+          console.log("Usuario creado:", data.user);
+          
+          // Esperar un momento para que se cree el perfil automáticamente mediante el trigger handle_new_user
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          
+          // Verificar si se necesita verificación de correo
+          if (data.user.identities && data.user.identities.length === 0) {
+            showError('Error al crear el usuario. Por favor, intenta con otro correo electrónico.');
+          } else if (data.user.email_confirmed_at) {
+            showSuccess('Registro exitoso. Tu correo ya está verificado. Puedes iniciar sesión.');
+            setActiveTab('sign_in');
+            setRegistrationSuccess(true);
+          } else {
+            showSuccess('Registro exitoso. Por favor, verifica tu correo electrónico para continuar.');
+            setActiveTab('sign_in');
+            setRegistrationSuccess(true);
+            
+            // Guardar el email para posible reenvío de verificación
+            localStorage.setItem('verificationEmail', registerData.email);
+          }
+        } else {
+          showError('Error al crear el usuario. No se recibió confirmación del servidor.');
+        }
       }
     } catch (error) {
       console.error('Error signing up:', error);
@@ -156,6 +181,33 @@ function Login() {
     }
   };
 
+  const handleResendVerification = async () => {
+    const email = localStorage.getItem('verificationEmail');
+    if (!email) {
+      showError('No hay correo electrónico guardado para reenviar la verificación.');
+      return;
+    }
+    
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email,
+      });
+      
+      if (error) {
+        showError(`Error al reenviar verificación: ${error.message}`);
+      } else {
+        showSuccess(`Se ha reenviado el correo de verificación a ${email}`);
+      }
+    } catch (error) {
+      console.error('Error resending verification:', error);
+      showError('Error inesperado al reenviar verificación');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
@@ -182,6 +234,24 @@ function Login() {
           {/* Formulario de Inicio de Sesión */}
           <TabsContent value="sign_in">
             <form onSubmit={handleSignIn} className="space-y-4 mt-4">
+              {registrationSuccess && (
+                <div className="bg-green-50 border border-green-200 rounded-md p-3 mb-4">
+                  <p className="text-sm text-green-800">
+                    <strong>¡Registro exitoso!</strong> Por favor, verifica tu correo electrónico para activar tu cuenta.
+                  </p>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleResendVerification}
+                    className="mt-2 text-xs"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? 'Enviando...' : 'Reenviar correo de verificación'}
+                  </Button>
+                </div>
+              )}
+              
               <div className="space-y-2">
                 <Label htmlFor="login-email">Correo electrónico</Label>
                 <Input 
