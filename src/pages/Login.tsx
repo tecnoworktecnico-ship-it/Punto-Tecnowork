@@ -88,8 +88,8 @@ function Login() {
         return;
       }
       
-      // Si hay hash pero no es ninguno de los casos anteriores, limpiar el hash
-      if (!accessToken && !error) {
+      // Si hay hash pero no es ninguno de los casos anteriores, limpiar el hash silenciosamente
+      if (!accessToken && !error && !type) {
         window.history.replaceState(null, '', window.location.pathname);
       }
     }
@@ -136,10 +136,35 @@ function Login() {
       } else if (data.session) {
         console.log('Login - Sign in successful, session created');
         showSuccess('Inicio de sesión exitoso');
-        // La redirección se maneja en SessionContext
-        // Pero vamos a forzar una verificación de sesión
+        
+        // Esperar un momento para que SessionContext procese la sesión
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Verificar la sesión y el perfil
         const { data: sessionData } = await supabase.auth.getSession();
         console.log('Login - Session verification', { hasSession: !!sessionData.session });
+        
+        if (sessionData.session) {
+          // Obtener el perfil del usuario
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', sessionData.session.user.id)
+            .single();
+          
+          console.log('Login - Profile data', { role: profileData?.role });
+          
+          // Redirigir manualmente si es necesario
+          if (profileData) {
+            if (profileData.role === 'admin') {
+              navigate('/admin/dashboard', { replace: true });
+            } else if (profileData.role === 'local') {
+              navigate('/local/dashboard', { replace: true });
+            } else if (profileData.role === 'client') {
+              navigate('/client', { replace: true });
+            }
+          }
+        }
       }
     } catch (error) {
       console.error('Unexpected error signing in:', error);
@@ -180,7 +205,7 @@ function Login() {
             phone_number: registerData.phone_number.trim(),
             role: 'client',
           },
-          emailRedirectTo: window.location.origin + '/auth-callback',
+          emailRedirectTo: `${window.location.origin}/auth-callback`,
         },
       });
       
@@ -265,8 +290,9 @@ function Login() {
     setIsSubmitting(true);
     
     try {
+      // Usar la URL base sin especificar una ruta específica
       const { error } = await supabase.auth.resetPasswordForEmail(resetData.email.trim(), {
-        redirectTo: window.location.origin + '/reset-password',
+        redirectTo: `${window.location.origin}/reset-password`,
       });
       
       if (error) {
@@ -501,6 +527,12 @@ function Login() {
           {/* Formulario de Recuperación de Contraseña */}
           <TabsContent value="reset_password">
             <form onSubmit={handleResetPassword} className="space-y-4 mt-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
+                <p className="text-sm text-blue-800">
+                  <strong>Nota:</strong> Asegúrate de que la URL <code className="bg-blue-100 px-1 rounded">{window.location.origin}/reset-password</code> esté configurada en Supabase → Authentication → URL Configuration → Redirect URLs.
+                </p>
+              </div>
+              
               <div className="space-y-2">
                 <Label htmlFor="reset-email">Correo electrónico</Label>
                 <Input 
