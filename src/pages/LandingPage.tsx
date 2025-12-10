@@ -2,13 +2,20 @@
 
 import { MadeWithDyad } from "@/components/made-with-dyad";
 import { useSession } from "@/contexts/SessionContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import BrandingDisplay from "@/components/BrandingDisplay";
 
 const LandingPage = () => {
   const { loading, session } = useSession();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Si hay un hash en la URL (posiblemente un token de auth), redirigir al callback
+  if (location.hash) {
+    navigate('/auth-callback', { replace: true });
+    return null; // No renderizar nada mientras se redirige
+  }
 
   if (loading || session) {
     return (

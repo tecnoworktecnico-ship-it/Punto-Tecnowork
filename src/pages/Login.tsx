@@ -53,7 +53,7 @@ function Login() {
       if (error && (errorCode === 'otp_expired' || error === 'access_denied')) {
         navigate('/verification-error', { replace: true });
       } else if (hashParams.get('type') || hashParams.get('access_token')) {
-        // If it looks like a successful auth callback (e.g., magic link, verification)
+        // Si parece un callback de auth (incluyendo recovery), redirigir al manejador
         navigate('/auth-callback', { replace: true });
       }
     }
@@ -187,8 +187,10 @@ function Login() {
     setIsSubmitting(true);
     
     try {
+      // Usamos la URL base para que Supabase devuelva el hash a la raíz, 
+      // y React Router lo redirija a AuthCallback.
       const { error } = await supabase.auth.resetPasswordForEmail(resetData.email, {
-        redirectTo: window.location.origin + '/auth-callback',
+        redirectTo: window.location.origin, // Redirigir a la raíz
       });
       
       if (error) {
