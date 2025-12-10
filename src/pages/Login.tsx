@@ -45,29 +45,44 @@ function Login() {
   });
 
   useEffect(() => {
-    // If the user lands here with a hash (e.g., from email verification),
-    // redirect them to the dedicated callback handler.
+    // Si ya hay sesión activa, redirigir (manejado por SessionContext)
+    if (session && !loading) {
+      return;
+    }
+
+    // Manejar hash en la URL
     if (location.hash) {
-      // Check for errors first, as AuthCallback handles successful session loading
       const hashParams = new URLSearchParams(location.hash.substring(1));
       const error = hashParams.get('error');
       const errorCode = hashParams.get('error_code');
-      const type = hashParams.get('type'); // <-- Check for type here
+      const type = hashParams.get('type');
+      const accessToken = hashParams.get('access_token');
       
+      // Manejar errores de verificación
       if (error && (errorCode === 'otp_expired' || error === 'access_denied')) {
         navigate('/verification-error', { replace: true });
-      } else if (type === 'recovery') { // <-- Handle recovery directly
+        return;
+      }
+      
+      // Si es un flujo de recuperación con token válido, ir a reset-password
+      if (type === 'recovery' && accessToken) {
         navigate('/reset-password' + location.hash, { replace: true });
-      } else if (hashParams.get('type') || hashParams.get('access_token')) {
-        // Si parece un callback de auth (incluyendo otros tipos de auth), redirigir al manejador
-        navigate('/auth-callback', { replace: true });
+        return;
+      }
+      
+      // Para cualquier otro tipo de autenticación con token, ir a auth-callback
+      if (accessToken && type !== 'recovery') {
+        navigate('/auth-callback' + location.hash, { replace: true });
+        return;
+      }
+      
+      // Si hay hash pero no es ninguno de los casos anteriores, limpiar el hash
+      // Esto evita el mensaje de error al volver de reset-password
+      if (!accessToken && !error) {
+        window.history.replaceState(null, '', window.location.pathname);
       }
     }
-
-    if (session && !loading) {
-      // The redirection for already signed-in users is handled in SessionContext
-    }
-  }, [session, loading, navigate, location]);
+  }, [session, loading, navigate, location.hash]);
 
   // Guardar el email cuando cambia para usarlo en caso de error de verificación
   const handleEmailChange = (email: string) => {
@@ -78,21 +93,30 @@ function Login() {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validar que los campos no estén vacíos
+    if (!loginData.email || !loginData.password) {
+      showError('Por favor completa todos los campos.');
+      return;
+    }
+    
     setIsSubmitting(true);
     
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: loginData.email,
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: loginData.email.trim(),
         password: loginData.password,
       });
       
       if (error) {
+        console.error('Error signing in:', error);
         showError(error.message);
-      } else {
+      } else if (data.session) {
         // La redirección se maneja en SessionContext
+        showSuccess('Inicio de sesión exitoso');
       }
     } catch (error) {
-      console.error('Error signing in:', error);
+      console.error('Unexpected error signing in:', error);
       showError('Error inesperado al iniciar sesión');
     } finally {
       setIsSubmitting(false);
@@ -112,32 +136,39 @@ function Login() {
         return;
       }
       
+      // Validar longitud de contraseña
+      if (registerData.password.length < 6) {
+        showError('La contraseña debe tener al menos 6 caracteres.');
+        setIsSubmitting(false);
+        return;
+      }
+      
       // Crear el usuario con la API de Supabase
       const { data, error } = await supabase.auth.signUp({
-        email: registerData.email,
+        email: registerData.email.trim(),
         password: registerData.password,
         options: {
           data: {
-            first_name: registerData.first_name,
-            last_name: registerData.last_name,
-            phone_number: registerData.phone_number,
-            role: 'client', // Por defecto, los usuarios registrados son clientes
+            first_name: registerData.first_name.trim(),
+            last_name: registerData.last_name.trim(),
+            phone_number: registerData.phone_number.trim(),
+            role: 'client',
           },
           emailRedirectTo: window.location.origin + '/auth-callback',
         },
       });
       
       if (error) {
+        console.error('Error signing up:', error);
         showError(error.message);
       } else if (data) {
-        // Verificar si el usuario fue creado correctamente
         if (data.user) {
           console.log("Usuario creado:", data.user);
           
-          // Esperar un momento para que se cree el perfil automáticamente mediante el trigger handle_new_user
+          // Esperar un momento para que se cree el perfil automáticamente
           await new Promise(resolve => setTimeout(resolve, 1500));
           
-          // Crear manualmente el perfil si es necesario
+          // Verificar si el perfil se creó
           const { data: profileData, error: profileError } = await supabase
             .from('profiles')
             .select('*')
@@ -150,9 +181,9 @@ function Login() {
               .from('profiles')
               .insert({
                 id: data.user.id,
-                first_name: registerData.first_name,
-                last_name: registerData.last_name,
-                phone_number: registerData.phone_number,
+                first_name: registerData.first_name.trim(),
+                last_name: registerData.last_name.trim(),
+                phone_number: registerData.phone_number.trim(),
                 role: 'client',
               });
               
@@ -174,14 +205,23 @@ function Login() {
             setRegistrationSuccess(true);
             
             // Guardar el email para posible reenvío de verificación
-            localStorage.setItem('verificationEmail', registerData.email);
+            localStorage.setItem('verificationEmail', registerData.email.trim());
           }
+          
+          // Limpiar el formulario
+          setRegisterData({
+            email: '',
+            password: '',
+            first_name: '',
+            last_name: '',
+            phone_number: '',
+          });
         } else {
           showError('Error al crear el usuario. No se recibió confirmación del servidor.');
         }
       }
     } catch (error) {
-      console.error('Error signing up:', error);
+      console.error('Unexpected error signing up:', error);
       showError('Error inesperado al registrarse');
     } finally {
       setIsSubmitting(false);
@@ -190,23 +230,29 @@ function Login() {
   
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!resetData.email) {
+      showError('Por favor ingresa tu correo electrónico.');
+      return;
+    }
+    
     setIsSubmitting(true);
     
     try {
-      // Usamos la URL base para que Supabase devuelva el hash a la raíz, 
-      // y React Router lo redirija a AuthCallback.
-      const { error } = await supabase.auth.resetPasswordForEmail(resetData.email, {
-        redirectTo: window.location.origin, // Redirigir a la raíz
+      const { error } = await supabase.auth.resetPasswordForEmail(resetData.email.trim(), {
+        redirectTo: window.location.origin + '/reset-password',
       });
       
       if (error) {
+        console.error('Error resetting password:', error);
         showError(error.message);
       } else {
         showSuccess('Se ha enviado un correo para restablecer tu contraseña. Por favor, revisa tu bandeja de entrada.');
+        setResetData({ email: '' });
         setActiveTab('sign_in');
       }
     } catch (error) {
-      console.error('Error resetting password:', error);
+      console.error('Unexpected error resetting password:', error);
       showError('Error inesperado al solicitar restablecimiento de contraseña');
     } finally {
       setIsSubmitting(false);
@@ -228,12 +274,13 @@ function Login() {
       });
       
       if (error) {
+        console.error('Error resending verification:', error);
         showError(`Error al reenviar verificación: ${error.message}`);
       } else {
         showSuccess(`Se ha reenviado el correo de verificación a ${email}`);
       }
     } catch (error) {
-      console.error('Error resending verification:', error);
+      console.error('Unexpected error resending verification:', error);
       showError('Error inesperado al reenviar verificación');
     } finally {
       setIsSubmitting(false);
@@ -243,6 +290,7 @@ function Login() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
+        <Loader2 className="h-8 w-8 text-white animate-spin mr-2" />
         <p className="text-white text-xl">Cargando...</p>
       </div>
     );
@@ -299,6 +347,7 @@ function Login() {
                     handleEmailChange(e.target.value);
                   }}
                   required
+                  disabled={isSubmitting}
                 />
               </div>
               
@@ -311,6 +360,7 @@ function Login() {
                   value={loginData.password}
                   onChange={(e) => setLoginData({...loginData, password: e.target.value})}
                   required
+                  disabled={isSubmitting}
                 />
               </div>
               
@@ -346,6 +396,7 @@ function Login() {
                     handleEmailChange(e.target.value);
                   }}
                   required
+                  disabled={isSubmitting}
                 />
               </div>
               
@@ -359,6 +410,7 @@ function Login() {
                   onChange={(e) => setRegisterData({...registerData, password: e.target.value})}
                   required
                   minLength={6}
+                  disabled={isSubmitting}
                 />
               </div>
               
@@ -371,6 +423,7 @@ function Login() {
                   value={registerData.first_name}
                   onChange={(e) => setRegisterData({...registerData, first_name: e.target.value})}
                   required
+                  disabled={isSubmitting}
                 />
               </div>
               
@@ -383,6 +436,7 @@ function Login() {
                   value={registerData.last_name}
                   onChange={(e) => setRegisterData({...registerData, last_name: e.target.value})}
                   required
+                  disabled={isSubmitting}
                 />
               </div>
               
@@ -395,6 +449,7 @@ function Login() {
                   value={registerData.phone_number}
                   onChange={(e) => setRegisterData({...registerData, phone_number: e.target.value})}
                   required
+                  disabled={isSubmitting}
                 />
               </div>
               
@@ -430,6 +485,7 @@ function Login() {
                     handleEmailChange(e.target.value);
                   }}
                   required
+                  disabled={isSubmitting}
                 />
               </div>
               

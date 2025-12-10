@@ -13,12 +13,13 @@ const LandingPage = () => {
   const location = useLocation();
 
   useEffect(() => {
-    // Si hay un hash en la URL (posiblemente un token de auth), procesarlo
+    // Si hay un hash en la URL, procesarlo
     if (location.hash) {
       const hashParams = new URLSearchParams(location.hash.substring(1));
       const type = hashParams.get('type');
       const error = hashParams.get('error');
       const errorCode = hashParams.get('error_code');
+      const accessToken = hashParams.get('access_token');
       
       // Manejar errores de verificación
       if (error && (errorCode === 'otp_expired' || error === 'access_denied')) {
@@ -26,14 +27,14 @@ const LandingPage = () => {
         return;
       }
       
-      // Si es un flujo de recuperación, ir directamente a reset-password
-      if (type === 'recovery') {
+      // Si es un flujo de recuperación con token, ir a reset-password
+      if (type === 'recovery' && accessToken) {
         navigate('/reset-password' + location.hash, { replace: true });
         return;
       }
       
-      // Para cualquier otro tipo de autenticación, ir a auth-callback
-      if (hashParams.get('access_token')) {
+      // Para cualquier otro tipo de autenticación con token, ir a auth-callback
+      if (accessToken && type !== 'recovery') {
         navigate('/auth-callback' + location.hash, { replace: true });
         return;
       }
