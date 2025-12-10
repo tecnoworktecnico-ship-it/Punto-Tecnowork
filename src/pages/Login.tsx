@@ -251,6 +251,9 @@ function Login() {
         <div className="mb-6">
           <BrandingDisplay type="main" className="h-20 mx-auto mb-4" />
           <h2 className="text-3xl font-bold text-center text-text-carbon">Iniciar Sesión / Registrarse</h2>
+          <p className="text-sm text-center text-gray-500 mt-1">
+            Versión: <span className="font-semibold">{APP_VERSION}</span>
+          </p>
         </div>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -444,10 +447,6 @@ function Login() {
             </form>
           </TabsContent>
         </Tabs>
-        
-        <div className="text-center text-xs text-gray-400 pt-4">
-          Versión: {APP_VERSION}
-        </div>
       </div>
       <MadeWithDyad />
     </div>
