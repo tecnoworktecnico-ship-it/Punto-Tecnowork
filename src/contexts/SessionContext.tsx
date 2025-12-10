@@ -17,6 +17,9 @@ interface SessionContextType {
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
+// Rutas que el SessionContext debe ignorar para la redirección automática
+const AUTH_PATHS = ['/login', '/auth-callback', '/verification-error', '/reset-password'];
+
 export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -59,6 +62,11 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
     // Redirigir según el rol actualizado
     if (profileData) {
       const currentPath = window.location.pathname;
+      if (AUTH_PATHS.some(path => currentPath.startsWith(path))) {
+        // Si estamos en una ruta de autenticación, no redirigir aquí.
+        return;
+      }
+      
       if (profileData.role === 'admin' && !currentPath.startsWith('/admin')) {
         navigate('/admin/dashboard', { replace: true });
       } else if (profileData.role === 'local' && !currentPath.startsWith('/local')) {
@@ -77,14 +85,16 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
 
       setSession(currentSession);
       setUser(currentSession?.user || null);
+      const currentPath = window.location.pathname;
+      const isAuthPath = AUTH_PATHS.some(path => currentPath.startsWith(path));
 
       if (currentSession?.user) {
         const profileData = await fetchProfile(currentSession.user.id);
         
         if (!isMounted) return;
 
-        if (profileData) {
-          const currentPath = window.location.pathname;
+        if (profileData && !isAuthPath) {
+          // Redirigir solo si NO estamos en una ruta de autenticación
           if (profileData.role === 'admin' && !currentPath.startsWith('/admin')) {
             navigate('/admin/dashboard', { replace: true });
           } else if (profileData.role === 'local' && !currentPath.startsWith('/local')) {
@@ -92,14 +102,14 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           } else if (profileData.role === 'client' && !currentPath.startsWith('/client') && currentPath !== '/') {
             navigate('/client', { replace: true });
           }
-          if (!currentPath.includes(profileData.role) && currentPath !== '/') {
+          if (!currentPath.includes(profileData.role) && currentPath !== '/' && !isAuthPath) {
              showSuccess(`Bienvenido, ${profileData?.first_name || currentSession.user.email}!`);
           }
         }
       } else {
         setProfile(null);
-        const currentPath = window.location.pathname;
-        if (currentPath !== '/login' && currentPath !== '/' && !currentPath.includes('/verification-error') && !currentPath.includes('/auth-callback')) {
+        // Redirigir al login solo si NO estamos ya en una ruta de autenticación
+        if (!isAuthPath && currentPath !== '/') {
           navigate('/login', { replace: true });
         }
       }
@@ -118,7 +128,11 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
             setUser(null);
             setProfile(null);
             setLoading(false);
-            navigate('/login', { replace: true });
+            const currentPath = window.location.pathname;
+            const isAuthPath = AUTH_PATHS.some(path => currentPath.startsWith(path));
+            if (!isAuthPath) {
+              navigate('/login', { replace: true });
+            }
             showSuccess('Sesión cerrada correctamente.');
           }
         } else if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {

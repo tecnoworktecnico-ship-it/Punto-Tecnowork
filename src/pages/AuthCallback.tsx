@@ -11,26 +11,26 @@ const AuthCallback = () => {
   const { session, loading, profile } = useSession();
 
   useEffect(() => {
-    // 1. Check for errors in the hash (e.g., verification expired)
     const hashParams = new URLSearchParams(location.hash.substring(1));
     const error = hashParams.get('error');
     const errorCode = hashParams.get('error_code');
     const type = hashParams.get('type');
     
+    // 1. Manejar errores de verificación (expiración, etc.)
     if (error && (errorCode === 'otp_expired' || error === 'access_denied')) {
-      // Redirect to the dedicated error page
       navigate('/verification-error', { replace: true });
       return;
     }
     
-    // 2. Check if this is a password recovery link
+    // 2. Manejar flujo de recuperación de contraseña
     if (type === 'recovery') {
-      // Redirect to the reset password page with the hash intact
+      // Redirigir inmediatamente a la página de restablecimiento de contraseña
+      // El componente ResetPassword se encargará de validar el token en el hash.
       navigate('/reset-password' + location.hash, { replace: true });
       return;
     }
 
-    // 3. If session is loaded and valid, redirect based on role
+    // 3. Si la sesión está cargada y es válida, redirigir al dashboard
     if (!loading && session && profile) {
       if (profile.role === 'admin') {
         navigate('/admin/dashboard', { replace: true });
@@ -42,14 +42,12 @@ const AuthCallback = () => {
       return;
     }
     
-    // 4. If loading finishes and no session/profile is found (e.g., failed login/callback), go to login
+    // 4. Si la carga finaliza y no hay sesión/perfil, ir al login
     if (!loading && !session) {
       navigate('/login', { replace: true });
       return;
     }
 
-    // Note: SessionContext handles the actual session parsing and profile fetching.
-    // This component just waits for that process to complete and handles routing.
   }, [session, loading, profile, navigate, location.hash]);
 
   return (
