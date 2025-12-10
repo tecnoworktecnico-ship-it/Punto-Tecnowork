@@ -27,6 +27,8 @@ const ResetPassword = () => {
     const refreshToken = hashParams.get('refresh_token');
     const type = hashParams.get('type');
     
+    console.log('ResetPassword - Hash params:', { accessToken: !!accessToken, refreshToken: !!refreshToken, type });
+    
     const checkToken = async () => {
       if (accessToken && type === 'recovery') {
         try {
@@ -53,6 +55,7 @@ const ResetPassword = () => {
         }
       } else {
         // No hay token válido, redirigir al login
+        console.error('No valid recovery token found in URL');
         showError('No se encontró un enlace de recuperación válido.');
         setTokenValid(false);
         navigate('/login', { replace: true });

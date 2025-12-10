@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { MadeWithDyad } from "@/components/made-with-dyad";
 import { useSession } from "@/contexts/SessionContext";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -11,11 +12,33 @@ const LandingPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Si hay un hash en la URL (posiblemente un token de auth), redirigir al callback
-  if (location.hash) {
-    navigate('/auth-callback', { replace: true });
-    return null; // No renderizar nada mientras se redirige
-  }
+  useEffect(() => {
+    // Si hay un hash en la URL (posiblemente un token de auth), procesarlo
+    if (location.hash) {
+      const hashParams = new URLSearchParams(location.hash.substring(1));
+      const type = hashParams.get('type');
+      const error = hashParams.get('error');
+      const errorCode = hashParams.get('error_code');
+      
+      // Manejar errores de verificación
+      if (error && (errorCode === 'otp_expired' || error === 'access_denied')) {
+        navigate('/verification-error', { replace: true });
+        return;
+      }
+      
+      // Si es un flujo de recuperación, ir directamente a reset-password
+      if (type === 'recovery') {
+        navigate('/reset-password' + location.hash, { replace: true });
+        return;
+      }
+      
+      // Para cualquier otro tipo de autenticación, ir a auth-callback
+      if (hashParams.get('access_token')) {
+        navigate('/auth-callback' + location.hash, { replace: true });
+        return;
+      }
+    }
+  }, [location.hash, navigate]);
 
   if (loading || session) {
     return (
