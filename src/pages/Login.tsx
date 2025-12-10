@@ -13,6 +13,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { showSuccess, showError } from '@/utils/toast';
 import { Loader2 } from 'lucide-react';
 
+// Obtener la versión de la aplicación
+const APP_VERSION = import.meta.env.VITE_APP_VERSION || 'N/A';
+
 function Login() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -441,6 +444,10 @@ function Login() {
             </form>
           </TabsContent>
         </Tabs>
+        
+        <div className="text-center text-xs text-gray-400 pt-4">
+          Versión: {APP_VERSION}
+        </div>
       </div>
       <MadeWithDyad />
     </div>
