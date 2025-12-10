@@ -52,11 +52,14 @@ function Login() {
       const hashParams = new URLSearchParams(location.hash.substring(1));
       const error = hashParams.get('error');
       const errorCode = hashParams.get('error_code');
+      const type = hashParams.get('type'); // <-- Check for type here
       
       if (error && (errorCode === 'otp_expired' || error === 'access_denied')) {
         navigate('/verification-error', { replace: true });
+      } else if (type === 'recovery') { // <-- Handle recovery directly
+        navigate('/reset-password' + location.hash, { replace: true });
       } else if (hashParams.get('type') || hashParams.get('access_token')) {
-        // Si parece un callback de auth (incluyendo recovery), redirigir al manejador
+        // Si parece un callback de auth (incluyendo otros tipos de auth), redirigir al manejador
         navigate('/auth-callback', { replace: true });
       }
     }

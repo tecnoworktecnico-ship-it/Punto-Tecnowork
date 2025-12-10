@@ -22,15 +22,10 @@ const AuthCallback = () => {
       return;
     }
     
-    // 2. Manejar flujo de recuperación de contraseña
-    if (type === 'recovery') {
-      // Redirigir inmediatamente a la página de restablecimiento de contraseña
-      // El componente ResetPassword se encargará de validar el token en el hash.
-      navigate('/reset-password' + location.hash, { replace: true });
-      return;
-    }
+    // Nota: El flujo de 'recovery' ahora se maneja directamente en LandingPage/Login
+    // para evitar conflictos de redirección.
 
-    // 3. Si la sesión está cargada y es válida, redirigir al dashboard
+    // 2. Si la sesión está cargada y es válida, redirigir al dashboard
     if (!loading && session && profile) {
       if (profile.role === 'admin') {
         navigate('/admin/dashboard', { replace: true });
@@ -42,7 +37,7 @@ const AuthCallback = () => {
       return;
     }
     
-    // 4. Si la carga finaliza y no hay sesión/perfil, ir al login
+    // 3. Si la carga finaliza y no hay sesión/perfil, ir al login
     if (!loading && !session) {
       navigate('/login', { replace: true });
       return;
