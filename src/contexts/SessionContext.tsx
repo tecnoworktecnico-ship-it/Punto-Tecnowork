@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { showSuccess, showError } from '@/utils/toast';
 
 interface SessionContextType {
@@ -26,6 +26,7 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
   const [profile, setProfile] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const fetchProfile = async (userId: string) => {
     try {
@@ -83,45 +84,68 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
     const handleSession = async (currentSession: Session | null) => {
       if (!isMounted) return;
 
+      console.log('SessionContext - handleSession called', { 
+        hasSession: !!currentSession, 
+        currentPath: location.pathname 
+      });
+
       setSession(currentSession);
       setUser(currentSession?.user || null);
-      const currentPath = window.location.pathname;
+      const currentPath = location.pathname;
       const isAuthPath = AUTH_PATHS.some(path => currentPath.startsWith(path));
 
       if (currentSession?.user) {
+        console.log('SessionContext - User authenticated, fetching profile');
         const profileData = await fetchProfile(currentSession.user.id);
         
         if (!isMounted) return;
 
-        if (profileData && !isAuthPath) {
+        if (profileData) {
+          console.log('SessionContext - Profile loaded', { 
+            role: profileData.role, 
+            currentPath, 
+            isAuthPath 
+          });
+          
           // Redirigir solo si NO estamos en una ruta de autenticación
-          if (profileData.role === 'admin' && !currentPath.startsWith('/admin')) {
-            navigate('/admin/dashboard', { replace: true });
-          } else if (profileData.role === 'local' && !currentPath.startsWith('/local')) {
-            navigate('/local/dashboard', { replace: true });
-          } else if (profileData.role === 'client' && !currentPath.startsWith('/client') && currentPath !== '/') {
-            navigate('/client', { replace: true });
-          }
-          if (!currentPath.includes(profileData.role) && currentPath !== '/' && !isAuthPath) {
-             showSuccess(`Bienvenido, ${profileData?.first_name || currentSession.user.email}!`);
+          if (!isAuthPath) {
+            if (profileData.role === 'admin' && !currentPath.startsWith('/admin')) {
+              console.log('SessionContext - Redirecting to admin dashboard');
+              navigate('/admin/dashboard', { replace: true });
+            } else if (profileData.role === 'local' && !currentPath.startsWith('/local')) {
+              console.log('SessionContext - Redirecting to local dashboard');
+              navigate('/local/dashboard', { replace: true });
+            } else if (profileData.role === 'client' && !currentPath.startsWith('/client') && currentPath !== '/') {
+              console.log('SessionContext - Redirecting to client dashboard');
+              navigate('/client', { replace: true });
+            }
           }
         }
       } else {
+        console.log('SessionContext - No user session');
         setProfile(null);
         // Redirigir al login solo si NO estamos ya en una ruta de autenticación
         if (!isAuthPath && currentPath !== '/') {
+          console.log('SessionContext - Redirecting to login');
           navigate('/login', { replace: true });
         }
       }
-      if (isMounted) setLoading(false);
+      if (isMounted) {
+        console.log('SessionContext - Setting loading to false');
+        setLoading(false);
+      }
     };
 
+    console.log('SessionContext - Initial setup');
     supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      console.log('SessionContext - Initial session retrieved', { hasSession: !!initialSession });
       handleSession(initialSession);
     });
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
+        console.log('SessionContext - Auth state changed', { event, hasSession: !!currentSession });
+        
         if (event === 'SIGNED_OUT') {
           if (isMounted) {
             setSession(null);
@@ -135,9 +159,14 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
             }
             showSuccess('Sesión cerrada correctamente.');
           }
-        } else if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+        } else if (event === 'SIGNED_IN') {
+          console.log('SessionContext - User signed in, handling session');
+          handleSession(currentSession);
+        } else if (event === 'INITIAL_SESSION') {
+          console.log('SessionContext - Initial session event');
           handleSession(currentSession);
         } else if (event === 'USER_UPDATED') {
+          console.log('SessionContext - User updated');
           // Cuando el usuario se actualiza, también actualizamos el perfil
           setSession(currentSession);
           setUser(currentSession?.user || null);
@@ -150,10 +179,11 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
     );
 
     return () => {
+      console.log('SessionContext - Cleanup');
       isMounted = false;
       authListener.subscription.unsubscribe();
     };
-  }, [navigate]);
+  }, [navigate, location.pathname]);
 
   const signOut = async () => {
     try {

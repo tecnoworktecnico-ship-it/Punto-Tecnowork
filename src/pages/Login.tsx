@@ -19,7 +19,7 @@ const APP_VERSION = import.meta.env.VITE_APP_VERSION || 'N/A';
 function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { session, loading } = useSession();
+  const { session, loading, profile } = useSession();
   const [activeTab, setActiveTab] = useState<string>('sign_in');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
@@ -45,8 +45,18 @@ function Login() {
   });
 
   useEffect(() => {
-    // Si ya hay sesión activa, redirigir (manejado por SessionContext)
-    if (session && !loading) {
+    console.log('Login - useEffect', { session: !!session, loading, profile: profile?.role });
+    
+    // Si ya hay sesión activa, redirigir según el rol
+    if (session && !loading && profile) {
+      console.log('Login - Session active, redirecting based on role', profile.role);
+      if (profile.role === 'admin') {
+        navigate('/admin/dashboard', { replace: true });
+      } else if (profile.role === 'local') {
+        navigate('/local/dashboard', { replace: true });
+      } else if (profile.role === 'client') {
+        navigate('/client', { replace: true });
+      }
       return;
     }
 
@@ -57,6 +67,8 @@ function Login() {
       const errorCode = hashParams.get('error_code');
       const type = hashParams.get('type');
       const accessToken = hashParams.get('access_token');
+      
+      console.log('Login - Hash params detected', { error, errorCode, type, hasToken: !!accessToken });
       
       // Manejar errores de verificación
       if (error && (errorCode === 'otp_expired' || error === 'access_denied')) {
@@ -77,12 +89,11 @@ function Login() {
       }
       
       // Si hay hash pero no es ninguno de los casos anteriores, limpiar el hash
-      // Esto evita el mensaje de error al volver de reset-password
       if (!accessToken && !error) {
         window.history.replaceState(null, '', window.location.pathname);
       }
     }
-  }, [session, loading, navigate, location.hash]);
+  }, [session, loading, profile, navigate, location.hash]);
 
   // Guardar el email cuando cambia para usarlo en caso de error de verificación
   const handleEmailChange = (email: string) => {
@@ -94,6 +105,8 @@ function Login() {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('Login - handleSignIn called');
+    
     // Validar que los campos no estén vacíos
     if (!loginData.email || !loginData.password) {
       showError('Por favor completa todos los campos.');
@@ -103,17 +116,30 @@ function Login() {
     setIsSubmitting(true);
     
     try {
+      console.log('Login - Attempting sign in with email:', loginData.email);
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email: loginData.email.trim(),
         password: loginData.password,
+      });
+      
+      console.log('Login - Sign in response', { 
+        hasData: !!data, 
+        hasSession: !!data?.session, 
+        hasUser: !!data?.user,
+        error: error?.message 
       });
       
       if (error) {
         console.error('Error signing in:', error);
         showError(error.message);
       } else if (data.session) {
-        // La redirección se maneja en SessionContext
+        console.log('Login - Sign in successful, session created');
         showSuccess('Inicio de sesión exitoso');
+        // La redirección se maneja en SessionContext
+        // Pero vamos a forzar una verificación de sesión
+        const { data: sessionData } = await supabase.auth.getSession();
+        console.log('Login - Session verification', { hasSession: !!sessionData.session });
       }
     } catch (error) {
       console.error('Unexpected error signing in:', error);
@@ -286,6 +312,8 @@ function Login() {
       setIsSubmitting(false);
     }
   };
+
+  console.log('Login - Render', { loading, hasSession: !!session, hasProfile: !!profile });
 
   if (loading) {
     return (
