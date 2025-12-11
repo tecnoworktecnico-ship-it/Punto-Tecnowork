@@ -98,8 +98,15 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
       // Verificar si hay un flujo de recuperación activo
       const hashParams = new URLSearchParams(location.hash.substring(1));
       const isRecoveryFlow = hashParams.get('type') === 'recovery' && hashParams.get('access_token');
+      
+      // Si estamos en /reset-password, SIEMPRE considerarlo como flujo de recuperación
+      const isResetPasswordPage = currentPath === '/reset-password';
 
-      console.log('SessionContext - Recovery check', { isRecoveryFlow, currentPath });
+      console.log('SessionContext - Recovery check', { 
+        isRecoveryFlow, 
+        isResetPasswordPage,
+        currentPath 
+      });
 
       if (currentSession?.user) {
         console.log('SessionContext - User authenticated, fetching profile');
@@ -112,13 +119,15 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
             role: profileData.role, 
             currentPath, 
             isAuthPath,
-            isRecoveryFlow
+            isRecoveryFlow,
+            isResetPasswordPage
           });
           
           // NO redirigir si:
           // 1. Estamos en una ruta de autenticación
           // 2. Hay un flujo de recuperación activo
-          if (!isAuthPath && !isRecoveryFlow) {
+          // 3. Estamos en la página de reset-password
+          if (!isAuthPath && !isRecoveryFlow && !isResetPasswordPage) {
             if (profileData.role === 'admin' && !currentPath.startsWith('/admin')) {
               console.log('SessionContext - Redirecting to admin dashboard');
               navigate('/admin/dashboard', { replace: true });
@@ -129,8 +138,8 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
               console.log('SessionContext - Redirecting to client dashboard');
               navigate('/client', { replace: true });
             }
-          } else if (isRecoveryFlow) {
-            console.log('SessionContext - Recovery flow detected, not redirecting');
+          } else if (isRecoveryFlow || isResetPasswordPage) {
+            console.log('SessionContext - Recovery flow or reset-password page detected, not redirecting');
           }
         }
       } else {

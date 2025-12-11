@@ -47,7 +47,7 @@ const ResetPassword = () => {
             console.error('Error validating reset token:', error);
             showError('El enlace de recuperación es inválido o ha expirado.');
             setTokenValid(false);
-            // No redirigir inmediatamente, dar tiempo al usuario para ver el error
+            // Redirigir después de 3 segundos
             setTimeout(() => {
               navigate('/login', { replace: true });
             }, 3000);
@@ -63,14 +63,23 @@ const ResetPassword = () => {
             navigate('/login', { replace: true });
           }, 3000);
         }
-      } else {
-        // No hay token válido
+      } else if (!accessToken || type !== 'recovery') {
+        // Solo mostrar error si realmente no hay token válido
         console.error('No valid recovery token found in URL', { accessToken: !!accessToken, type });
-        showError('No se encontró un enlace de recuperación válido.');
-        setTokenValid(false);
-        setTimeout(() => {
-          navigate('/login', { replace: true });
-        }, 3000);
+        
+        // Verificar si ya hay una sesión activa (puede ser que el token ya se procesó)
+        const { data: sessionData } = await supabase.auth.getSession();
+        
+        if (sessionData.session) {
+          console.log('Session already exists, token was already processed');
+          setTokenValid(true);
+        } else {
+          showError('No se encontró un enlace de recuperación válido.');
+          setTokenValid(false);
+          setTimeout(() => {
+            navigate('/login', { replace: true });
+          }, 3000);
+        }
       }
       
       setTokenChecked(true);
