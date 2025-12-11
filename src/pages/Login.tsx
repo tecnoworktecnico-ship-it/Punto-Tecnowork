@@ -23,6 +23,7 @@ function Login() {
   const [activeTab, setActiveTab] = useState<string>('sign_in');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
+  const [isRecoveryFlow, setIsRecoveryFlow] = useState(false);
   
   // Formulario de inicio de sesión
   const [loginData, setLoginData] = useState({
@@ -47,8 +48,22 @@ function Login() {
   useEffect(() => {
     console.log('Login - useEffect', { session: !!session, loading, profile: profile?.role, hash: location.hash });
     
-    // PRIMERO: Manejar hash en la URL (antes de verificar sesión)
+    // PRIMERO: Detectar si es un flujo de recuperación
     if (location.hash) {
+      const hashParams = new URLSearchParams(location.hash.substring(1));
+      const type = hashParams.get('type');
+      const accessToken = hashParams.get('access_token');
+      
+      if (type === 'recovery' && accessToken) {
+        console.log('Login - Recovery flow detected, marking as recovery');
+        setIsRecoveryFlow(true);
+        // NO hacer nada más, dejar que el usuario permanezca en login
+        return;
+      }
+    }
+    
+    // SEGUNDO: Manejar hash en la URL (solo si NO es recovery)
+    if (location.hash && !isRecoveryFlow) {
       const hashParams = new URLSearchParams(location.hash.substring(1));
       const error = hashParams.get('error');
       const errorCode = hashParams.get('error_code');
@@ -60,13 +75,6 @@ function Login() {
       // Manejar errores de verificación
       if (error && (errorCode === 'otp_expired' || error === 'access_denied')) {
         navigate('/verification-error', { replace: true });
-        return;
-      }
-      
-      // Si es un flujo de recuperación con token válido, ir DIRECTAMENTE a reset-password
-      if (type === 'recovery' && accessToken) {
-        console.log('Login - Recovery flow detected, redirecting to reset-password');
-        navigate('/reset-password' + location.hash, { replace: true });
         return;
       }
       
@@ -83,8 +91,8 @@ function Login() {
       }
     }
     
-    // SEGUNDO: Si ya hay sesión activa, redirigir según el rol
-    if (session && !loading && profile) {
+    // TERCERO: Si ya hay sesión activa Y NO es flujo de recuperación, redirigir según el rol
+    if (session && !loading && profile && !isRecoveryFlow) {
       console.log('Login - Session active, redirecting based on role', profile.role);
       if (profile.role === 'admin') {
         navigate('/admin/dashboard', { replace: true });
@@ -95,7 +103,7 @@ function Login() {
       }
       return;
     }
-  }, [session, loading, profile, navigate, location.hash]);
+  }, [session, loading, profile, navigate, location.hash, isRecoveryFlow]);
 
   // Guardar el email cuando cambia para usarlo en caso de error de verificación
   const handleEmailChange = (email: string) => {
@@ -300,7 +308,7 @@ function Login() {
         console.error('Error resetting password:', error);
         showError(error.message);
       } else {
-        showSuccess('Se ha enviado un correo para restablecer tu contraseña. Por favor, revisa tu bandeja de entrada.');
+        showSuccess('Se ha enviado un correo para restablecer tu contraseña. El enlace se abrirá en una nueva pestaña.');
         setResetData({ email: '' });
         setActiveTab('sign_in');
       }
@@ -340,9 +348,9 @@ function Login() {
     }
   };
 
-  console.log('Login - Render', { loading, hasSession: !!session, hasProfile: !!profile });
+  console.log('Login - Render', { loading, hasSession: !!session, hasProfile: !!profile, isRecoveryFlow });
 
-  if (loading) {
+  if (loading && !isRecoveryFlow) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
         <Loader2 className="h-8 w-8 text-white animate-spin mr-2" />
@@ -361,6 +369,14 @@ function Login() {
             Versión: <span className="font-semibold">{APP_VERSION}</span>
           </p>
         </div>
+        
+        {isRecoveryFlow && (
+          <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
+            <p className="text-sm text-blue-800">
+              <strong>Recuperación de contraseña en proceso.</strong> Por favor, completa el proceso en la nueva pestaña que se abrió.
+            </p>
+          </div>
+        )}
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-3">

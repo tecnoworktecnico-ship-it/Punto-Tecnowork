@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { showSuccess, showError } from '@/utils/toast';
-import { Loader2, Lock } from 'lucide-react';
+import { Loader2, Lock, CheckCircle } from 'lucide-react';
 import BrandingDisplay from '@/components/BrandingDisplay';
 
 const ResetPassword = () => {
@@ -19,6 +19,7 @@ const ResetPassword = () => {
   const [loading, setLoading] = useState(false);
   const [tokenChecked, setTokenChecked] = useState(false);
   const [tokenValid, setTokenValid] = useState(false);
+  const [passwordUpdated, setPasswordUpdated] = useState(false);
 
   useEffect(() => {
     // Verificar si hay un token de recuperación en la URL
@@ -47,7 +48,6 @@ const ResetPassword = () => {
             console.error('Error validating reset token:', error);
             showError('El enlace de recuperación es inválido o ha expirado.');
             setTokenValid(false);
-            // Redirigir después de 3 segundos
             setTimeout(() => {
               navigate('/login', { replace: true });
             }, 3000);
@@ -64,10 +64,9 @@ const ResetPassword = () => {
           }, 3000);
         }
       } else if (!accessToken || type !== 'recovery') {
-        // Solo mostrar error si realmente no hay token válido
         console.error('No valid recovery token found in URL', { accessToken: !!accessToken, type });
         
-        // Verificar si ya hay una sesión activa (puede ser que el token ya se procesó)
+        // Verificar si ya hay una sesión activa
         const { data: sessionData } = await supabase.auth.getSession();
         
         if (sessionData.session) {
@@ -104,37 +103,62 @@ const ResetPassword = () => {
     setLoading(true);
     
     try {
-      const { error } = await supabase.auth.updateUser({
+      console.log('ResetPassword - Updating password...');
+      
+      const { data: updateData, error: updateError } = await supabase.auth.updateUser({
         password: newPassword,
       });
       
-      if (error) {
-        console.error('Error updating password:', error);
-        showError(`Error al actualizar la contraseña: ${error.message}`);
-      } else {
-        // Actualizar el campo password_changed en el perfil
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (user) {
-          await supabase
-            .from('profiles')
-            .update({ 
-              password_changed: true,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', user.id);
-        }
-        
-        showSuccess('Contraseña actualizada correctamente. Por favor, inicia sesión con tu nueva contraseña.');
-        
-        // Cerrar sesión para forzar un nuevo inicio de sesión con la nueva contraseña
-        await supabase.auth.signOut();
-        navigate('/login', { replace: true });
+      console.log('ResetPassword - Update result:', { 
+        hasData: !!updateData, 
+        error: updateError?.message 
+      });
+      
+      if (updateError) {
+        console.error('Error updating password:', updateError);
+        showError(`Error al actualizar la contraseña: ${updateError.message}`);
+        setLoading(false);
+        return;
       }
+      
+      // Actualizar el campo password_changed en el perfil
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        console.log('ResetPassword - Updating profile for user:', user.id);
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({ 
+            password_changed: true,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', user.id);
+          
+        if (profileError) {
+          console.error('Error updating profile:', profileError);
+        }
+      }
+      
+      console.log('ResetPassword - Password updated successfully');
+      setPasswordUpdated(true);
+      showSuccess('¡Contraseña actualizada correctamente!');
+      
+      // Esperar 2 segundos antes de cerrar sesión y redirigir
+      setTimeout(async () => {
+        console.log('ResetPassword - Signing out...');
+        await supabase.auth.signOut();
+        
+        // Cerrar esta pestaña si fue abierta desde un enlace
+        if (window.opener) {
+          window.close();
+        } else {
+          navigate('/login', { replace: true });
+        }
+      }, 2000);
+      
     } catch (err) {
       console.error('Unexpected error:', err);
       showError('Error inesperado al actualizar la contraseña.');
-    } finally {
       setLoading(false);
     }
   };
@@ -158,6 +182,29 @@ const ResetPassword = () => {
             </p>
             <p className="text-gray-600">
               Serás redirigido al login en unos segundos...
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (passwordUpdated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
+        <Card className="w-full max-w-md p-6 bg-white rounded-lg shadow-lg">
+          <CardContent className="text-center py-8">
+            <CheckCircle className="h-16 w-16 text-success-green mx-auto mb-4" />
+            <p className="text-success-green text-2xl font-bold mb-4">
+              ¡Contraseña Actualizada!
+            </p>
+            <p className="text-gray-600 mb-2">
+              Tu contraseña ha sido cambiada exitosamente.
+            </p>
+            <p className="text-gray-500 text-sm">
+              {window.opener 
+                ? 'Esta ventana se cerrará automáticamente...' 
+                : 'Serás redirigido al login...'}
             </p>
           </CardContent>
         </Card>
@@ -191,6 +238,7 @@ const ResetPassword = () => {
                 placeholder="Mínimo 6 caracteres"
                 required
                 minLength={6}
+                disabled={loading}
               />
             </div>
             <div className="space-y-2">
@@ -202,6 +250,7 @@ const ResetPassword = () => {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Repite la nueva contraseña"
                 required
+                disabled={loading}
               />
             </div>
             <Button
@@ -212,7 +261,7 @@ const ResetPassword = () => {
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Actualizando...
+                  Actualizando contraseña...
                 </>
               ) : (
                 <>
