@@ -45,22 +45,9 @@ function Login() {
   });
 
   useEffect(() => {
-    console.log('Login - useEffect', { session: !!session, loading, profile: profile?.role });
+    console.log('Login - useEffect', { session: !!session, loading, profile: profile?.role, hash: location.hash });
     
-    // Si ya hay sesión activa, redirigir según el rol
-    if (session && !loading && profile) {
-      console.log('Login - Session active, redirecting based on role', profile.role);
-      if (profile.role === 'admin') {
-        navigate('/admin/dashboard', { replace: true });
-      } else if (profile.role === 'local') {
-        navigate('/local/dashboard', { replace: true });
-      } else if (profile.role === 'client') {
-        navigate('/client', { replace: true });
-      }
-      return;
-    }
-
-    // Manejar hash en la URL
+    // PRIMERO: Manejar hash en la URL (antes de verificar sesión)
     if (location.hash) {
       const hashParams = new URLSearchParams(location.hash.substring(1));
       const error = hashParams.get('error');
@@ -76,14 +63,16 @@ function Login() {
         return;
       }
       
-      // Si es un flujo de recuperación con token válido, ir a reset-password
+      // Si es un flujo de recuperación con token válido, ir DIRECTAMENTE a reset-password
       if (type === 'recovery' && accessToken) {
+        console.log('Login - Recovery flow detected, redirecting to reset-password');
         navigate('/reset-password' + location.hash, { replace: true });
         return;
       }
       
       // Para cualquier otro tipo de autenticación con token, ir a auth-callback
       if (accessToken && type !== 'recovery') {
+        console.log('Login - Auth callback flow detected');
         navigate('/auth-callback' + location.hash, { replace: true });
         return;
       }
@@ -92,6 +81,19 @@ function Login() {
       if (!accessToken && !error && !type) {
         window.history.replaceState(null, '', window.location.pathname);
       }
+    }
+    
+    // SEGUNDO: Si ya hay sesión activa, redirigir según el rol
+    if (session && !loading && profile) {
+      console.log('Login - Session active, redirecting based on role', profile.role);
+      if (profile.role === 'admin') {
+        navigate('/admin/dashboard', { replace: true });
+      } else if (profile.role === 'local') {
+        navigate('/local/dashboard', { replace: true });
+      } else if (profile.role === 'client') {
+        navigate('/client', { replace: true });
+      }
+      return;
     }
   }, [session, loading, profile, navigate, location.hash]);
 
@@ -290,7 +292,6 @@ function Login() {
     setIsSubmitting(true);
     
     try {
-      // Usar la URL base sin especificar una ruta específica
       const { error } = await supabase.auth.resetPasswordForEmail(resetData.email.trim(), {
         redirectTo: `${window.location.origin}/reset-password`,
       });
@@ -527,12 +528,6 @@ function Login() {
           {/* Formulario de Recuperación de Contraseña */}
           <TabsContent value="reset_password">
             <form onSubmit={handleResetPassword} className="space-y-4 mt-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
-                <p className="text-sm text-blue-800">
-                  <strong>Nota:</strong> Asegúrate de que la URL <code className="bg-blue-100 px-1 rounded">{window.location.origin}/reset-password</code> esté configurada en Supabase → Authentication → URL Configuration → Redirect URLs.
-                </p>
-              </div>
-              
               <div className="space-y-2">
                 <Label htmlFor="reset-email">Correo electrónico</Label>
                 <Input 

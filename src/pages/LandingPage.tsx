@@ -21,14 +21,17 @@ const LandingPage = () => {
       const errorCode = hashParams.get('error_code');
       const accessToken = hashParams.get('access_token');
       
+      console.log('LandingPage - Hash detected', { type, error, errorCode, hasToken: !!accessToken });
+      
       // Manejar errores de verificación
       if (error && (errorCode === 'otp_expired' || error === 'access_denied')) {
         navigate('/verification-error', { replace: true });
         return;
       }
       
-      // Si es un flujo de recuperación con token, ir a reset-password
+      // Si es un flujo de recuperación con token, ir DIRECTAMENTE a reset-password
       if (type === 'recovery' && accessToken) {
+        console.log('LandingPage - Recovery flow detected, redirecting to reset-password');
         navigate('/reset-password' + location.hash, { replace: true });
         return;
       }
