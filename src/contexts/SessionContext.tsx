@@ -38,7 +38,6 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
 
       if (profileError) {
         console.error('Error fetching profile:', profileError);
-        showError('Error al cargar el perfil del usuario.');
         setProfile(null);
         return null;
       }
@@ -47,7 +46,6 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
       return profileData;
     } catch (error) {
       console.error('Unexpected error fetching profile:', error);
-      showError('Error inesperado al cargar el perfil.');
       setProfile(null);
       return null;
     }
@@ -64,7 +62,6 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
     if (profileData) {
       const currentPath = window.location.pathname;
       if (AUTH_PATHS.some(path => currentPath.startsWith(path))) {
-        // Si estamos en una ruta de autenticación, no redirigir aquí.
         return;
       }
       
@@ -78,39 +75,36 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
     }
   };
 
-  // Función para verificar si estamos en un flujo de recuperación
-  const isRecoveryFlow = () => {
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const type = hashParams.get('type');
-    const accessToken = hashParams.get('access_token');
-    return type === 'recovery' && !!accessToken;
-  };
-
   useEffect(() => {
     let isMounted = true;
 
     const handleSession = async (currentSession: Session | null) => {
       if (!isMounted) return;
 
+      const currentPath = location.pathname;
+      
       console.log('SessionContext - handleSession called', { 
         hasSession: !!currentSession, 
-        currentPath: location.pathname,
-        hash: location.hash,
-        isRecovery: isRecoveryFlow()
+        currentPath,
+        hash: location.hash
       });
+
+      // Si estamos en /reset-password, NO hacer nada más que establecer la sesión
+      if (currentPath === '/reset-password') {
+        console.log('SessionContext - On reset-password page, only setting session state');
+        setSession(currentSession);
+        setUser(currentSession?.user || null);
+        setLoading(false);
+        return;
+      }
 
       setSession(currentSession);
       setUser(currentSession?.user || null);
-      const currentPath = location.pathname;
       const isAuthPath = AUTH_PATHS.some(path => currentPath.startsWith(path));
-      const isResetPasswordPage = currentPath === '/reset-password';
-      const recoveryFlow = isRecoveryFlow();
 
       console.log('SessionContext - Path checks', { 
         currentPath,
-        isAuthPath,
-        isResetPasswordPage,
-        recoveryFlow
+        isAuthPath
       });
 
       if (currentSession?.user) {
@@ -123,20 +117,11 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           console.log('SessionContext - Profile loaded', { 
             role: profileData.role, 
             currentPath, 
-            isAuthPath,
-            recoveryFlow,
-            isResetPasswordPage
+            isAuthPath
           });
           
-          // NO redirigir si:
-          // 1. Estamos en una ruta de autenticación
-          // 2. Hay un flujo de recuperación activo
-          // 3. Estamos en la página de reset-password
-          const shouldNotRedirect = isAuthPath || recoveryFlow || isResetPasswordPage;
-          
-          console.log('SessionContext - Should redirect?', { shouldNotRedirect });
-          
-          if (!shouldNotRedirect) {
+          // NO redirigir si estamos en una ruta de autenticación
+          if (!isAuthPath) {
             if (profileData.role === 'admin' && !currentPath.startsWith('/admin')) {
               console.log('SessionContext - Redirecting to admin dashboard');
               navigate('/admin/dashboard', { replace: true });
@@ -148,7 +133,7 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
               navigate('/client', { replace: true });
             }
           } else {
-            console.log('SessionContext - Skipping redirect due to recovery flow or auth path');
+            console.log('SessionContext - Skipping redirect due to auth path');
           }
         }
       } else {
@@ -160,6 +145,7 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           navigate('/login', { replace: true });
         }
       }
+      
       if (isMounted) {
         console.log('SessionContext - Setting loading to false');
         setLoading(false);
@@ -189,24 +175,12 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
             }
             showSuccess('Sesión cerrada correctamente.');
           }
-        } else if (event === 'SIGNED_IN') {
-          console.log('SessionContext - User signed in, handling session');
+        } else if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'USER_UPDATED') {
+          console.log('SessionContext - Handling session for event:', event);
           handleSession(currentSession);
-        } else if (event === 'INITIAL_SESSION') {
-          console.log('SessionContext - Initial session event');
-          handleSession(currentSession);
-        } else if (event === 'USER_UPDATED') {
-          console.log('SessionContext - User updated');
-          // Cuando el usuario se actualiza, también actualizamos el perfil
-          setSession(currentSession);
-          setUser(currentSession?.user || null);
-          if (currentSession?.user) {
-            await fetchProfile(currentSession.user.id);
-          }
-          if (isMounted) setLoading(false);
         } else if (event === 'PASSWORD_RECOVERY') {
-          console.log('SessionContext - Password recovery event detected');
-          // No hacer nada especial, dejar que el flujo continúe
+          console.log('SessionContext - Password recovery event, setting session only');
+          // Solo establecer la sesión, no redirigir
           setSession(currentSession);
           setUser(currentSession?.user || null);
           if (isMounted) setLoading(false);
@@ -223,11 +197,9 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
 
   const signOut = async () => {
     try {
-      // Verificar si hay una sesión activa antes de intentar cerrarla
       const { data } = await supabase.auth.getSession();
       
       if (!data.session) {
-        // Si no hay sesión, simplemente limpiar el estado y redirigir
         setSession(null);
         setUser(null);
         setProfile(null);
@@ -236,16 +208,13 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
         return;
       }
       
-      // Si hay sesión, proceder con el cierre normal
       const { error } = await supabase.auth.signOut();
       
       if (error) {
-        // Si hay un error específico que no sea "Auth session missing"
         if (error.message !== "Auth session missing!") {
           console.error('Error signing out:', error);
           showError(`Error al cerrar sesión: ${error.message}`);
         } else {
-          // Si el error es "Auth session missing", manejar como si fuera exitoso
           setSession(null);
           setUser(null);
           setProfile(null);
@@ -253,11 +222,8 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           showSuccess('Sesión cerrada correctamente.');
         }
       }
-      // Si no hay error, el listener onAuthStateChange manejará la redirección
     } catch (err) {
       console.error('Unexpected error during sign out:', err);
-      
-      // En caso de error, forzar el cierre de sesión de todas formas
       setSession(null);
       setUser(null);
       setProfile(null);

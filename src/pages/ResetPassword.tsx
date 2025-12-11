@@ -20,6 +20,7 @@ const ResetPassword = () => {
   const [tokenChecked, setTokenChecked] = useState(false);
   const [tokenValid, setTokenValid] = useState(false);
   const [passwordUpdated, setPasswordUpdated] = useState(false);
+  const [sessionEstablished, setSessionEstablished] = useState(false);
 
   useEffect(() => {
     // Verificar si hay un token de recuperación en la URL
@@ -38,7 +39,9 @@ const ResetPassword = () => {
     const checkToken = async () => {
       if (accessToken && type === 'recovery') {
         try {
-          // Intentar establecer la sesión con el token
+          console.log('ResetPassword - Setting session with recovery token');
+          
+          // Establecer la sesión con el token de recuperación
           const { data, error } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken || '',
@@ -52,8 +55,16 @@ const ResetPassword = () => {
               navigate('/login', { replace: true });
             }, 3000);
           } else {
-            console.log('Token válido, usuario puede restablecer contraseña', data);
+            console.log('ResetPassword - Session established successfully', data);
             setTokenValid(true);
+            setSessionEstablished(true);
+            
+            // Verificar que la sesión se estableció correctamente
+            const { data: sessionData } = await supabase.auth.getSession();
+            console.log('ResetPassword - Session verification', { 
+              hasSession: !!sessionData.session,
+              userId: sessionData.session?.user?.id 
+            });
           }
         } catch (err) {
           console.error('Unexpected error validating token:', err);
@@ -72,6 +83,7 @@ const ResetPassword = () => {
         if (sessionData.session) {
           console.log('Session already exists, token was already processed');
           setTokenValid(true);
+          setSessionEstablished(true);
         } else {
           showError('No se encontró un enlace de recuperación válido.');
           setTokenValid(false);
@@ -100,11 +112,32 @@ const ResetPassword = () => {
       return;
     }
     
+    if (!sessionEstablished) {
+      showError('La sesión no está establecida. Por favor, intenta de nuevo desde el enlace del correo.');
+      return;
+    }
+    
     setLoading(true);
     
     try {
-      console.log('ResetPassword - Updating password...');
+      console.log('ResetPassword - Verifying session before update');
       
+      // Verificar que tenemos una sesión válida
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !sessionData.session) {
+        console.error('No active session found:', sessionError);
+        showError('La sesión ha expirado. Por favor, solicita un nuevo enlace de recuperación.');
+        setLoading(false);
+        setTimeout(() => {
+          navigate('/login', { replace: true });
+        }, 2000);
+        return;
+      }
+      
+      console.log('ResetPassword - Session verified, updating password for user:', sessionData.session.user.id);
+      
+      // Actualizar la contraseña
       const { data: updateData, error: updateError } = await supabase.auth.updateUser({
         password: newPassword,
       });
@@ -122,21 +155,19 @@ const ResetPassword = () => {
       }
       
       // Actualizar el campo password_changed en el perfil
-      const { data: { user } } = await supabase.auth.getUser();
+      const userId = sessionData.session.user.id;
       
-      if (user) {
-        console.log('ResetPassword - Updating profile for user:', user.id);
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({ 
-            password_changed: true,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', user.id);
-          
-        if (profileError) {
-          console.error('Error updating profile:', profileError);
-        }
+      console.log('ResetPassword - Updating profile for user:', userId);
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ 
+          password_changed: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId);
+        
+      if (profileError) {
+        console.error('Error updating profile:', profileError);
       }
       
       console.log('ResetPassword - Password updated successfully');
@@ -256,7 +287,7 @@ const ResetPassword = () => {
             <Button
               type="submit"
               className="w-full bg-primary-blue hover:bg-blue-700 text-white flex items-center justify-center gap-2"
-              disabled={loading}
+              disabled={loading || !sessionEstablished}
             >
               {loading ? (
                 <>
@@ -270,6 +301,11 @@ const ResetPassword = () => {
                 </>
               )}
             </Button>
+            {!sessionEstablished && (
+              <p className="text-xs text-center text-gray-500">
+                Estableciendo sesión segura...
+              </p>
+            )}
           </form>
         </CardContent>
       </Card>
