@@ -86,13 +86,20 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
 
       console.log('SessionContext - handleSession called', { 
         hasSession: !!currentSession, 
-        currentPath: location.pathname 
+        currentPath: location.pathname,
+        hash: location.hash
       });
 
       setSession(currentSession);
       setUser(currentSession?.user || null);
       const currentPath = location.pathname;
       const isAuthPath = AUTH_PATHS.some(path => currentPath.startsWith(path));
+
+      // Verificar si hay un flujo de recuperación activo
+      const hashParams = new URLSearchParams(location.hash.substring(1));
+      const isRecoveryFlow = hashParams.get('type') === 'recovery' && hashParams.get('access_token');
+
+      console.log('SessionContext - Recovery check', { isRecoveryFlow, currentPath });
 
       if (currentSession?.user) {
         console.log('SessionContext - User authenticated, fetching profile');
@@ -104,11 +111,14 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           console.log('SessionContext - Profile loaded', { 
             role: profileData.role, 
             currentPath, 
-            isAuthPath 
+            isAuthPath,
+            isRecoveryFlow
           });
           
-          // Redirigir solo si NO estamos en una ruta de autenticación
-          if (!isAuthPath) {
+          // NO redirigir si:
+          // 1. Estamos en una ruta de autenticación
+          // 2. Hay un flujo de recuperación activo
+          if (!isAuthPath && !isRecoveryFlow) {
             if (profileData.role === 'admin' && !currentPath.startsWith('/admin')) {
               console.log('SessionContext - Redirecting to admin dashboard');
               navigate('/admin/dashboard', { replace: true });
@@ -119,6 +129,8 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
               console.log('SessionContext - Redirecting to client dashboard');
               navigate('/client', { replace: true });
             }
+          } else if (isRecoveryFlow) {
+            console.log('SessionContext - Recovery flow detected, not redirecting');
           }
         }
       } else {
@@ -183,7 +195,7 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
       isMounted = false;
       authListener.subscription.unsubscribe();
     };
-  }, [navigate, location.pathname]);
+  }, [navigate, location.pathname, location.hash]);
 
   const signOut = async () => {
     try {

@@ -27,7 +27,12 @@ const ResetPassword = () => {
     const refreshToken = hashParams.get('refresh_token');
     const type = hashParams.get('type');
     
-    console.log('ResetPassword - Hash params:', { accessToken: !!accessToken, refreshToken: !!refreshToken, type });
+    console.log('ResetPassword - Hash params:', { 
+      accessToken: !!accessToken, 
+      refreshToken: !!refreshToken, 
+      type,
+      fullHash: location.hash 
+    });
     
     const checkToken = async () => {
       if (accessToken && type === 'recovery') {
@@ -42,23 +47,30 @@ const ResetPassword = () => {
             console.error('Error validating reset token:', error);
             showError('El enlace de recuperación es inválido o ha expirado.');
             setTokenValid(false);
-            navigate('/login', { replace: true });
+            // No redirigir inmediatamente, dar tiempo al usuario para ver el error
+            setTimeout(() => {
+              navigate('/login', { replace: true });
+            }, 3000);
           } else {
-            console.log('Token válido, usuario puede restablecer contraseña');
+            console.log('Token válido, usuario puede restablecer contraseña', data);
             setTokenValid(true);
           }
         } catch (err) {
           console.error('Unexpected error validating token:', err);
           showError('Error al validar el enlace de recuperación.');
           setTokenValid(false);
-          navigate('/login', { replace: true });
+          setTimeout(() => {
+            navigate('/login', { replace: true });
+          }, 3000);
         }
       } else {
-        // No hay token válido, redirigir al login
-        console.error('No valid recovery token found in URL');
+        // No hay token válido
+        console.error('No valid recovery token found in URL', { accessToken: !!accessToken, type });
         showError('No se encontró un enlace de recuperación válido.');
         setTokenValid(false);
-        navigate('/login', { replace: true });
+        setTimeout(() => {
+          navigate('/login', { replace: true });
+        }, 3000);
       }
       
       setTokenChecked(true);
@@ -128,7 +140,20 @@ const ResetPassword = () => {
   }
 
   if (!tokenValid) {
-    return null; // La redirección ya se manejó en el useEffect
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
+        <Card className="w-full max-w-md p-6 bg-white rounded-lg shadow-lg">
+          <CardContent className="text-center py-8">
+            <p className="text-emphasis-red text-lg mb-4">
+              El enlace de recuperación es inválido o ha expirado.
+            </p>
+            <p className="text-gray-600">
+              Serás redirigido al login en unos segundos...
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
