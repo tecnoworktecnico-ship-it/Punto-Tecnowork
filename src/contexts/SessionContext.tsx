@@ -78,6 +78,14 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
     }
   };
 
+  // Función para verificar si estamos en un flujo de recuperación
+  const isRecoveryFlow = () => {
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const type = hashParams.get('type');
+    const accessToken = hashParams.get('access_token');
+    return type === 'recovery' && !!accessToken;
+  };
+
   useEffect(() => {
     let isMounted = true;
 
@@ -87,25 +95,22 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
       console.log('SessionContext - handleSession called', { 
         hasSession: !!currentSession, 
         currentPath: location.pathname,
-        hash: location.hash
+        hash: location.hash,
+        isRecovery: isRecoveryFlow()
       });
 
       setSession(currentSession);
       setUser(currentSession?.user || null);
       const currentPath = location.pathname;
       const isAuthPath = AUTH_PATHS.some(path => currentPath.startsWith(path));
-
-      // Verificar si hay un flujo de recuperación activo
-      const hashParams = new URLSearchParams(location.hash.substring(1));
-      const isRecoveryFlow = hashParams.get('type') === 'recovery' && hashParams.get('access_token');
-      
-      // Si estamos en /reset-password, SIEMPRE considerarlo como flujo de recuperación
       const isResetPasswordPage = currentPath === '/reset-password';
+      const recoveryFlow = isRecoveryFlow();
 
-      console.log('SessionContext - Recovery check', { 
-        isRecoveryFlow, 
+      console.log('SessionContext - Path checks', { 
+        currentPath,
+        isAuthPath,
         isResetPasswordPage,
-        currentPath 
+        recoveryFlow
       });
 
       if (currentSession?.user) {
@@ -119,7 +124,7 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
             role: profileData.role, 
             currentPath, 
             isAuthPath,
-            isRecoveryFlow,
+            recoveryFlow,
             isResetPasswordPage
           });
           
@@ -127,7 +132,11 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           // 1. Estamos en una ruta de autenticación
           // 2. Hay un flujo de recuperación activo
           // 3. Estamos en la página de reset-password
-          if (!isAuthPath && !isRecoveryFlow && !isResetPasswordPage) {
+          const shouldNotRedirect = isAuthPath || recoveryFlow || isResetPasswordPage;
+          
+          console.log('SessionContext - Should redirect?', { shouldNotRedirect });
+          
+          if (!shouldNotRedirect) {
             if (profileData.role === 'admin' && !currentPath.startsWith('/admin')) {
               console.log('SessionContext - Redirecting to admin dashboard');
               navigate('/admin/dashboard', { replace: true });
@@ -138,8 +147,8 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
               console.log('SessionContext - Redirecting to client dashboard');
               navigate('/client', { replace: true });
             }
-          } else if (isRecoveryFlow || isResetPasswordPage) {
-            console.log('SessionContext - Recovery flow or reset-password page detected, not redirecting');
+          } else {
+            console.log('SessionContext - Skipping redirect due to recovery flow or auth path');
           }
         }
       } else {
@@ -194,6 +203,12 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           if (currentSession?.user) {
             await fetchProfile(currentSession.user.id);
           }
+          if (isMounted) setLoading(false);
+        } else if (event === 'PASSWORD_RECOVERY') {
+          console.log('SessionContext - Password recovery event detected');
+          // No hacer nada especial, dejar que el flujo continúe
+          setSession(currentSession);
+          setUser(currentSession?.user || null);
           if (isMounted) setLoading(false);
         }
       }

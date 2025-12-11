@@ -23,7 +23,6 @@ function Login() {
   const [activeTab, setActiveTab] = useState<string>('sign_in');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
-  const [isRecoveryFlow, setIsRecoveryFlow] = useState(false);
   
   // Formulario de inicio de sesión
   const [loginData, setLoginData] = useState({
@@ -45,25 +44,31 @@ function Login() {
     email: '',
   });
 
+  // Función para verificar si hay un flujo de recuperación activo
+  const isRecoveryFlow = () => {
+    const hashParams = new URLSearchParams(location.hash.substring(1));
+    const type = hashParams.get('type');
+    const accessToken = hashParams.get('access_token');
+    return type === 'recovery' && !!accessToken;
+  };
+
   useEffect(() => {
-    console.log('Login - useEffect', { session: !!session, loading, profile: profile?.role, hash: location.hash });
+    console.log('Login - useEffect', { 
+      session: !!session, 
+      loading, 
+      profile: profile?.role, 
+      hash: location.hash,
+      isRecovery: isRecoveryFlow()
+    });
     
-    // PRIMERO: Detectar si es un flujo de recuperación
-    if (location.hash) {
-      const hashParams = new URLSearchParams(location.hash.substring(1));
-      const type = hashParams.get('type');
-      const accessToken = hashParams.get('access_token');
-      
-      if (type === 'recovery' && accessToken) {
-        console.log('Login - Recovery flow detected, marking as recovery');
-        setIsRecoveryFlow(true);
-        // NO hacer nada más, dejar que el usuario permanezca en login
-        return;
-      }
+    // Si hay un flujo de recuperación activo, no hacer nada
+    if (isRecoveryFlow()) {
+      console.log('Login - Recovery flow detected, staying on login page');
+      return;
     }
     
-    // SEGUNDO: Manejar hash en la URL (solo si NO es recovery)
-    if (location.hash && !isRecoveryFlow) {
+    // Manejar hash en la URL
+    if (location.hash) {
       const hashParams = new URLSearchParams(location.hash.substring(1));
       const error = hashParams.get('error');
       const errorCode = hashParams.get('error_code');
@@ -91,8 +96,8 @@ function Login() {
       }
     }
     
-    // TERCERO: Si ya hay sesión activa Y NO es flujo de recuperación, redirigir según el rol
-    if (session && !loading && profile && !isRecoveryFlow) {
+    // Si ya hay sesión activa, redirigir según el rol
+    if (session && !loading && profile) {
       console.log('Login - Session active, redirecting based on role', profile.role);
       if (profile.role === 'admin') {
         navigate('/admin/dashboard', { replace: true });
@@ -103,7 +108,7 @@ function Login() {
       }
       return;
     }
-  }, [session, loading, profile, navigate, location.hash, isRecoveryFlow]);
+  }, [session, loading, profile, navigate, location.hash]);
 
   // Guardar el email cuando cambia para usarlo en caso de error de verificación
   const handleEmailChange = (email: string) => {
@@ -348,9 +353,11 @@ function Login() {
     }
   };
 
-  console.log('Login - Render', { loading, hasSession: !!session, hasProfile: !!profile, isRecoveryFlow });
+  const recoveryActive = isRecoveryFlow();
 
-  if (loading && !isRecoveryFlow) {
+  console.log('Login - Render', { loading, hasSession: !!session, hasProfile: !!profile, recoveryActive });
+
+  if (loading && !recoveryActive) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
         <Loader2 className="h-8 w-8 text-white animate-spin mr-2" />
@@ -370,7 +377,7 @@ function Login() {
           </p>
         </div>
         
-        {isRecoveryFlow && (
+        {recoveryActive && (
           <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
             <p className="text-sm text-blue-800">
               <strong>Recuperación de contraseña en proceso.</strong> Por favor, completa el proceso en la nueva pestaña que se abrió.
