@@ -23,16 +23,19 @@ const ResetPassword = () => {
 
   useEffect(() => {
     const checkAndSetSession = async () => {
-      console.log('ResetPassword - Checking token...');
+      console.log('ResetPassword - Full URL:', window.location.href);
+      console.log('ResetPassword - Hash:', location.hash);
+      
       const hashParams = new URLSearchParams(location.hash.substring(1));
       const accessToken = hashParams.get('access_token');
       const refreshToken = hashParams.get('refresh_token');
       const type = hashParams.get('type');
       
-      console.log('ResetPassword - Hash params:', { 
+      console.log('ResetPassword - Parsed params:', { 
         hasAccessToken: !!accessToken, 
         hasRefreshToken: !!refreshToken, 
-        type 
+        type,
+        accessTokenPreview: accessToken ? accessToken.substring(0, 20) + '...' : 'none'
       });
       
       if (accessToken && type === 'recovery') {
@@ -45,22 +48,27 @@ const ResetPassword = () => {
           });
           
           if (error) {
-            console.error('Error setting session:', error);
+            console.error('ResetPassword - Error setting session:', error);
             showError('El enlace de recuperación es inválido o ha expirado.');
             setTokenValid(false);
             setTimeout(() => navigate('/login', { replace: true }), 3000);
           } else {
-            console.log('ResetPassword - Session set successfully');
+            console.log('ResetPassword - Session set successfully:', !!data.session);
             setTokenValid(true);
           }
         } catch (err) {
-          console.error('Unexpected error:', err);
+          console.error('ResetPassword - Unexpected error:', err);
           showError('Error al validar el enlace de recuperación.');
           setTokenValid(false);
           setTimeout(() => navigate('/login', { replace: true }), 3000);
         }
       } else {
         console.error('ResetPassword - No valid recovery token found');
+        console.log('ResetPassword - Missing:', {
+          noAccessToken: !accessToken,
+          wrongType: type !== 'recovery',
+          actualType: type
+        });
         showError('No se encontró un enlace de recuperación válido.');
         setTokenValid(false);
         setTimeout(() => navigate('/login', { replace: true }), 3000);

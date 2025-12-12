@@ -13,6 +13,9 @@ const LandingPage = () => {
   const location = useLocation();
 
   useEffect(() => {
+    console.log('LandingPage - Full URL:', window.location.href);
+    console.log('LandingPage - Hash:', location.hash);
+    
     // Si hay un hash en la URL, procesarlo
     if (location.hash) {
       const hashParams = new URLSearchParams(location.hash.substring(1));
@@ -30,24 +33,26 @@ const LandingPage = () => {
       }
       
       // Si es un flujo de recuperación con token, ir DIRECTAMENTE a reset-password
+      // IMPORTANTE: Preservar el hash completo
       if (type === 'recovery' && accessToken) {
-        console.log('LandingPage - Recovery flow detected, redirecting to reset-password');
+        console.log('LandingPage - Recovery flow detected, redirecting to reset-password with hash');
         navigate('/reset-password' + location.hash, { replace: true });
         return;
       }
       
       // Para cualquier otro tipo de autenticación con token, ir a auth-callback
       if (accessToken && type !== 'recovery') {
+        console.log('LandingPage - Auth flow detected, redirecting to auth-callback');
         navigate('/auth-callback' + location.hash, { replace: true });
         return;
       }
     }
   }, [location.hash, navigate]);
 
-  // Si hay sesión activa, redirigir al dashboard correspondiente
+  // Si hay sesión activa, no redirigir automáticamente desde aquí
   useEffect(() => {
     if (!loading && session) {
-      // No redirigir automáticamente, dejar que SessionContext lo maneje
+      // Dejar que SessionContext maneje la redirección
       return;
     }
   }, [loading, session]);

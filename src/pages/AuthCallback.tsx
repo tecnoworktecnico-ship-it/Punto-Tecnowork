@@ -15,6 +15,9 @@ const AuthCallback = () => {
     const error = hashParams.get('error');
     const errorCode = hashParams.get('error_code');
     const type = hashParams.get('type');
+    const accessToken = hashParams.get('access_token');
+    
+    console.log('AuthCallback - Processing', { type, error, errorCode, hasToken: !!accessToken });
     
     // 1. Manejar errores de verificación (expiración, etc.)
     if (error && (errorCode === 'otp_expired' || error === 'access_denied')) {
@@ -22,10 +25,14 @@ const AuthCallback = () => {
       return;
     }
     
-    // Nota: El flujo de 'recovery' ahora se maneja directamente en LandingPage/Login
-    // para evitar conflictos de redirección.
+    // 2. Si es recuperación de contraseña, ir directamente a reset-password
+    if (type === 'recovery' && accessToken) {
+      console.log('AuthCallback - Recovery detected, redirecting to reset-password');
+      navigate('/reset-password' + location.hash, { replace: true });
+      return;
+    }
 
-    // 2. Si la sesión está cargada y es válida, redirigir al dashboard
+    // 3. Si la sesión está cargada y es válida, redirigir al dashboard
     if (!loading && session && profile) {
       if (profile.role === 'admin') {
         navigate('/admin/dashboard', { replace: true });
@@ -37,7 +44,7 @@ const AuthCallback = () => {
       return;
     }
     
-    // 3. Si la carga finaliza y no hay sesión/perfil, ir al login
+    // 4. Si la carga finaliza y no hay sesión/perfil, ir al login
     if (!loading && !session) {
       navigate('/login', { replace: true });
       return;
