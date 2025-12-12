@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useSession } from '@/contexts/SessionContext';
 import { MadeWithDyad } from '@/components/made-with-dyad';
 import BrandingDisplay from '@/components/BrandingDisplay';
@@ -18,8 +18,7 @@ const APP_VERSION = import.meta.env.VITE_APP_VERSION || 'N/A';
 
 function Login() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { session, loading, profile } = useSession();
+  const { session, loading: sessionLoading, profile } = useSession();
   const [activeTab, setActiveTab] = useState<string>('sign_in');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
@@ -44,61 +43,10 @@ function Login() {
     email: '',
   });
 
-  // Función para verificar si hay un flujo de recuperación activo
-  const isRecoveryFlow = () => {
-    const hashParams = new URLSearchParams(location.hash.substring(1));
-    const type = hashParams.get('type');
-    const accessToken = hashParams.get('access_token');
-    return type === 'recovery' && !!accessToken;
-  };
-
+  // Redirigir si ya hay sesión activa
   useEffect(() => {
-    console.log('Login - useEffect', { 
-      session: !!session, 
-      loading, 
-      profile: profile?.role, 
-      hash: location.hash,
-      isRecovery: isRecoveryFlow()
-    });
-    
-    // Si hay un flujo de recuperación activo, no hacer nada
-    if (isRecoveryFlow()) {
-      console.log('Login - Recovery flow detected, staying on login page');
-      return;
-    }
-    
-    // Manejar hash en la URL
-    if (location.hash) {
-      const hashParams = new URLSearchParams(location.hash.substring(1));
-      const error = hashParams.get('error');
-      const errorCode = hashParams.get('error_code');
-      const type = hashParams.get('type');
-      const accessToken = hashParams.get('access_token');
-      
-      console.log('Login - Hash params detected', { error, errorCode, type, hasToken: !!accessToken });
-      
-      // Manejar errores de verificación
-      if (error && (errorCode === 'otp_expired' || error === 'access_denied')) {
-        navigate('/verification-error', { replace: true });
-        return;
-      }
-      
-      // Para cualquier otro tipo de autenticación con token, ir a auth-callback
-      if (accessToken && type !== 'recovery') {
-        console.log('Login - Auth callback flow detected');
-        navigate('/auth-callback' + location.hash, { replace: true });
-        return;
-      }
-      
-      // Si hay hash pero no es ninguno de los casos anteriores, limpiar el hash silenciosamente
-      if (!accessToken && !error && !type) {
-        window.history.replaceState(null, '', window.location.pathname);
-      }
-    }
-    
-    // Si ya hay sesión activa, redirigir según el rol
-    if (session && !loading && profile) {
-      console.log('Login - Session active, redirecting based on role', profile.role);
+    if (!sessionLoading && session && profile) {
+      console.log('Login - Session active, redirecting...', profile.role);
       if (profile.role === 'admin') {
         navigate('/admin/dashboard', { replace: true });
       } else if (profile.role === 'local') {
@@ -106,23 +54,12 @@ function Login() {
       } else if (profile.role === 'client') {
         navigate('/client', { replace: true });
       }
-      return;
     }
-  }, [session, loading, profile, navigate, location.hash]);
-
-  // Guardar el email cuando cambia para usarlo en caso de error de verificación
-  const handleEmailChange = (email: string) => {
-    if (email) {
-      localStorage.setItem('verificationEmail', email);
-    }
-  };
+  }, [session, sessionLoading, profile, navigate]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    console.log('Login - handleSignIn called');
-    
-    // Validar que los campos no estén vacíos
     if (!loginData.email || !loginData.password) {
       showError('Por favor completa todos los campos.');
       return;
@@ -131,58 +68,33 @@ function Login() {
     setIsSubmitting(true);
     
     try {
-      console.log('Login - Attempting sign in with email:', loginData.email);
+      console.log('Login - Attempting sign in...');
       
       const { data, error } = await supabase.auth.signInWithPassword({
         email: loginData.email.trim(),
         password: loginData.password,
       });
       
-      console.log('Login - Sign in response', { 
-        hasData: !!data, 
-        hasSession: !!data?.session, 
-        hasUser: !!data?.user,
-        error: error?.message 
-      });
-      
       if (error) {
-        console.error('Error signing in:', error);
-        showError(error.message);
-      } else if (data.session) {
-        console.log('Login - Sign in successful, session created');
-        showSuccess('Inicio de sesión exitoso');
-        
-        // Esperar un momento para que SessionContext procese la sesión
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Verificar la sesión y el perfil
-        const { data: sessionData } = await supabase.auth.getSession();
-        console.log('Login - Session verification', { hasSession: !!sessionData.session });
-        
-        if (sessionData.session) {
-          // Obtener el perfil del usuario
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', sessionData.session.user.id)
-            .single();
-          
-          console.log('Login - Profile data', { role: profileData?.role });
-          
-          // Redirigir manualmente si es necesario
-          if (profileData) {
-            if (profileData.role === 'admin') {
-              navigate('/admin/dashboard', { replace: true });
-            } else if (profileData.role === 'local') {
-              navigate('/local/dashboard', { replace: true });
-            } else if (profileData.role === 'client') {
-              navigate('/client', { replace: true });
-            }
-          }
+        console.error('Login error:', error);
+        if (error.message === 'Invalid login credentials') {
+          showError('Credenciales inválidas. Verifica tu correo y contraseña.');
+        } else if (error.message === 'Email not confirmed') {
+          showError('Tu correo no ha sido verificado. Revisa tu bandeja de entrada.');
+        } else {
+          showError(error.message);
         }
+        setIsSubmitting(false);
+        return;
+      }
+      
+      if (data.session) {
+        console.log('Login - Sign in successful');
+        showSuccess('Inicio de sesión exitoso');
+        // La redirección se maneja en el SessionContext
       }
     } catch (error) {
-      console.error('Unexpected error signing in:', error);
+      console.error('Unexpected error:', error);
       showError('Error inesperado al iniciar sesión');
     } finally {
       setIsSubmitting(false);
@@ -194,7 +106,6 @@ function Login() {
     setIsSubmitting(true);
     
     try {
-      // Validar que todos los campos obligatorios estén completos
       if (!registerData.email || !registerData.password || !registerData.first_name || 
           !registerData.last_name || !registerData.phone_number) {
         showError('Por favor completa todos los campos obligatorios.');
@@ -202,14 +113,12 @@ function Login() {
         return;
       }
       
-      // Validar longitud de contraseña
       if (registerData.password.length < 6) {
         showError('La contraseña debe tener al menos 6 caracteres.');
         setIsSubmitting(false);
         return;
       }
       
-      // Crear el usuario con la API de Supabase
       const { data, error } = await supabase.auth.signUp({
         email: registerData.email.trim(),
         password: registerData.password,
@@ -225,56 +134,21 @@ function Login() {
       });
       
       if (error) {
-        console.error('Error signing up:', error);
+        console.error('Sign up error:', error);
         showError(error.message);
-      } else if (data) {
-        if (data.user) {
-          console.log("Usuario creado:", data.user);
+        setIsSubmitting(false);
+        return;
+      }
+      
+      if (data.user) {
+        if (data.user.identities && data.user.identities.length === 0) {
+          showError('Este correo ya está registrado. Intenta iniciar sesión.');
+        } else {
+          showSuccess('Registro exitoso. Por favor, verifica tu correo electrónico.');
+          setActiveTab('sign_in');
+          setRegistrationSuccess(true);
+          localStorage.setItem('verificationEmail', registerData.email.trim());
           
-          // Esperar un momento para que se cree el perfil automáticamente
-          await new Promise(resolve => setTimeout(resolve, 1500));
-          
-          // Verificar si el perfil se creó
-          const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', data.user.id)
-            .single();
-            
-          if (profileError && profileError.code === 'PGRST116') {
-            // El perfil no existe, crearlo manualmente
-            const { error: insertError } = await supabase
-              .from('profiles')
-              .insert({
-                id: data.user.id,
-                first_name: registerData.first_name.trim(),
-                last_name: registerData.last_name.trim(),
-                phone_number: registerData.phone_number.trim(),
-                role: 'client',
-              });
-              
-            if (insertError) {
-              console.error('Error creating profile manually:', insertError);
-            }
-          }
-          
-          // Verificar si se necesita verificación de correo
-          if (data.user.identities && data.user.identities.length === 0) {
-            showError('Error al crear el usuario. Por favor, intenta con otro correo electrónico.');
-          } else if (data.user.email_confirmed_at) {
-            showSuccess('Registro exitoso. Tu correo ya está verificado. Puedes iniciar sesión.');
-            setActiveTab('sign_in');
-            setRegistrationSuccess(true);
-          } else {
-            showSuccess('Registro exitoso. Por favor, verifica tu correo electrónico para continuar.');
-            setActiveTab('sign_in');
-            setRegistrationSuccess(true);
-            
-            // Guardar el email para posible reenvío de verificación
-            localStorage.setItem('verificationEmail', registerData.email.trim());
-          }
-          
-          // Limpiar el formulario
           setRegisterData({
             email: '',
             password: '',
@@ -282,12 +156,10 @@ function Login() {
             last_name: '',
             phone_number: '',
           });
-        } else {
-          showError('Error al crear el usuario. No se recibió confirmación del servidor.');
         }
       }
     } catch (error) {
-      console.error('Unexpected error signing up:', error);
+      console.error('Unexpected error:', error);
       showError('Error inesperado al registrarse');
     } finally {
       setIsSubmitting(false);
@@ -310,16 +182,16 @@ function Login() {
       });
       
       if (error) {
-        console.error('Error resetting password:', error);
+        console.error('Reset password error:', error);
         showError(error.message);
       } else {
-        showSuccess('Se ha enviado un correo para restablecer tu contraseña. El enlace se abrirá en una nueva pestaña.');
+        showSuccess('Se ha enviado un correo para restablecer tu contraseña.');
         setResetData({ email: '' });
         setActiveTab('sign_in');
       }
     } catch (error) {
-      console.error('Unexpected error resetting password:', error);
-      showError('Error inesperado al solicitar restablecimiento de contraseña');
+      console.error('Unexpected error:', error);
+      showError('Error inesperado');
     } finally {
       setIsSubmitting(false);
     }
@@ -328,7 +200,7 @@ function Login() {
   const handleResendVerification = async () => {
     const email = localStorage.getItem('verificationEmail');
     if (!email) {
-      showError('No hay correo electrónico guardado para reenviar la verificación.');
+      showError('No hay correo guardado para reenviar la verificación.');
       return;
     }
     
@@ -340,28 +212,33 @@ function Login() {
       });
       
       if (error) {
-        console.error('Error resending verification:', error);
-        showError(`Error al reenviar verificación: ${error.message}`);
+        showError(`Error: ${error.message}`);
       } else {
-        showSuccess(`Se ha reenviado el correo de verificación a ${email}`);
+        showSuccess(`Correo de verificación reenviado a ${email}`);
       }
     } catch (error) {
-      console.error('Unexpected error resending verification:', error);
-      showError('Error inesperado al reenviar verificación');
+      showError('Error inesperado');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const recoveryActive = isRecoveryFlow();
-
-  console.log('Login - Render', { loading, hasSession: !!session, hasProfile: !!profile, recoveryActive });
-
-  if (loading && !recoveryActive) {
+  // Mostrar loading mientras se verifica la sesión
+  if (sessionLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
         <Loader2 className="h-8 w-8 text-white animate-spin mr-2" />
         <p className="text-white text-xl">Cargando...</p>
+      </div>
+    );
+  }
+
+  // Si ya hay sesión, no mostrar el formulario (la redirección se maneja en useEffect)
+  if (session && profile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
+        <Loader2 className="h-8 w-8 text-white animate-spin mr-2" />
+        <p className="text-white text-xl">Redirigiendo...</p>
       </div>
     );
   }
@@ -371,19 +248,11 @@ function Login() {
       <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-lg">
         <div className="mb-6">
           <BrandingDisplay type="main" className="h-20 mx-auto mb-4" />
-          <h2 className="text-3xl font-bold text-center text-text-carbon">Iniciar Sesión / Registrarse</h2>
+          <h2 className="text-3xl font-bold text-center text-text-carbon">Bienvenido</h2>
           <p className="text-sm text-center text-gray-500 mt-1">
             Versión: <span className="font-semibold">{APP_VERSION}</span>
           </p>
         </div>
-        
-        {recoveryActive && (
-          <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
-            <p className="text-sm text-blue-800">
-              <strong>Recuperación de contraseña en proceso.</strong> Por favor, completa el proceso en la nueva pestaña que se abrió.
-            </p>
-          </div>
-        )}
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-3">
@@ -398,7 +267,7 @@ function Login() {
               {registrationSuccess && (
                 <div className="bg-green-50 border border-green-200 rounded-md p-3 mb-4">
                   <p className="text-sm text-green-800">
-                    <strong>¡Registro exitoso!</strong> Por favor, verifica tu correo electrónico para activar tu cuenta.
+                    <strong>¡Registro exitoso!</strong> Verifica tu correo electrónico.
                   </p>
                   <Button 
                     type="button" 
@@ -408,7 +277,7 @@ function Login() {
                     className="mt-2 text-xs"
                     disabled={isSubmitting}
                   >
-                    {isSubmitting ? 'Enviando...' : 'Reenviar correo de verificación'}
+                    Reenviar verificación
                   </Button>
                 </div>
               )}
@@ -420,10 +289,7 @@ function Login() {
                   type="email" 
                   placeholder="tu@email.com" 
                   value={loginData.email}
-                  onChange={(e) => {
-                    setLoginData({...loginData, email: e.target.value});
-                    handleEmailChange(e.target.value);
-                  }}
+                  onChange={(e) => setLoginData({...loginData, email: e.target.value})}
                   required
                   disabled={isSubmitting}
                 />
@@ -469,10 +335,7 @@ function Login() {
                   type="email" 
                   placeholder="tu@email.com" 
                   value={registerData.email}
-                  onChange={(e) => {
-                    setRegisterData({...registerData, email: e.target.value});
-                    handleEmailChange(e.target.value);
-                  }}
+                  onChange={(e) => setRegisterData({...registerData, email: e.target.value})}
                   required
                   disabled={isSubmitting}
                 />
@@ -483,7 +346,7 @@ function Login() {
                 <Input 
                   id="register-password" 
                   type="password" 
-                  placeholder="Contraseña (mínimo 6 caracteres)" 
+                  placeholder="Mínimo 6 caracteres" 
                   value={registerData.password}
                   onChange={(e) => setRegisterData({...registerData, password: e.target.value})}
                   required
@@ -519,7 +382,7 @@ function Login() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="register-phone">Número de Teléfono *</Label>
+                <Label htmlFor="register-phone">Teléfono *</Label>
                 <Input 
                   id="register-phone" 
                   type="tel" 
@@ -548,7 +411,7 @@ function Login() {
             </form>
           </TabsContent>
           
-          {/* Formulario de Recuperación de Contraseña */}
+          {/* Formulario de Recuperación */}
           <TabsContent value="reset_password">
             <form onSubmit={handleResetPassword} className="space-y-4 mt-4">
               <div className="space-y-2">
@@ -558,10 +421,7 @@ function Login() {
                   type="email" 
                   placeholder="tu@email.com" 
                   value={resetData.email}
-                  onChange={(e) => {
-                    setResetData({...resetData, email: e.target.value});
-                    handleEmailChange(e.target.value);
-                  }}
+                  onChange={(e) => setResetData({...resetData, email: e.target.value})}
                   required
                   disabled={isSubmitting}
                 />
@@ -575,7 +435,7 @@ function Login() {
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Enviando instrucciones...
+                    Enviando...
                   </>
                 ) : (
                   'Enviar Instrucciones'

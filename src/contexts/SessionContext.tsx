@@ -6,10 +6,20 @@ import { supabase } from '@/integrations/supabase/client';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { showSuccess, showError } from '@/utils/toast';
 
+interface Profile {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  role: string;
+  avatar_url: string | null;
+  password_changed: boolean | null;
+  phone_number: string | null;
+}
+
 interface SessionContextType {
   session: Session | null;
   user: User | null;
-  profile: any | null;
+  profile: Profile | null;
   loading: boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -17,19 +27,20 @@ interface SessionContextType {
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
-// Rutas que el SessionContext debe ignorar para la redirección automática
-const AUTH_PATHS = ['/login', '/auth-callback', '/verification-error', '/reset-password'];
+// Rutas públicas que no requieren autenticación
+const PUBLIC_PATHS = ['/', '/login', '/auth-callback', '/verification-error', '/reset-password'];
 
 export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<any | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (userId: string): Promise<Profile | null> => {
     try {
+      console.log('SessionContext - Fetching profile for user:', userId);
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -38,15 +49,13 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
 
       if (profileError) {
         console.error('Error fetching profile:', profileError);
-        setProfile(null);
         return null;
       }
       
-      setProfile(profileData);
+      console.log('SessionContext - Profile fetched:', profileData);
       return profileData;
     } catch (error) {
       console.error('Unexpected error fetching profile:', error);
-      setProfile(null);
       return null;
     }
   };
@@ -54,136 +63,130 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
   const refreshProfile = async () => {
     if (!user) return;
     
-    setLoading(true);
     const profileData = await fetchProfile(user.id);
-    setLoading(false);
-    
-    // Redirigir según el rol actualizado
     if (profileData) {
-      const currentPath = window.location.pathname;
-      if (AUTH_PATHS.some(path => currentPath.startsWith(path))) {
-        return;
-      }
-      
-      if (profileData.role === 'admin' && !currentPath.startsWith('/admin')) {
-        navigate('/admin/dashboard', { replace: true });
-      } else if (profileData.role === 'local' && !currentPath.startsWith('/local')) {
-        navigate('/local/dashboard', { replace: true });
-      } else if (profileData.role === 'client' && !currentPath.startsWith('/client') && currentPath !== '/') {
-        navigate('/client', { replace: true });
-      }
+      setProfile(profileData);
+    }
+  };
+
+  const redirectBasedOnRole = (role: string) => {
+    const currentPath = location.pathname;
+    
+    console.log('SessionContext - Redirecting based on role:', role, 'current path:', currentPath);
+    
+    // No redirigir si ya estamos en la ruta correcta
+    if (role === 'admin' && currentPath.startsWith('/admin')) return;
+    if (role === 'local' && currentPath.startsWith('/local')) return;
+    if (role === 'client' && currentPath.startsWith('/client')) return;
+    
+    // Redirigir según el rol
+    if (role === 'admin') {
+      navigate('/admin/dashboard', { replace: true });
+    } else if (role === 'local') {
+      navigate('/local/dashboard', { replace: true });
+    } else if (role === 'client') {
+      navigate('/client', { replace: true });
     }
   };
 
   useEffect(() => {
     let isMounted = true;
 
-    const handleSession = async (currentSession: Session | null) => {
-      if (!isMounted) return;
-
-      const currentPath = location.pathname;
+    const initializeAuth = async () => {
+      console.log('SessionContext - Initializing auth...');
       
-      console.log('SessionContext - handleSession called', { 
-        hasSession: !!currentSession, 
-        currentPath,
-        hash: location.hash
-      });
-
-      // Si estamos en /reset-password, NO hacer nada más que establecer la sesión
-      if (currentPath === '/reset-password') {
-        console.log('SessionContext - On reset-password page, only setting session state');
-        setSession(currentSession);
-        setUser(currentSession?.user || null);
-        setLoading(false);
-        return;
-      }
-
-      setSession(currentSession);
-      setUser(currentSession?.user || null);
-      const isAuthPath = AUTH_PATHS.some(path => currentPath.startsWith(path));
-
-      console.log('SessionContext - Path checks', { 
-        currentPath,
-        isAuthPath
-      });
-
-      if (currentSession?.user) {
-        console.log('SessionContext - User authenticated, fetching profile');
-        const profileData = await fetchProfile(currentSession.user.id);
+      try {
+        // Obtener sesión inicial
+        const { data: { session: initialSession }, error } = await supabase.auth.getSession();
         
-        if (!isMounted) return;
+        if (error) {
+          console.error('SessionContext - Error getting session:', error);
+          if (isMounted) {
+            setLoading(false);
+          }
+          return;
+        }
 
-        if (profileData) {
-          console.log('SessionContext - Profile loaded', { 
-            role: profileData.role, 
-            currentPath, 
-            isAuthPath
-          });
+        console.log('SessionContext - Initial session:', !!initialSession);
+
+        if (initialSession?.user && isMounted) {
+          setSession(initialSession);
+          setUser(initialSession.user);
           
-          // NO redirigir si estamos en una ruta de autenticación
-          if (!isAuthPath) {
-            if (profileData.role === 'admin' && !currentPath.startsWith('/admin')) {
-              console.log('SessionContext - Redirecting to admin dashboard');
-              navigate('/admin/dashboard', { replace: true });
-            } else if (profileData.role === 'local' && !currentPath.startsWith('/local')) {
-              console.log('SessionContext - Redirecting to local dashboard');
-              navigate('/local/dashboard', { replace: true });
-            } else if (profileData.role === 'client' && !currentPath.startsWith('/client') && currentPath !== '/') {
-              console.log('SessionContext - Redirecting to client dashboard');
-              navigate('/client', { replace: true });
+          const profileData = await fetchProfile(initialSession.user.id);
+          
+          if (isMounted && profileData) {
+            setProfile(profileData);
+            
+            // Solo redirigir si estamos en una ruta pública
+            const currentPath = location.pathname;
+            if (PUBLIC_PATHS.includes(currentPath) || currentPath === '/') {
+              redirectBasedOnRole(profileData.role);
             }
-          } else {
-            console.log('SessionContext - Skipping redirect due to auth path');
           }
         }
-      } else {
-        console.log('SessionContext - No user session');
-        setProfile(null);
-        // Redirigir al login solo si NO estamos ya en una ruta de autenticación
-        if (!isAuthPath && currentPath !== '/') {
-          console.log('SessionContext - Redirecting to login');
-          navigate('/login', { replace: true });
+        
+        if (isMounted) {
+          setLoading(false);
         }
-      }
-      
-      if (isMounted) {
-        console.log('SessionContext - Setting loading to false');
-        setLoading(false);
+      } catch (err) {
+        console.error('SessionContext - Initialization error:', err);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
-    console.log('SessionContext - Initial setup');
-    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
-      console.log('SessionContext - Initial session retrieved', { hasSession: !!initialSession });
-      handleSession(initialSession);
-    });
+    initializeAuth();
 
+    // Escuchar cambios de autenticación
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
-        console.log('SessionContext - Auth state changed', { event, hasSession: !!currentSession });
+        console.log('SessionContext - Auth state changed:', event, !!currentSession);
         
+        if (!isMounted) return;
+
         if (event === 'SIGNED_OUT') {
-          if (isMounted) {
-            setSession(null);
-            setUser(null);
-            setProfile(null);
-            setLoading(false);
-            const currentPath = window.location.pathname;
-            const isAuthPath = AUTH_PATHS.some(path => currentPath.startsWith(path));
-            if (!isAuthPath) {
-              navigate('/login', { replace: true });
-            }
-            showSuccess('Sesión cerrada correctamente.');
+          setSession(null);
+          setUser(null);
+          setProfile(null);
+          setLoading(false);
+          
+          const currentPath = location.pathname;
+          if (!PUBLIC_PATHS.includes(currentPath)) {
+            navigate('/login', { replace: true });
           }
-        } else if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'USER_UPDATED') {
-          console.log('SessionContext - Handling session for event:', event);
-          handleSession(currentSession);
-        } else if (event === 'PASSWORD_RECOVERY') {
-          console.log('SessionContext - Password recovery event, setting session only');
-          // Solo establecer la sesión, no redirigir
+          return;
+        }
+
+        if (event === 'SIGNED_IN' && currentSession?.user) {
+          console.log('SessionContext - User signed in, fetching profile...');
+          
           setSession(currentSession);
-          setUser(currentSession?.user || null);
-          if (isMounted) setLoading(false);
+          setUser(currentSession.user);
+          
+          const profileData = await fetchProfile(currentSession.user.id);
+          
+          if (isMounted && profileData) {
+            setProfile(profileData);
+            redirectBasedOnRole(profileData.role);
+          }
+          
+          if (isMounted) {
+            setLoading(false);
+          }
+          return;
+        }
+
+        if (event === 'TOKEN_REFRESHED' && currentSession) {
+          setSession(currentSession);
+          setUser(currentSession.user);
+        }
+
+        if (event === 'USER_UPDATED' && currentSession?.user) {
+          setSession(currentSession);
+          setUser(currentSession.user);
+          await refreshProfile();
         }
       }
     );
@@ -193,34 +196,22 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
       isMounted = false;
       authListener.subscription.unsubscribe();
     };
-  }, [navigate, location.pathname, location.hash]);
+  }, []);
 
   const signOut = async () => {
     try {
-      const { data } = await supabase.auth.getSession();
+      setLoading(true);
+      const { error } = await supabase.auth.signOut();
       
-      if (!data.session) {
+      if (error && error.message !== "Auth session missing!") {
+        console.error('Error signing out:', error);
+        showError(`Error al cerrar sesión: ${error.message}`);
+      } else {
         setSession(null);
         setUser(null);
         setProfile(null);
-        navigate('/login', { replace: true });
         showSuccess('Sesión cerrada correctamente.');
-        return;
-      }
-      
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) {
-        if (error.message !== "Auth session missing!") {
-          console.error('Error signing out:', error);
-          showError(`Error al cerrar sesión: ${error.message}`);
-        } else {
-          setSession(null);
-          setUser(null);
-          setProfile(null);
-          navigate('/login', { replace: true });
-          showSuccess('Sesión cerrada correctamente.');
-        }
+        navigate('/login', { replace: true });
       }
     } catch (err) {
       console.error('Unexpected error during sign out:', err);
@@ -228,7 +219,6 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
       setUser(null);
       setProfile(null);
       navigate('/login', { replace: true });
-      showSuccess('Sesión cerrada.');
     } finally {
       setLoading(false);
     }
