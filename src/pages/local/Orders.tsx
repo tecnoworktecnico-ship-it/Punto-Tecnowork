@@ -35,7 +35,6 @@ interface OrderWithClient {
   created_at: string;
   updated_at: string;
   client_name: string;
-  client_email: string;
   file_count: number;
 }
 
@@ -86,59 +85,51 @@ const LocalOrders = () => {
 
       setLocalId(local.id);
 
-      // Obtener pedidos del local con información del cliente
+      // Obtener pedidos del local
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
-        .select(`
-          id,
-          client_id,
-          local_id,
-          status,
-          total_price,
-          points_earned,
-          created_at,
-          updated_at,
-          profiles!orders_client_id_fkey (
-            first_name,
-            last_name
-          ),
-          order_files (
-            id
-          )
-        `)
+        .select('id, client_id, local_id, status, total_price, points_earned, created_at, updated_at')
         .eq('local_id', local.id)
         .order('created_at', { ascending: false });
 
       if (ordersError) {
         console.error('Error fetching orders:', ordersError);
         showError('Error al cargar los pedidos.');
-      } else {
-        // Transformar los datos para incluir el nombre del cliente
-        const transformedOrders: OrderWithClient[] = (ordersData || []).map(order => {
-          const clientProfile = order.profiles as any;
+        setLoading(false);
+        return;
+      }
+
+      // Para cada pedido, obtener el nombre del cliente y la cantidad de archivos
+      const ordersWithDetails = await Promise.all(
+        (ordersData || []).map(async (order) => {
+          // Obtener perfil del cliente
+          const { data: clientProfile } = await supabase
+            .from('profiles')
+            .select('first_name, last_name')
+            .eq('id', order.client_id)
+            .single();
+
+          // Obtener cantidad de archivos
+          const { count: fileCount } = await supabase
+            .from('order_files')
+            .select('*', { count: 'exact', head: true })
+            .eq('order_id', order.id);
+
           const firstName = clientProfile?.first_name || '';
           const lastName = clientProfile?.last_name || '';
           const clientName = firstName || lastName 
             ? `${firstName} ${lastName}`.trim() 
             : 'Cliente sin nombre';
-          
-          return {
-            id: order.id,
-            client_id: order.client_id,
-            local_id: order.local_id,
-            status: order.status,
-            total_price: order.total_price,
-            points_earned: order.points_earned,
-            created_at: order.created_at,
-            updated_at: order.updated_at,
-            client_name: clientName,
-            client_email: '', // No tenemos acceso al email desde profiles
-            file_count: Array.isArray(order.order_files) ? order.order_files.length : 0,
-          };
-        });
 
-        setOrders(transformedOrders);
-      }
+          return {
+            ...order,
+            client_name: clientName,
+            file_count: fileCount || 0,
+          };
+        })
+      );
+
+      setOrders(ordersWithDetails);
     } catch (error) {
       console.error('Unexpected error:', error);
       showError('Error inesperado al cargar datos.');
@@ -253,8 +244,9 @@ const LocalOrders = () => {
                   variant="outline"
                   onClick={fetchLocalAndOrders}
                   className="flex items-center gap-2"
+                  disabled={loading}
                 >
-                  <RefreshCw className="h-4 w-4" />
+                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                   Actualizar
                 </Button>
                 <Select value={filterStatus} onValueChange={setFilterStatus}>
@@ -324,6 +316,7 @@ const LocalOrders = () => {
                         <Select
                           value={order.status}
                           onValueChange={(value) => handleStatusChange(order.id, value)}
+                          disabled={loading}
                         >
                           <SelectTrigger className="w-[140px]">
                             {getStatusBadge(order.status)}

@@ -17,86 +17,59 @@ const ResetPassword = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [tokenChecked, setTokenChecked] = useState(false);
+  const [checkingToken, setCheckingToken] = useState(true);
   const [tokenValid, setTokenValid] = useState(false);
   const [passwordUpdated, setPasswordUpdated] = useState(false);
-  const [sessionEstablished, setSessionEstablished] = useState(false);
 
   useEffect(() => {
-    // Verificar si hay un token de recuperación en la URL
-    const hashParams = new URLSearchParams(location.hash.substring(1));
-    const accessToken = hashParams.get('access_token');
-    const refreshToken = hashParams.get('refresh_token');
-    const type = hashParams.get('type');
-    
-    console.log('ResetPassword - Hash params:', { 
-      accessToken: !!accessToken, 
-      refreshToken: !!refreshToken, 
-      type,
-      fullHash: location.hash 
-    });
-    
-    const checkToken = async () => {
+    const checkAndSetSession = async () => {
+      console.log('ResetPassword - Checking token...');
+      const hashParams = new URLSearchParams(location.hash.substring(1));
+      const accessToken = hashParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token');
+      const type = hashParams.get('type');
+      
+      console.log('ResetPassword - Hash params:', { 
+        hasAccessToken: !!accessToken, 
+        hasRefreshToken: !!refreshToken, 
+        type 
+      });
+      
       if (accessToken && type === 'recovery') {
         try {
           console.log('ResetPassword - Setting session with recovery token');
           
-          // Establecer la sesión con el token de recuperación
           const { data, error } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken || '',
           });
           
           if (error) {
-            console.error('Error validating reset token:', error);
+            console.error('Error setting session:', error);
             showError('El enlace de recuperación es inválido o ha expirado.');
             setTokenValid(false);
-            setTimeout(() => {
-              navigate('/login', { replace: true });
-            }, 3000);
+            setTimeout(() => navigate('/login', { replace: true }), 3000);
           } else {
-            console.log('ResetPassword - Session established successfully', data);
+            console.log('ResetPassword - Session set successfully');
             setTokenValid(true);
-            setSessionEstablished(true);
-            
-            // Verificar que la sesión se estableció correctamente
-            const { data: sessionData } = await supabase.auth.getSession();
-            console.log('ResetPassword - Session verification', { 
-              hasSession: !!sessionData.session,
-              userId: sessionData.session?.user?.id 
-            });
           }
         } catch (err) {
-          console.error('Unexpected error validating token:', err);
+          console.error('Unexpected error:', err);
           showError('Error al validar el enlace de recuperación.');
           setTokenValid(false);
-          setTimeout(() => {
-            navigate('/login', { replace: true });
-          }, 3000);
+          setTimeout(() => navigate('/login', { replace: true }), 3000);
         }
-      } else if (!accessToken || type !== 'recovery') {
-        console.error('No valid recovery token found in URL', { accessToken: !!accessToken, type });
-        
-        // Verificar si ya hay una sesión activa
-        const { data: sessionData } = await supabase.auth.getSession();
-        
-        if (sessionData.session) {
-          console.log('Session already exists, token was already processed');
-          setTokenValid(true);
-          setSessionEstablished(true);
-        } else {
-          showError('No se encontró un enlace de recuperación válido.');
-          setTokenValid(false);
-          setTimeout(() => {
-            navigate('/login', { replace: true });
-          }, 3000);
-        }
+      } else {
+        console.error('ResetPassword - No valid recovery token found');
+        showError('No se encontró un enlace de recuperación válido.');
+        setTokenValid(false);
+        setTimeout(() => navigate('/login', { replace: true }), 3000);
       }
       
-      setTokenChecked(true);
+      setCheckingToken(false);
     };
     
-    checkToken();
+    checkAndSetSession();
   }, [location, navigate]);
 
   const handleResetPassword = async (e: React.FormEvent) => {
@@ -112,39 +85,13 @@ const ResetPassword = () => {
       return;
     }
     
-    if (!sessionEstablished) {
-      showError('La sesión no está establecida. Por favor, intenta de nuevo desde el enlace del correo.');
-      return;
-    }
-    
     setLoading(true);
     
     try {
-      console.log('ResetPassword - Verifying session before update');
+      console.log('ResetPassword - Updating password...');
       
-      // Verificar que tenemos una sesión válida
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError || !sessionData.session) {
-        console.error('No active session found:', sessionError);
-        showError('La sesión ha expirado. Por favor, solicita un nuevo enlace de recuperación.');
-        setLoading(false);
-        setTimeout(() => {
-          navigate('/login', { replace: true });
-        }, 2000);
-        return;
-      }
-      
-      console.log('ResetPassword - Session verified, updating password for user:', sessionData.session.user.id);
-      
-      // Actualizar la contraseña
       const { data: updateData, error: updateError } = await supabase.auth.updateUser({
         password: newPassword,
-      });
-      
-      console.log('ResetPassword - Update result:', { 
-        hasData: !!updateData, 
-        error: updateError?.message 
       });
       
       if (updateError) {
@@ -154,37 +101,30 @@ const ResetPassword = () => {
         return;
       }
       
-      // Actualizar el campo password_changed en el perfil
-      const userId = sessionData.session.user.id;
+      console.log('ResetPassword - Password updated successfully');
       
-      console.log('ResetPassword - Updating profile for user:', userId);
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ 
-          password_changed: true,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', userId);
-        
-      if (profileError) {
-        console.error('Error updating profile:', profileError);
+      // Actualizar el campo password_changed en el perfil
+      if (updateData.user) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({ 
+            password_changed: true,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', updateData.user.id);
+          
+        if (profileError) {
+          console.error('Error updating profile:', profileError);
+        }
       }
       
-      console.log('ResetPassword - Password updated successfully');
       setPasswordUpdated(true);
       showSuccess('¡Contraseña actualizada correctamente!');
       
       // Esperar 2 segundos antes de cerrar sesión y redirigir
       setTimeout(async () => {
-        console.log('ResetPassword - Signing out...');
         await supabase.auth.signOut();
-        
-        // Cerrar esta pestaña si fue abierta desde un enlace
-        if (window.opener) {
-          window.close();
-        } else {
-          navigate('/login', { replace: true });
-        }
+        navigate('/login', { replace: true });
       }, 2000);
       
     } catch (err) {
@@ -194,7 +134,7 @@ const ResetPassword = () => {
     }
   };
 
-  if (!tokenChecked) {
+  if (checkingToken) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
         <Loader2 className="h-8 w-8 text-white animate-spin mr-2" />
@@ -233,9 +173,7 @@ const ResetPassword = () => {
               Tu contraseña ha sido cambiada exitosamente.
             </p>
             <p className="text-gray-500 text-sm">
-              {window.opener 
-                ? 'Esta ventana se cerrará automáticamente...' 
-                : 'Serás redirigido al login...'}
+              Serás redirigido al login...
             </p>
           </CardContent>
         </Card>
@@ -287,7 +225,7 @@ const ResetPassword = () => {
             <Button
               type="submit"
               className="w-full bg-primary-blue hover:bg-blue-700 text-white flex items-center justify-center gap-2"
-              disabled={loading || !sessionEstablished}
+              disabled={loading}
             >
               {loading ? (
                 <>
@@ -301,11 +239,6 @@ const ResetPassword = () => {
                 </>
               )}
             </Button>
-            {!sessionEstablished && (
-              <p className="text-xs text-center text-gray-500">
-                Estableciendo sesión segura...
-              </p>
-            )}
           </form>
         </CardContent>
       </Card>

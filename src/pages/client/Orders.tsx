@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { showError } from '@/utils/toast';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Eye, FileText } from 'lucide-react';
+import { ArrowLeft, FileText, RefreshCw } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -17,6 +17,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+interface OrderFile {
+  file_name: string;
+  copies: number;
+}
 
 interface Order {
   id: string;
@@ -25,9 +36,8 @@ interface Order {
   total_price: number;
   points_earned: number;
   created_at: string;
-  locals: {
-    name: string;
-  };
+  local_name: string;
+  files: OrderFile[];
 }
 
 const ClientOrders = () => {
@@ -50,25 +60,52 @@ const ClientOrders = () => {
   const fetchOrders = async () => {
     setLoading(true);
 
-    const { data, error } = await supabase
-      .from('orders')
-      .select(`
-        *,
-        locals (
-          name
-        )
-      `)
-      .eq('client_id', profile?.id)
-      .order('created_at', { ascending: false });
+    try {
+      // Obtener pedidos
+      const { data: ordersData, error: ordersError } = await supabase
+        .from('orders')
+        .select('id, local_id, status, total_price, points_earned, created_at')
+        .eq('client_id', profile?.id)
+        .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching orders:', error);
-      showError('Error al cargar los pedidos.');
-    } else {
-      setOrders(data || []);
+      if (ordersError) {
+        console.error('Error fetching orders:', ordersError);
+        showError('Error al cargar los pedidos.');
+        setLoading(false);
+        return;
+      }
+
+      // Para cada pedido, obtener el nombre del local y los archivos
+      const ordersWithDetails = await Promise.all(
+        (ordersData || []).map(async (order) => {
+          // Obtener nombre del local
+          const { data: localData } = await supabase
+            .from('locals')
+            .select('name')
+            .eq('id', order.local_id)
+            .single();
+
+          // Obtener archivos del pedido
+          const { data: filesData } = await supabase
+            .from('order_files')
+            .select('file_name, copies')
+            .eq('order_id', order.id);
+
+          return {
+            ...order,
+            local_name: localData?.name || 'Local desconocido',
+            files: filesData || [],
+          };
+        })
+      );
+
+      setOrders(ordersWithDetails);
+    } catch (error) {
+      console.error('Unexpected error:', error);
+      showError('Error inesperado al cargar pedidos.');
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const getStatusBadge = (status: string) => {
@@ -82,6 +119,44 @@ const ClientOrders = () => {
 
     const config = statusConfig[status] || { label: status, variant: 'outline' };
     return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  const renderFilesList = (files: OrderFile[]) => {
+    if (files.length === 0) return 'Sin archivos';
+    
+    if (files.length === 1) {
+      return (
+        <div className="flex flex-col">
+          <span className="font-medium truncate max-w-[200px]">{files[0].file_name}</span>
+          <span className="text-xs text-gray-500">{files[0].copies} copia{files[0].copies > 1 ? 's' : ''}</span>
+        </div>
+      );
+    }
+
+    const filesList = files.map(f => `${f.file_name} (${f.copies}x)`).join('\n');
+    
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex flex-col cursor-help">
+              <span className="font-medium">{files.length} archivos</span>
+              <span className="text-xs text-gray-500">Ver detalles</span>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs">
+            <div className="space-y-1">
+              {files.map((file, idx) => (
+                <div key={idx} className="text-sm">
+                  <span className="font-medium">{file.file_name}</span>
+                  <span className="text-gray-400 ml-2">({file.copies}x)</span>
+                </div>
+              ))}
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
   };
 
   if (sessionLoading || loading) {
@@ -110,12 +185,23 @@ const ClientOrders = () => {
                 <ArrowLeft className="h-5 w-5" />
                 Volver al Dashboard
               </Button>
-              <Button
-                onClick={() => navigate('/client/new-order')}
-                className="bg-primary-blue hover:bg-blue-700 text-white"
-              >
-                Nuevo Pedido
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={fetchOrders}
+                  className="flex items-center gap-2"
+                  disabled={loading}
+                >
+                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                  Actualizar
+                </Button>
+                <Button
+                  onClick={() => navigate('/client/new-order')}
+                  className="bg-primary-blue hover:bg-blue-700 text-white"
+                >
+                  Nuevo Pedido
+                </Button>
+              </div>
             </div>
             <CardTitle className="text-3xl font-bold text-text-carbon">
               Mis Pedidos
@@ -139,23 +225,22 @@ const ClientOrders = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>ID</TableHead>
                     <TableHead>Local</TableHead>
+                    <TableHead>Archivos</TableHead>
                     <TableHead>Total</TableHead>
                     <TableHead>Puntos</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead>Fecha</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {orders.map((order) => (
                     <TableRow key={order.id}>
-                      <TableCell className="font-mono text-sm">
-                        {order.id.substring(0, 8)}...
-                      </TableCell>
                       <TableCell className="font-medium">
-                        {order.locals?.name}
+                        {order.local_name}
+                      </TableCell>
+                      <TableCell>
+                        {renderFilesList(order.files)}
                       </TableCell>
                       <TableCell className="font-bold">
                         ${order.total_price.toFixed(2)}
@@ -172,15 +257,6 @@ const ClientOrders = () => {
                           month: 'short',
                           day: 'numeric',
                         })}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => navigate(`/client/orders/${order.id}`)}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}

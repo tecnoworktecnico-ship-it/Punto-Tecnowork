@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -36,6 +36,7 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
+  const isSigningOut = useRef(false);
 
   const fetchProfile = async (userId: string, retries = 3): Promise<Profile | null> => {
     for (let i = 0; i < retries; i++) {
@@ -51,7 +52,6 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
         if (profileError) {
           console.error(`Error fetching profile (attempt ${i + 1}):`, profileError);
           
-          // Si es error de recursión o permisos, esperar y reintentar
           if (profileError.code === '42P17' || profileError.code === 'PGRST301') {
             if (i < retries - 1) {
               console.log('Waiting before retry...');
@@ -107,6 +107,12 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
     const initSession = async () => {
       console.log('SessionContext - Initializing session...');
       
+      // Si estamos cerrando sesión, no hacer nada
+      if (isSigningOut.current) {
+        console.log('SessionContext - Sign out in progress, skipping init');
+        return;
+      }
+      
       try {
         const { data: { session: currentSession }, error } = await supabase.auth.getSession();
         
@@ -118,13 +124,13 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
 
         console.log('SessionContext - Current session:', !!currentSession);
 
-        if (currentSession && mounted) {
+        if (currentSession && mounted && !isSigningOut.current) {
           setSession(currentSession);
           setUser(currentSession.user);
           
           const profileData = await fetchProfile(currentSession.user.id);
           
-          if (profileData && mounted) {
+          if (profileData && mounted && !isSigningOut.current) {
             console.log('SessionContext - Profile loaded, role:', profileData.role);
             setProfile(profileData);
             
@@ -132,7 +138,7 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
             if (PUBLIC_PATHS.includes(currentPath)) {
               redirectBasedOnRole(profileData.role, currentPath);
             }
-          } else if (mounted) {
+          } else if (mounted && !isSigningOut.current) {
             console.error('SessionContext - Could not load profile');
             showError('Error al cargar el perfil. Por favor, intenta cerrar sesión y volver a iniciar.');
           }
@@ -151,12 +157,14 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
       async (event, currentSession) => {
         console.log('SessionContext - Auth event:', event, 'has session:', !!currentSession);
         
-        if (!mounted) return;
+        if (!mounted || isSigningOut.current) return;
 
         if (event === 'SIGNED_OUT') {
+          console.log('SessionContext - User signed out');
           setSession(null);
           setUser(null);
           setProfile(null);
+          setLoading(false);
           
           const currentPath = location.pathname;
           if (!PUBLIC_PATHS.includes(currentPath)) {
@@ -171,7 +179,6 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           setSession(currentSession);
           setUser(currentSession.user);
           
-          // Esperar un poco para que el trigger cree el perfil
           await new Promise(resolve => setTimeout(resolve, 1000));
           
           const profileData = await fetchProfile(currentSession.user.id);
@@ -208,27 +215,35 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
 
   const signOut = async () => {
     try {
+      console.log('SessionContext - Starting sign out...');
+      isSigningOut.current = true;
       setLoading(true);
+      
+      // Limpiar estado inmediatamente
+      setSession(null);
+      setUser(null);
+      setProfile(null);
+      
       const { error } = await supabase.auth.signOut();
       
       if (error && error.message !== "Auth session missing!") {
         console.error('Error signing out:', error);
         showError(`Error al cerrar sesión: ${error.message}`);
       } else {
-        setSession(null);
-        setUser(null);
-        setProfile(null);
         showSuccess('Sesión cerrada correctamente.');
-        navigate('/login', { replace: true });
       }
+      
+      // Navegar al login
+      navigate('/login', { replace: true });
+      
     } catch (err) {
       console.error('Unexpected error during sign out:', err);
-      setSession(null);
-      setUser(null);
-      setProfile(null);
-      navigate('/login', { replace: true });
     } finally {
       setLoading(false);
+      // Resetear el flag después de un pequeño delay
+      setTimeout(() => {
+        isSigningOut.current = false;
+      }, 500);
     }
   };
 
