@@ -25,7 +25,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-interface Order {
+interface OrderWithClient {
   id: string;
   client_id: string;
   local_id: string;
@@ -34,12 +34,15 @@ interface Order {
   points_earned: number;
   created_at: string;
   updated_at: string;
+  client_name: string;
+  client_email: string;
+  file_count: number;
 }
 
 const LocalOrders = () => {
   const { profile, loading: sessionLoading } = useSession();
   const navigate = useNavigate();
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<OrderWithClient[]>([]);
   const [localId, setLocalId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -83,11 +86,26 @@ const LocalOrders = () => {
 
       setLocalId(local.id);
 
-      // Obtener pedidos del local SIN intentar unir perfiles
-      // Esto evita problemas de RLS/unión
+      // Obtener pedidos del local con información del cliente
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
-        .select('*')
+        .select(`
+          id,
+          client_id,
+          local_id,
+          status,
+          total_price,
+          points_earned,
+          created_at,
+          updated_at,
+          profiles!orders_client_id_fkey (
+            first_name,
+            last_name
+          ),
+          order_files (
+            id
+          )
+        `)
         .eq('local_id', local.id)
         .order('created_at', { ascending: false });
 
@@ -95,7 +113,31 @@ const LocalOrders = () => {
         console.error('Error fetching orders:', ordersError);
         showError('Error al cargar los pedidos.');
       } else {
-        setOrders(ordersData || []);
+        // Transformar los datos para incluir el nombre del cliente
+        const transformedOrders: OrderWithClient[] = (ordersData || []).map(order => {
+          const clientProfile = order.profiles as any;
+          const firstName = clientProfile?.first_name || '';
+          const lastName = clientProfile?.last_name || '';
+          const clientName = firstName || lastName 
+            ? `${firstName} ${lastName}`.trim() 
+            : 'Cliente sin nombre';
+          
+          return {
+            id: order.id,
+            client_id: order.client_id,
+            local_id: order.local_id,
+            status: order.status,
+            total_price: order.total_price,
+            points_earned: order.points_earned,
+            created_at: order.created_at,
+            updated_at: order.updated_at,
+            client_name: clientName,
+            client_email: '', // No tenemos acceso al email desde profiles
+            file_count: Array.isArray(order.order_files) ? order.order_files.length : 0,
+          };
+        });
+
+        setOrders(transformedOrders);
       }
     } catch (error) {
       console.error('Unexpected error:', error);
@@ -245,8 +287,8 @@ const LocalOrders = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>ID Cliente</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Archivos</TableHead>
                     <TableHead>Total</TableHead>
                     <TableHead>Puntos</TableHead>
                     <TableHead>Estado</TableHead>
@@ -257,16 +299,25 @@ const LocalOrders = () => {
                 <TableBody>
                   {filteredOrders.map((order) => (
                     <TableRow key={order.id}>
-                      <TableCell className="font-mono text-sm">
-                        {order.id.substring(0, 8)}...
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-medium text-text-carbon">
+                            {order.client_name}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            ID: {order.id.substring(0, 8)}...
+                          </span>
+                        </div>
                       </TableCell>
-                      <TableCell className="font-mono text-sm">
-                        {order.client_id.substring(0, 8)}...
+                      <TableCell>
+                        <Badge variant="outline" className="bg-primary-blue/10">
+                          {order.file_count} archivo{order.file_count !== 1 ? 's' : ''}
+                        </Badge>
                       </TableCell>
-                      <TableCell className="font-bold">
+                      <TableCell className="font-bold text-success-green">
                         ${order.total_price.toFixed(2)}
                       </TableCell>
-                      <TableCell className="text-secondary-yellow">
+                      <TableCell className="text-secondary-yellow font-medium">
                         {order.points_earned} pts
                       </TableCell>
                       <TableCell>
@@ -287,15 +338,27 @@ const LocalOrders = () => {
                         </Select>
                       </TableCell>
                       <TableCell>
-                        {new Date(order.created_at).toLocaleDateString('es-ES')}
+                        <div className="flex flex-col">
+                          <span className="font-medium">
+                            {new Date(order.created_at).toLocaleDateString('es-ES')}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {new Date(order.created_at).toLocaleTimeString('es-ES', { 
+                              hour: '2-digit', 
+                              minute: '2-digit' 
+                            })}
+                          </span>
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => navigate(`/local/orders/${order.id}`)}
+                          className="flex items-center gap-1"
                         >
                           <Eye className="h-4 w-4" />
+                          Ver
                         </Button>
                       </TableCell>
                     </TableRow>
