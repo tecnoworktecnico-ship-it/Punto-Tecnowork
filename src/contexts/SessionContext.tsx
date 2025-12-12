@@ -37,6 +37,7 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
   const navigate = useNavigate();
   const location = useLocation();
   const isSigningOut = useRef(false);
+  const isInitialized = useRef(false);
 
   const fetchProfile = async (userId: string, retries = 3): Promise<Profile | null> => {
     for (let i = 0; i < retries; i++) {
@@ -88,9 +89,13 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
   const redirectBasedOnRole = (role: string, currentPath: string) => {
     console.log('SessionContext - Redirecting based on role:', role, 'current path:', currentPath);
     
+    // No redirigir si ya estamos en la ruta correcta
     if (role === 'admin' && currentPath.startsWith('/admin')) return;
     if (role === 'local' && currentPath.startsWith('/local')) return;
     if (role === 'client' && currentPath.startsWith('/client')) return;
+    
+    // Solo redirigir si estamos en una ruta pública
+    if (!PUBLIC_PATHS.includes(currentPath)) return;
     
     if (role === 'admin') {
       navigate('/admin/dashboard', { replace: true });
@@ -105,6 +110,12 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
     let mounted = true;
 
     const initSession = async () => {
+      // Solo inicializar una vez
+      if (isInitialized.current) {
+        console.log('SessionContext - Already initialized, skipping');
+        return;
+      }
+      
       console.log('SessionContext - Initializing session...');
       
       // Si estamos cerrando sesión, no hacer nada
@@ -118,7 +129,10 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
         
         if (error) {
           console.error('SessionContext - Error getting session:', error);
-          if (mounted) setLoading(false);
+          if (mounted) {
+            setLoading(false);
+            isInitialized.current = true;
+          }
           return;
         }
 
@@ -144,10 +158,16 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           }
         }
         
-        if (mounted) setLoading(false);
+        if (mounted) {
+          setLoading(false);
+          isInitialized.current = true;
+        }
       } catch (err) {
         console.error('SessionContext - Initialization error:', err);
-        if (mounted) setLoading(false);
+        if (mounted) {
+          setLoading(false);
+          isInitialized.current = true;
+        }
       }
     };
 
@@ -165,6 +185,7 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           setUser(null);
           setProfile(null);
           setLoading(false);
+          isInitialized.current = false;
           
           const currentPath = location.pathname;
           if (!PUBLIC_PATHS.includes(currentPath)) {
@@ -217,6 +238,7 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
     try {
       console.log('SessionContext - Starting sign out...');
       isSigningOut.current = true;
+      isInitialized.current = false;
       setLoading(true);
       
       // Limpiar estado inmediatamente

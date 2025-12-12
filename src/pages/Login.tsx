@@ -22,6 +22,7 @@ function Login() {
   const [activeTab, setActiveTab] = useState<string>('sign_in');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
+  const [hasRedirected, setHasRedirected] = useState(false);
   
   // Formulario de inicio de sesión
   const [loginData, setLoginData] = useState({
@@ -43,36 +44,23 @@ function Login() {
     email: '',
   });
 
-  // Log de cambios en session y profile
+  // Redirigir si ya hay sesión activa (solo una vez)
   useEffect(() => {
-    console.log('Login - Session state changed:', {
-      hasSession: !!session,
-      hasProfile: !!profile,
-      profileRole: profile?.role,
-      sessionLoading
-    });
-  }, [session, profile, sessionLoading]);
-
-  // Redirigir si ya hay sesión activa
-  useEffect(() => {
-    if (!sessionLoading && session && profile) {
+    if (!sessionLoading && session && profile && !hasRedirected) {
       console.log('Login - Redirecting user with role:', profile.role);
+      setHasRedirected(true);
       
-      // Pequeño delay para asegurar que el contexto esté listo
       setTimeout(() => {
         if (profile.role === 'admin') {
-          console.log('Login - Navigating to admin dashboard');
           navigate('/admin/dashboard', { replace: true });
         } else if (profile.role === 'local') {
-          console.log('Login - Navigating to local dashboard');
           navigate('/local/dashboard', { replace: true });
         } else if (profile.role === 'client') {
-          console.log('Login - Navigating to client dashboard');
           navigate('/client', { replace: true });
         }
       }, 100);
     }
-  }, [session, sessionLoading, profile, navigate]);
+  }, [session, sessionLoading, profile, navigate, hasRedirected]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,13 +79,6 @@ function Login() {
         password: loginData.password,
       });
       
-      console.log('Login - Sign in response:', {
-        hasData: !!data,
-        hasSession: !!data?.session,
-        hasUser: !!data?.user,
-        error: error?.message
-      });
-      
       if (error) {
         console.error('Login error:', error);
         if (error.message === 'Invalid login credentials') {
@@ -112,39 +93,15 @@ function Login() {
       }
       
       if (data.session) {
-        console.log('Login - Session created successfully, user ID:', data.user.id);
+        console.log('Login - Session created successfully');
         showSuccess('Inicio de sesión exitoso');
-        
-        // Verificar que el perfil existe
-        console.log('Login - Checking if profile exists...');
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', data.user.id)
-          .single();
-          
-        console.log('Login - Profile check:', {
-          hasProfile: !!profileData,
-          profileRole: profileData?.role,
-          error: profileError?.message
-        });
-        
-        if (!profileData) {
-          console.error('Login - Profile not found, this should not happen');
-          showError('Error: Perfil de usuario no encontrado. Contacta al administrador.');
-          setIsSubmitting(false);
-          return;
-        }
-        
-        // El SessionContext debería manejar la redirección automáticamente
-        console.log('Login - Waiting for SessionContext to handle redirect...');
+        // El SessionContext manejará la redirección
       }
     } catch (error) {
       console.error('Unexpected error:', error);
       showError('Error inesperado al iniciar sesión');
       setIsSubmitting(false);
     }
-    // No establecer isSubmitting a false aquí, dejar que la redirección ocurra
   };
   
   const handleSignUp = async (e: React.FormEvent) => {
@@ -279,12 +236,12 @@ function Login() {
     );
   }
 
-  // Si ya hay sesión, mostrar loading mientras redirige
-  if (session && profile) {
+  // Si ya hay sesión y estamos redirigiendo, mostrar loading
+  if (session && profile && hasRedirected) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
         <Loader2 className="h-8 w-8 text-white animate-spin mr-2" />
-        <p className="text-white text-xl">Redirigiendo a {profile.role}...</p>
+        <p className="text-white text-xl">Redirigiendo...</p>
       </div>
     );
   }

@@ -26,15 +26,17 @@ import {
 } from '@/components/ui/select';
 
 interface OrderWithClient {
-  id: string;
+  order_id: string;
   client_id: string;
+  client_email: string;
+  client_first_name: string | null;
+  client_last_name: string | null;
   local_id: string;
   status: string;
   total_price: number;
   points_earned: number;
   created_at: string;
   updated_at: string;
-  client_name: string;
   file_count: number;
 }
 
@@ -85,12 +87,9 @@ const LocalOrders = () => {
 
       setLocalId(local.id);
 
-      // Obtener pedidos del local
+      // Usar la función RPC para obtener pedidos con información del cliente
       const { data: ordersData, error: ordersError } = await supabase
-        .from('orders')
-        .select('id, client_id, local_id, status, total_price, points_earned, created_at, updated_at')
-        .eq('local_id', local.id)
-        .order('created_at', { ascending: false });
+        .rpc('get_local_orders_with_client_info', { target_local_id: local.id });
 
       if (ordersError) {
         console.error('Error fetching orders:', ordersError);
@@ -99,37 +98,7 @@ const LocalOrders = () => {
         return;
       }
 
-      // Para cada pedido, obtener el nombre del cliente y la cantidad de archivos
-      const ordersWithDetails = await Promise.all(
-        (ordersData || []).map(async (order) => {
-          // Obtener perfil del cliente
-          const { data: clientProfile } = await supabase
-            .from('profiles')
-            .select('first_name, last_name')
-            .eq('id', order.client_id)
-            .single();
-
-          // Obtener cantidad de archivos
-          const { count: fileCount } = await supabase
-            .from('order_files')
-            .select('*', { count: 'exact', head: true })
-            .eq('order_id', order.id);
-
-          const firstName = clientProfile?.first_name || '';
-          const lastName = clientProfile?.last_name || '';
-          const clientName = firstName || lastName 
-            ? `${firstName} ${lastName}`.trim() 
-            : 'Cliente sin nombre';
-
-          return {
-            ...order,
-            client_name: clientName,
-            file_count: fileCount || 0,
-          };
-        })
-      );
-
-      setOrders(ordersWithDetails);
+      setOrders(ordersData || []);
     } catch (error) {
       console.error('Unexpected error:', error);
       showError('Error inesperado al cargar datos.');
@@ -185,6 +154,19 @@ const LocalOrders = () => {
 
     const config = statusConfig[status] || { label: status, variant: 'outline' };
     return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  const getClientDisplayName = (order: OrderWithClient) => {
+    const firstName = order.client_first_name || '';
+    const lastName = order.client_last_name || '';
+    const fullName = `${firstName} ${lastName}`.trim();
+    
+    if (fullName) {
+      return fullName;
+    }
+    
+    // Si no hay nombre, mostrar el email
+    return order.client_email || 'Cliente desconocido';
   };
 
   const filteredOrders = filterStatus === 'all' 
@@ -290,14 +272,14 @@ const LocalOrders = () => {
                 </TableHeader>
                 <TableBody>
                   {filteredOrders.map((order) => (
-                    <TableRow key={order.id}>
+                    <TableRow key={order.order_id}>
                       <TableCell>
                         <div className="flex flex-col">
                           <span className="font-medium text-text-carbon">
-                            {order.client_name}
+                            {getClientDisplayName(order)}
                           </span>
                           <span className="text-xs text-gray-500">
-                            ID: {order.id.substring(0, 8)}...
+                            {order.client_email}
                           </span>
                         </div>
                       </TableCell>
@@ -315,7 +297,7 @@ const LocalOrders = () => {
                       <TableCell>
                         <Select
                           value={order.status}
-                          onValueChange={(value) => handleStatusChange(order.id, value)}
+                          onValueChange={(value) => handleStatusChange(order.order_id, value)}
                           disabled={loading}
                         >
                           <SelectTrigger className="w-[140px]">
@@ -347,7 +329,7 @@ const LocalOrders = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => navigate(`/local/orders/${order.id}`)}
+                          onClick={() => navigate(`/local/orders/${order.order_id}`)}
                           className="flex items-center gap-1"
                         >
                           <Eye className="h-4 w-4" />

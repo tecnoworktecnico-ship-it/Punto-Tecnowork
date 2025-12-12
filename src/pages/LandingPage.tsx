@@ -44,7 +44,15 @@ const LandingPage = () => {
     }
   }, [location.hash, navigate]);
 
-  if (loading || session) {
+  // Si hay sesión activa, redirigir al dashboard correspondiente
+  useEffect(() => {
+    if (!loading && session) {
+      // No redirigir automáticamente, dejar que SessionContext lo maneje
+      return;
+    }
+  }, [loading, session]);
+
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
         <p className="text-white text-xl">Cargando...</p>
