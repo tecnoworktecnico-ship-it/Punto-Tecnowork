@@ -27,7 +27,6 @@ interface SessionContextType {
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
-// Rutas públicas que no requieren autenticación
 const PUBLIC_PATHS = ['/', '/login', '/auth-callback', '/verification-error', '/reset-password'];
 
 export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -38,26 +37,43 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
   const navigate = useNavigate();
   const location = useLocation();
 
-  const fetchProfile = async (userId: string): Promise<Profile | null> => {
-    try {
-      console.log('SessionContext - Fetching profile for user:', userId);
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
+  const fetchProfile = async (userId: string, retries = 3): Promise<Profile | null> => {
+    for (let i = 0; i < retries; i++) {
+      try {
+        console.log(`SessionContext - Fetching profile for user (attempt ${i + 1}/${retries}):`, userId);
+        
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
 
-      if (profileError) {
-        console.error('Error fetching profile:', profileError);
-        return null;
+        if (profileError) {
+          console.error(`Error fetching profile (attempt ${i + 1}):`, profileError);
+          
+          // Si es error de recursión o permisos, esperar y reintentar
+          if (profileError.code === '42P17' || profileError.code === 'PGRST301') {
+            if (i < retries - 1) {
+              console.log('Waiting before retry...');
+              await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+              continue;
+            }
+          }
+          
+          return null;
+        }
+        
+        console.log('SessionContext - Profile fetched successfully:', profileData);
+        return profileData;
+      } catch (error) {
+        console.error(`Unexpected error fetching profile (attempt ${i + 1}):`, error);
+        if (i < retries - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+        }
       }
-      
-      console.log('SessionContext - Profile fetched:', profileData);
-      return profileData;
-    } catch (error) {
-      console.error('Unexpected error fetching profile:', error);
-      return null;
     }
+    
+    return null;
   };
 
   const refreshProfile = async () => {
@@ -72,34 +88,19 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
   const redirectBasedOnRole = (role: string, currentPath: string) => {
     console.log('SessionContext - Redirecting based on role:', role, 'current path:', currentPath);
     
-    // No redirigir si ya estamos en la ruta correcta
-    if (role === 'admin' && currentPath.startsWith('/admin')) {
-      console.log('Already in admin route, skipping redirect');
-      return;
-    }
-    if (role === 'local' && currentPath.startsWith('/local')) {
-      console.log('Already in local route, skipping redirect');
-      return;
-    }
-    if (role === 'client' && currentPath.startsWith('/client')) {
-      console.log('Already in client route, skipping redirect');
-      return;
-    }
+    if (role === 'admin' && currentPath.startsWith('/admin')) return;
+    if (role === 'local' && currentPath.startsWith('/local')) return;
+    if (role === 'client' && currentPath.startsWith('/client')) return;
     
-    // Redirigir según el rol
     if (role === 'admin') {
-      console.log('Redirecting to admin dashboard');
       navigate('/admin/dashboard', { replace: true });
     } else if (role === 'local') {
-      console.log('Redirecting to local dashboard');
       navigate('/local/dashboard', { replace: true });
     } else if (role === 'client') {
-      console.log('Redirecting to client dashboard');
       navigate('/client', { replace: true });
     }
   };
 
-  // Inicialización y manejo de sesión
   useEffect(() => {
     let mounted = true;
 
@@ -111,16 +112,13 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
         
         if (error) {
           console.error('SessionContext - Error getting session:', error);
-          if (mounted) {
-            setLoading(false);
-          }
+          if (mounted) setLoading(false);
           return;
         }
 
         console.log('SessionContext - Current session:', !!currentSession);
 
         if (currentSession && mounted) {
-          console.log('SessionContext - Session found, setting state...');
           setSession(currentSession);
           setUser(currentSession.user);
           
@@ -130,41 +128,32 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
             console.log('SessionContext - Profile loaded, role:', profileData.role);
             setProfile(profileData);
             
-            // Solo redirigir si estamos en una ruta pública
             const currentPath = location.pathname;
             if (PUBLIC_PATHS.includes(currentPath)) {
-              console.log('SessionContext - In public path, redirecting...');
               redirectBasedOnRole(profileData.role, currentPath);
             }
+          } else if (mounted) {
+            console.error('SessionContext - Could not load profile');
+            showError('Error al cargar el perfil. Por favor, intenta cerrar sesión y volver a iniciar.');
           }
         }
         
-        if (mounted) {
-          setLoading(false);
-        }
+        if (mounted) setLoading(false);
       } catch (err) {
         console.error('SessionContext - Initialization error:', err);
-        if (mounted) {
-          setLoading(false);
-        }
+        if (mounted) setLoading(false);
       }
     };
 
     initSession();
 
-    // Listener de cambios de autenticación
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
         console.log('SessionContext - Auth event:', event, 'has session:', !!currentSession);
         
-        if (!mounted) {
-          console.log('Component unmounted, ignoring event');
-          return;
-        }
+        if (!mounted) return;
 
-        // Manejar cierre de sesión
         if (event === 'SIGNED_OUT') {
-          console.log('SessionContext - User signed out');
           setSession(null);
           setUser(null);
           setProfile(null);
@@ -176,43 +165,34 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           return;
         }
 
-        // Manejar inicio de sesión
         if (event === 'SIGNED_IN' && currentSession) {
-          console.log('SessionContext - User signed in, user ID:', currentSession.user.id);
+          console.log('SessionContext - User signed in');
           
           setSession(currentSession);
           setUser(currentSession.user);
           
-          // Esperar un poco para asegurar que el perfil esté creado
-          await new Promise(resolve => setTimeout(resolve, 500));
+          // Esperar un poco para que el trigger cree el perfil
+          await new Promise(resolve => setTimeout(resolve, 1000));
           
           const profileData = await fetchProfile(currentSession.user.id);
           
           if (profileData && mounted) {
-            console.log('SessionContext - Profile loaded after sign in, role:', profileData.role);
+            console.log('SessionContext - Profile loaded, role:', profileData.role);
             setProfile(profileData);
-            
-            // Forzar redirección después de login
-            const currentPath = location.pathname;
-            console.log('SessionContext - Current path after login:', currentPath);
-            redirectBasedOnRole(profileData.role, currentPath);
+            redirectBasedOnRole(profileData.role, location.pathname);
           } else {
-            console.error('SessionContext - Failed to load profile after sign in');
-            showError('Error al cargar el perfil de usuario. Por favor, intenta de nuevo.');
+            console.error('SessionContext - Failed to load profile');
+            showError('Error al cargar el perfil. Por favor, contacta al administrador.');
           }
           return;
         }
 
-        // Manejar actualización de token
         if (event === 'TOKEN_REFRESHED' && currentSession) {
-          console.log('SessionContext - Token refreshed');
           setSession(currentSession);
           setUser(currentSession.user);
         }
 
-        // Manejar actualización de usuario
         if (event === 'USER_UPDATED' && currentSession) {
-          console.log('SessionContext - User updated');
           setSession(currentSession);
           setUser(currentSession.user);
           await refreshProfile();
@@ -221,7 +201,6 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
     );
 
     return () => {
-      console.log('SessionContext - Cleanup');
       mounted = false;
       subscription.unsubscribe();
     };
