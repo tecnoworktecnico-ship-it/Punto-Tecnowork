@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { showSuccess, showError } from '@/utils/toast';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Upload, Plus, Trash2, Store, DollarSign, Info } from 'lucide-react';
+import { ArrowLeft, Upload, Trash2, Store, DollarSign, Info, Loader2 } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -50,6 +50,8 @@ const NewOrder = () => {
   const [selectedLocal, setSelectedLocal] = useState<string>('');
   const [orderFiles, setOrderFiles] = useState<OrderFile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string>('');
 
   // Usar el hook para obtener precios del local seleccionado
   const { 
@@ -158,11 +160,14 @@ const NewOrder = () => {
       return;
     }
 
-    setLoading(true);
+    setSubmitting(true);
+    setUploadProgress('Creando pedido...');
 
     try {
       const total = calculateTotal();
       const points = calculatePoints(total);
+
+      console.log('Creando pedido:', { client_id: profile?.id, local_id: selectedLocal, total, points });
 
       // Crear el pedido
       const { data: order, error: orderError } = await supabase
@@ -179,15 +184,25 @@ const NewOrder = () => {
 
       if (orderError) {
         console.error('Error creating order:', orderError);
-        showError('Error al crear el pedido.');
-        setLoading(false);
+        showError(`Error al crear el pedido: ${orderError.message}`);
+        setSubmitting(false);
+        setUploadProgress('');
         return;
       }
 
+      console.log('Pedido creado:', order);
+
       // Subir archivos y crear registros de order_files
+      let filesUploaded = 0;
+      let filesWithErrors = 0;
+
       for (const orderFile of orderFiles) {
+        setUploadProgress(`Subiendo archivo ${filesUploaded + 1} de ${orderFiles.length}...`);
+        
         const fileName = `${order.id}/${Date.now()}_${orderFile.file.name}`;
         
+        console.log('Subiendo archivo:', fileName);
+
         // Subir archivo a Supabase Storage
         const { error: uploadError } = await supabase.storage
           .from('order-files')
@@ -195,11 +210,25 @@ const NewOrder = () => {
 
         if (uploadError) {
           console.error('Error uploading file:', uploadError);
+          filesWithErrors++;
+          
+          // Crear registro en order_files sin el archivo (para mantener el registro)
+          await supabase.from('order_files').insert({
+            order_id: order.id,
+            file_path: `error_${fileName}`,
+            file_name: orderFile.file.name,
+            file_type: orderFile.file.type,
+            copies: orderFile.copies,
+            color_mode: orderFile.color_mode,
+            size: orderFile.size,
+            price_per_copy: orderFile.price_per_copy,
+          });
+          
           continue;
         }
 
         // Crear registro en order_files
-        await supabase.from('order_files').insert({
+        const { error: fileRecordError } = await supabase.from('order_files').insert({
           order_id: order.id,
           file_path: fileName,
           file_name: orderFile.file.name,
@@ -209,7 +238,15 @@ const NewOrder = () => {
           size: orderFile.size,
           price_per_copy: orderFile.price_per_copy,
         });
+
+        if (fileRecordError) {
+          console.error('Error creating file record:', fileRecordError);
+        }
+
+        filesUploaded++;
       }
+
+      setUploadProgress('Actualizando puntos...');
 
       // Actualizar puntos del usuario
       const { data: userPoints } = await supabase
@@ -234,17 +271,23 @@ const NewOrder = () => {
         order_id: order.id,
         user_id: profile?.id,
         action: 'created',
-        details: { total_price: total, points_earned: points }
+        details: { total_price: total, points_earned: points, files_uploaded: filesUploaded, files_with_errors: filesWithErrors }
       });
 
-      showSuccess('Pedido creado correctamente. ¡Has ganado ' + points + ' puntos!');
+      if (filesWithErrors > 0) {
+        showSuccess(`Pedido creado con ${filesWithErrors} archivo(s) que no se pudieron subir. ¡Has ganado ${points} puntos!`);
+      } else {
+        showSuccess(`¡Pedido creado correctamente! Has ganado ${points} puntos.`);
+      }
+      
       navigate('/client/orders');
     } catch (error) {
       console.error('Unexpected error:', error);
-      showError('Error inesperado al crear el pedido.');
+      showError('Error inesperado al crear el pedido. Por favor intenta de nuevo.');
+    } finally {
+      setSubmitting(false);
+      setUploadProgress('');
     }
-
-    setLoading(false);
   };
 
   const selectedLocalData = locals.find(l => l.id === selectedLocal);
@@ -291,7 +334,7 @@ const NewOrder = () => {
                   <Store className="h-5 w-5 text-primary-blue" />
                   Selecciona un Local *
                 </Label>
-                <Select value={selectedLocal} onValueChange={handleLocalChange}>
+                <Select value={selectedLocal} onValueChange={handleLocalChange} disabled={submitting}>
                   <SelectTrigger className="mt-2">
                     <SelectValue placeholder="Selecciona un local" />
                   </SelectTrigger>
@@ -361,7 +404,7 @@ const NewOrder = () => {
                         onChange={handleFileAdd}
                         accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                         className="cursor-pointer"
-                        disabled={prices.length === 0}
+                        disabled={prices.length === 0 || submitting}
                       />
                       <p className="text-sm text-gray-500 mt-2">
                         Formatos aceptados: PDF, DOC, DOCX, JPG, PNG
@@ -395,6 +438,7 @@ const NewOrder = () => {
                             size="sm"
                             onClick={() => handleFileRemove(index)}
                             className="text-emphasis-red hover:text-red-700"
+                            disabled={submitting}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -408,6 +452,7 @@ const NewOrder = () => {
                               onValueChange={(value) =>
                                 handleFileUpdate(index, 'service_name', value)
                               }
+                              disabled={submitting}
                             >
                               <SelectTrigger className="mt-1">
                                 <SelectValue />
@@ -432,6 +477,7 @@ const NewOrder = () => {
                                 handleFileUpdate(index, 'copies', parseInt(e.target.value) || 1)
                               }
                               className="mt-1"
+                              disabled={submitting}
                             />
                           </div>
 
@@ -442,6 +488,7 @@ const NewOrder = () => {
                               onValueChange={(value) =>
                                 handleFileUpdate(index, 'color_mode', value)
                               }
+                              disabled={submitting}
                             >
                               <SelectTrigger className="mt-1">
                                 <SelectValue />
@@ -460,6 +507,7 @@ const NewOrder = () => {
                               onValueChange={(value) =>
                                 handleFileUpdate(index, 'size', value)
                               }
+                              disabled={submitting}
                             >
                               <SelectTrigger className="mt-1">
                                 <SelectValue />
@@ -512,13 +560,28 @@ const NewOrder = () => {
                 </Card>
               )}
 
+              {/* Indicador de Progreso */}
+              {submitting && uploadProgress && (
+                <div className="flex items-center justify-center gap-3 p-4 bg-primary-blue/10 rounded-lg">
+                  <Loader2 className="h-5 w-5 animate-spin text-primary-blue" />
+                  <span className="text-primary-blue font-medium">{uploadProgress}</span>
+                </div>
+              )}
+
               {/* Botón de Envío */}
               <Button
                 type="submit"
-                disabled={loading || !selectedLocal || orderFiles.length === 0}
+                disabled={submitting || !selectedLocal || orderFiles.length === 0}
                 className="w-full bg-primary-blue hover:bg-blue-700 text-white font-bold py-4 text-lg"
               >
-                {loading ? 'Creando Pedido...' : 'Crear Pedido'}
+                {submitting ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Procesando...
+                  </span>
+                ) : (
+                  'Crear Pedido'
+                )}
               </Button>
             </form>
           </CardContent>
