@@ -69,88 +69,105 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
     }
   };
 
-  const redirectBasedOnRole = (role: string) => {
-    const currentPath = location.pathname;
-    
+  const redirectBasedOnRole = (role: string, currentPath: string) => {
     console.log('SessionContext - Redirecting based on role:', role, 'current path:', currentPath);
     
     // No redirigir si ya estamos en la ruta correcta
-    if (role === 'admin' && currentPath.startsWith('/admin')) return;
-    if (role === 'local' && currentPath.startsWith('/local')) return;
-    if (role === 'client' && currentPath.startsWith('/client')) return;
+    if (role === 'admin' && currentPath.startsWith('/admin')) {
+      console.log('Already in admin route, skipping redirect');
+      return;
+    }
+    if (role === 'local' && currentPath.startsWith('/local')) {
+      console.log('Already in local route, skipping redirect');
+      return;
+    }
+    if (role === 'client' && currentPath.startsWith('/client')) {
+      console.log('Already in client route, skipping redirect');
+      return;
+    }
     
     // Redirigir según el rol
     if (role === 'admin') {
+      console.log('Redirecting to admin dashboard');
       navigate('/admin/dashboard', { replace: true });
     } else if (role === 'local') {
+      console.log('Redirecting to local dashboard');
       navigate('/local/dashboard', { replace: true });
     } else if (role === 'client') {
+      console.log('Redirecting to client dashboard');
       navigate('/client', { replace: true });
     }
   };
 
+  // Inicialización y manejo de sesión
   useEffect(() => {
-    let isMounted = true;
+    let mounted = true;
 
-    const initializeAuth = async () => {
-      console.log('SessionContext - Initializing auth...');
+    const initSession = async () => {
+      console.log('SessionContext - Initializing session...');
       
       try {
-        // Obtener sesión inicial
-        const { data: { session: initialSession }, error } = await supabase.auth.getSession();
+        const { data: { session: currentSession }, error } = await supabase.auth.getSession();
         
         if (error) {
           console.error('SessionContext - Error getting session:', error);
-          if (isMounted) {
+          if (mounted) {
             setLoading(false);
           }
           return;
         }
 
-        console.log('SessionContext - Initial session:', !!initialSession);
+        console.log('SessionContext - Current session:', !!currentSession);
 
-        if (initialSession?.user && isMounted) {
-          setSession(initialSession);
-          setUser(initialSession.user);
+        if (currentSession && mounted) {
+          console.log('SessionContext - Session found, setting state...');
+          setSession(currentSession);
+          setUser(currentSession.user);
           
-          const profileData = await fetchProfile(initialSession.user.id);
+          const profileData = await fetchProfile(currentSession.user.id);
           
-          if (isMounted && profileData) {
+          if (profileData && mounted) {
+            console.log('SessionContext - Profile loaded, role:', profileData.role);
             setProfile(profileData);
             
             // Solo redirigir si estamos en una ruta pública
             const currentPath = location.pathname;
-            if (PUBLIC_PATHS.includes(currentPath) || currentPath === '/') {
-              redirectBasedOnRole(profileData.role);
+            if (PUBLIC_PATHS.includes(currentPath)) {
+              console.log('SessionContext - In public path, redirecting...');
+              redirectBasedOnRole(profileData.role, currentPath);
             }
           }
         }
         
-        if (isMounted) {
+        if (mounted) {
           setLoading(false);
         }
       } catch (err) {
         console.error('SessionContext - Initialization error:', err);
-        if (isMounted) {
+        if (mounted) {
           setLoading(false);
         }
       }
     };
 
-    initializeAuth();
+    initSession();
 
-    // Escuchar cambios de autenticación
-    const { data: authListener } = supabase.auth.onAuthStateChange(
+    // Listener de cambios de autenticación
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
-        console.log('SessionContext - Auth state changed:', event, !!currentSession);
+        console.log('SessionContext - Auth event:', event, 'has session:', !!currentSession);
         
-        if (!isMounted) return;
+        if (!mounted) {
+          console.log('Component unmounted, ignoring event');
+          return;
+        }
 
+        // Manejar cierre de sesión
         if (event === 'SIGNED_OUT') {
+          console.log('SessionContext - User signed out');
           setSession(null);
           setUser(null);
           setProfile(null);
-          setLoading(false);
           
           const currentPath = location.pathname;
           if (!PUBLIC_PATHS.includes(currentPath)) {
@@ -159,31 +176,43 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           return;
         }
 
-        if (event === 'SIGNED_IN' && currentSession?.user) {
-          console.log('SessionContext - User signed in, fetching profile...');
+        // Manejar inicio de sesión
+        if (event === 'SIGNED_IN' && currentSession) {
+          console.log('SessionContext - User signed in, user ID:', currentSession.user.id);
           
           setSession(currentSession);
           setUser(currentSession.user);
           
+          // Esperar un poco para asegurar que el perfil esté creado
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
           const profileData = await fetchProfile(currentSession.user.id);
           
-          if (isMounted && profileData) {
+          if (profileData && mounted) {
+            console.log('SessionContext - Profile loaded after sign in, role:', profileData.role);
             setProfile(profileData);
-            redirectBasedOnRole(profileData.role);
-          }
-          
-          if (isMounted) {
-            setLoading(false);
+            
+            // Forzar redirección después de login
+            const currentPath = location.pathname;
+            console.log('SessionContext - Current path after login:', currentPath);
+            redirectBasedOnRole(profileData.role, currentPath);
+          } else {
+            console.error('SessionContext - Failed to load profile after sign in');
+            showError('Error al cargar el perfil de usuario. Por favor, intenta de nuevo.');
           }
           return;
         }
 
+        // Manejar actualización de token
         if (event === 'TOKEN_REFRESHED' && currentSession) {
+          console.log('SessionContext - Token refreshed');
           setSession(currentSession);
           setUser(currentSession.user);
         }
 
-        if (event === 'USER_UPDATED' && currentSession?.user) {
+        // Manejar actualización de usuario
+        if (event === 'USER_UPDATED' && currentSession) {
+          console.log('SessionContext - User updated');
           setSession(currentSession);
           setUser(currentSession.user);
           await refreshProfile();
@@ -193,10 +222,10 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
 
     return () => {
       console.log('SessionContext - Cleanup');
-      isMounted = false;
-      authListener.subscription.unsubscribe();
+      mounted = false;
+      subscription.unsubscribe();
     };
-  }, []);
+  }, [location.pathname, navigate]);
 
   const signOut = async () => {
     try {

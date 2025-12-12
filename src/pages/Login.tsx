@@ -43,17 +43,34 @@ function Login() {
     email: '',
   });
 
+  // Log de cambios en session y profile
+  useEffect(() => {
+    console.log('Login - Session state changed:', {
+      hasSession: !!session,
+      hasProfile: !!profile,
+      profileRole: profile?.role,
+      sessionLoading
+    });
+  }, [session, profile, sessionLoading]);
+
   // Redirigir si ya hay sesión activa
   useEffect(() => {
     if (!sessionLoading && session && profile) {
-      console.log('Login - Session active, redirecting...', profile.role);
-      if (profile.role === 'admin') {
-        navigate('/admin/dashboard', { replace: true });
-      } else if (profile.role === 'local') {
-        navigate('/local/dashboard', { replace: true });
-      } else if (profile.role === 'client') {
-        navigate('/client', { replace: true });
-      }
+      console.log('Login - Redirecting user with role:', profile.role);
+      
+      // Pequeño delay para asegurar que el contexto esté listo
+      setTimeout(() => {
+        if (profile.role === 'admin') {
+          console.log('Login - Navigating to admin dashboard');
+          navigate('/admin/dashboard', { replace: true });
+        } else if (profile.role === 'local') {
+          console.log('Login - Navigating to local dashboard');
+          navigate('/local/dashboard', { replace: true });
+        } else if (profile.role === 'client') {
+          console.log('Login - Navigating to client dashboard');
+          navigate('/client', { replace: true });
+        }
+      }, 100);
     }
   }, [session, sessionLoading, profile, navigate]);
 
@@ -66,13 +83,19 @@ function Login() {
     }
     
     setIsSubmitting(true);
+    console.log('Login - Starting sign in process...');
     
     try {
-      console.log('Login - Attempting sign in...');
-      
       const { data, error } = await supabase.auth.signInWithPassword({
         email: loginData.email.trim(),
         password: loginData.password,
+      });
+      
+      console.log('Login - Sign in response:', {
+        hasData: !!data,
+        hasSession: !!data?.session,
+        hasUser: !!data?.user,
+        error: error?.message
       });
       
       if (error) {
@@ -89,16 +112,39 @@ function Login() {
       }
       
       if (data.session) {
-        console.log('Login - Sign in successful');
+        console.log('Login - Session created successfully, user ID:', data.user.id);
         showSuccess('Inicio de sesión exitoso');
-        // La redirección se maneja en el SessionContext
+        
+        // Verificar que el perfil existe
+        console.log('Login - Checking if profile exists...');
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+          
+        console.log('Login - Profile check:', {
+          hasProfile: !!profileData,
+          profileRole: profileData?.role,
+          error: profileError?.message
+        });
+        
+        if (!profileData) {
+          console.error('Login - Profile not found, this should not happen');
+          showError('Error: Perfil de usuario no encontrado. Contacta al administrador.');
+          setIsSubmitting(false);
+          return;
+        }
+        
+        // El SessionContext debería manejar la redirección automáticamente
+        console.log('Login - Waiting for SessionContext to handle redirect...');
       }
     } catch (error) {
       console.error('Unexpected error:', error);
       showError('Error inesperado al iniciar sesión');
-    } finally {
       setIsSubmitting(false);
     }
+    // No establecer isSubmitting a false aquí, dejar que la redirección ocurra
   };
   
   const handleSignUp = async (e: React.FormEvent) => {
@@ -228,17 +274,17 @@ function Login() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
         <Loader2 className="h-8 w-8 text-white animate-spin mr-2" />
-        <p className="text-white text-xl">Cargando...</p>
+        <p className="text-white text-xl">Verificando sesión...</p>
       </div>
     );
   }
 
-  // Si ya hay sesión, no mostrar el formulario (la redirección se maneja en useEffect)
+  // Si ya hay sesión, mostrar loading mientras redirige
   if (session && profile) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
         <Loader2 className="h-8 w-8 text-white animate-spin mr-2" />
-        <p className="text-white text-xl">Redirigiendo...</p>
+        <p className="text-white text-xl">Redirigiendo a {profile.role}...</p>
       </div>
     );
   }
