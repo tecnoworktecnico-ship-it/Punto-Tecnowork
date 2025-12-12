@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { showSuccess, showError } from '@/utils/toast';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Upload, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Upload, Plus, Trash2, Store, DollarSign, Info } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -17,18 +17,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useLocalPricesById } from '@/hooks/useLocalPrices';
+import PriceList from '@/components/PriceList';
+import { Badge } from '@/components/ui/badge';
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 
 interface Local {
   id: string;
   name: string;
   address: string | null;
   has_photo_print: boolean;
-}
-
-interface Price {
-  service_name: string;
-  price: number;
-  is_photo_print: boolean;
+  can_edit_prices: boolean;
 }
 
 interface OrderFile {
@@ -45,9 +48,15 @@ const NewOrder = () => {
   const navigate = useNavigate();
   const [locals, setLocals] = useState<Local[]>([]);
   const [selectedLocal, setSelectedLocal] = useState<string>('');
-  const [prices, setPrices] = useState<Price[]>([]);
   const [orderFiles, setOrderFiles] = useState<OrderFile[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Usar el hook para obtener precios del local seleccionado
+  const { 
+    prices, 
+    localInfo, 
+    loading: loadingPrices 
+  } = useLocalPricesById(selectedLocal || null);
 
   useEffect(() => {
     if (!sessionLoading && profile?.role !== 'client') {
@@ -64,7 +73,7 @@ const NewOrder = () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('locals')
-      .select('*')
+      .select('id, name, address, has_photo_print, can_edit_prices')
       .order('name', { ascending: true });
 
     if (error) {
@@ -76,66 +85,35 @@ const NewOrder = () => {
     setLoading(false);
   };
 
-  const fetchPrices = async (localId: string) => {
-    setLoading(true);
-
-    // Obtener precios locales personalizados
-    const { data: localPrices, error: localError } = await supabase
-      .from('local_prices')
-      .select('service_name, price')
-      .eq('local_id', localId);
-
-    // Obtener precios globales
-    const { data: globalPrices, error: globalError } = await supabase
-      .from('global_prices')
-      .select('service_name, base_price, is_photo_print');
-
-    if (globalError) {
-      console.error('Error fetching prices:', globalError);
-      showError('Error al cargar los precios.');
-      setLoading(false);
-      return;
-    }
-
-    // Combinar precios: usar local si existe, sino global
-    const local = locals.find(l => l.id === localId);
-    const filteredGlobalPrices = local?.has_photo_print 
-      ? globalPrices 
-      : globalPrices?.filter(p => !p.is_photo_print);
-
-    const combinedPrices = filteredGlobalPrices?.map(gp => {
-      const localPrice = localPrices?.find(lp => lp.service_name === gp.service_name);
-      return {
-        service_name: gp.service_name,
-        price: localPrice ? localPrice.price : gp.base_price,
-        is_photo_print: gp.is_photo_print,
-      };
-    }) || [];
-
-    setPrices(combinedPrices);
-    setLoading(false);
-  };
-
   const handleLocalChange = (localId: string) => {
     setSelectedLocal(localId);
-    setOrderFiles([]);
-    fetchPrices(localId);
+    setOrderFiles([]); // Limpiar archivos al cambiar de local
   };
 
   const handleFileAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
+    if (prices.length === 0) {
+      showError('No hay servicios disponibles en este local.');
+      return;
+    }
+
+    const defaultService = prices[0];
+
     const newFiles: OrderFile[] = Array.from(files).map(file => ({
       file,
-      service_name: prices[0]?.service_name || '',
+      service_name: defaultService.service_name,
       copies: 1,
       color_mode: 'color',
       size: 'A4',
-      price_per_copy: prices[0]?.price || 0,
+      price_per_copy: defaultService.price,
     }));
 
     setOrderFiles([...orderFiles, ...newFiles]);
+    
+    // Limpiar el input para permitir seleccionar el mismo archivo de nuevo
+    e.target.value = '';
   };
 
   const handleFileUpdate = (index: number, field: string, value: any) => {
@@ -269,6 +247,8 @@ const NewOrder = () => {
     setLoading(false);
   };
 
+  const selectedLocalData = locals.find(l => l.id === selectedLocal);
+
   if (sessionLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
@@ -283,7 +263,7 @@ const NewOrder = () => {
 
   return (
     <div className="min-h-screen p-4 bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <Card className="bg-white rounded-lg shadow-lg">
           <CardHeader>
             <div className="flex items-center justify-between mb-4">
@@ -300,45 +280,99 @@ const NewOrder = () => {
               Crear Nuevo Pedido
             </CardTitle>
             <CardDescription>
-              Selecciona un local, sube tus archivos y configura tu pedido.
+              Selecciona un local, revisa los precios, sube tus archivos y configura tu pedido.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Selección de Local */}
               <div>
-                <Label htmlFor="local">Local *</Label>
+                <Label htmlFor="local" className="text-lg font-semibold flex items-center gap-2">
+                  <Store className="h-5 w-5 text-primary-blue" />
+                  Selecciona un Local *
+                </Label>
                 <Select value={selectedLocal} onValueChange={handleLocalChange}>
-                  <SelectTrigger>
+                  <SelectTrigger className="mt-2">
                     <SelectValue placeholder="Selecciona un local" />
                   </SelectTrigger>
                   <SelectContent>
                     {locals.map(local => (
                       <SelectItem key={local.id} value={local.id}>
-                        {local.name} {local.address && `- ${local.address}`}
+                        <div className="flex items-center gap-2">
+                          <span>{local.name}</span>
+                          {local.address && (
+                            <span className="text-gray-500 text-sm">- {local.address}</span>
+                          )}
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
-              {/* Subir Archivos */}
+              {/* Información del Local Seleccionado */}
+              {selectedLocal && selectedLocalData && (
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertTitle className="flex items-center gap-2">
+                    {selectedLocalData.name}
+                    {selectedLocalData.can_edit_prices && (
+                      <Badge variant="outline" className="text-xs">Precios Personalizados</Badge>
+                    )}
+                  </AlertTitle>
+                  <AlertDescription>
+                    {selectedLocalData.address || 'Sin dirección registrada'}
+                    {selectedLocalData.has_photo_print && (
+                      <span className="ml-2 text-secondary-yellow">• Impresión de fotos disponible</span>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Lista de Precios del Local */}
               {selectedLocal && (
-                <div>
-                  <Label htmlFor="files">Archivos *</Label>
-                  <div className="mt-2">
-                    <Input
-                      id="files"
-                      type="file"
-                      multiple
-                      onChange={handleFileAdd}
-                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                      className="cursor-pointer"
-                    />
-                    <p className="text-sm text-gray-500 mt-1">
-                      Formatos aceptados: PDF, DOC, DOCX, JPG, PNG
-                    </p>
-                  </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <PriceList 
+                    prices={prices}
+                    loading={loadingPrices}
+                    title="Precios del Local"
+                    description={
+                      localInfo?.can_edit_prices 
+                        ? "Este local tiene precios personalizados"
+                        : "Precios estándar"
+                    }
+                    showCustomBadge={false}
+                    compact={true}
+                  />
+
+                  {/* Subir Archivos */}
+                  <Card className="shadow-md">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg font-bold text-text-carbon flex items-center gap-2">
+                        <Upload className="h-5 w-5 text-primary-blue" />
+                        Subir Archivos
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <Input
+                        id="files"
+                        type="file"
+                        multiple
+                        onChange={handleFileAdd}
+                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                        className="cursor-pointer"
+                        disabled={prices.length === 0}
+                      />
+                      <p className="text-sm text-gray-500 mt-2">
+                        Formatos aceptados: PDF, DOC, DOCX, JPG, PNG
+                      </p>
+                      {prices.length === 0 && !loadingPrices && (
+                        <p className="text-sm text-emphasis-red mt-2">
+                          No hay servicios disponibles en este local.
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
                 </div>
               )}
 
@@ -346,10 +380,10 @@ const NewOrder = () => {
               {orderFiles.length > 0 && (
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-text-carbon">
-                    Archivos del Pedido
+                    Archivos del Pedido ({orderFiles.length})
                   </h3>
                   {orderFiles.map((file, index) => (
-                    <Card key={index} className="p-4">
+                    <Card key={index} className="p-4 border-l-4 border-l-primary-blue">
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
                           <p className="font-medium text-sm truncate flex-1">
@@ -366,16 +400,16 @@ const NewOrder = () => {
                           </Button>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                           <div>
-                            <Label>Servicio</Label>
+                            <Label className="text-xs">Servicio</Label>
                             <Select
                               value={file.service_name}
                               onValueChange={(value) =>
                                 handleFileUpdate(index, 'service_name', value)
                               }
                             >
-                              <SelectTrigger>
+                              <SelectTrigger className="mt-1">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -389,26 +423,27 @@ const NewOrder = () => {
                           </div>
 
                           <div>
-                            <Label>Copias</Label>
+                            <Label className="text-xs">Copias</Label>
                             <Input
                               type="number"
                               min="1"
                               value={file.copies}
                               onChange={(e) =>
-                                handleFileUpdate(index, 'copies', parseInt(e.target.value))
+                                handleFileUpdate(index, 'copies', parseInt(e.target.value) || 1)
                               }
+                              className="mt-1"
                             />
                           </div>
 
                           <div>
-                            <Label>Color</Label>
+                            <Label className="text-xs">Color</Label>
                             <Select
                               value={file.color_mode}
                               onValueChange={(value) =>
                                 handleFileUpdate(index, 'color_mode', value)
                               }
                             >
-                              <SelectTrigger>
+                              <SelectTrigger className="mt-1">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -419,14 +454,14 @@ const NewOrder = () => {
                           </div>
 
                           <div>
-                            <Label>Tamaño</Label>
+                            <Label className="text-xs">Tamaño</Label>
                             <Select
                               value={file.size}
                               onValueChange={(value) =>
                                 handleFileUpdate(index, 'size', value)
                               }
                             >
-                              <SelectTrigger>
+                              <SelectTrigger className="mt-1">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -455,18 +490,22 @@ const NewOrder = () => {
 
               {/* Resumen del Pedido */}
               {orderFiles.length > 0 && (
-                <Card className="bg-gray-50 p-4">
-                  <div className="space-y-2">
+                <Card className="bg-gradient-to-r from-primary-blue/10 to-purple-100 p-6 border-2 border-primary-blue">
+                  <div className="space-y-3">
+                    <h3 className="text-xl font-bold text-text-carbon flex items-center gap-2">
+                      <DollarSign className="h-6 w-6 text-success-green" />
+                      Resumen del Pedido
+                    </h3>
                     <div className="flex justify-between text-lg">
                       <span className="font-semibold">Total:</span>
-                      <span className="font-bold text-primary-blue">
+                      <span className="font-bold text-2xl text-primary-blue">
                         ${calculateTotal().toFixed(2)}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm text-gray-600">
                       <span>Puntos a ganar:</span>
-                      <span className="text-secondary-yellow font-medium">
-                        {calculatePoints(calculateTotal())} puntos
+                      <span className="text-secondary-yellow font-bold text-lg">
+                        +{calculatePoints(calculateTotal())} puntos
                       </span>
                     </div>
                   </div>
@@ -477,7 +516,7 @@ const NewOrder = () => {
               <Button
                 type="submit"
                 disabled={loading || !selectedLocal || orderFiles.length === 0}
-                className="w-full bg-primary-blue hover:bg-blue-700 text-white font-bold py-3"
+                className="w-full bg-primary-blue hover:bg-blue-700 text-white font-bold py-4 text-lg"
               >
                 {loading ? 'Creando Pedido...' : 'Crear Pedido'}
               </Button>
