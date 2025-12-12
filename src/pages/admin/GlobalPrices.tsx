@@ -78,45 +78,73 @@ const GlobalPrices = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validaciones
+    if (!formData.service_name.trim()) {
+      showError('El nombre del servicio es obligatorio.');
+      return;
+    }
+    
+    const parsedPrice = parseFloat(formData.base_price);
+    if (isNaN(parsedPrice) || parsedPrice < 0) {
+      showError('El precio base debe ser un número válido mayor o igual a 0.');
+      return;
+    }
+    
     setLoading(true);
 
     const priceData = {
-      service_name: formData.service_name,
-      base_price: parseFloat(formData.base_price),
+      service_name: formData.service_name.trim(),
+      base_price: parsedPrice,
       is_photo_print: formData.is_photo_print,
     };
 
-    if (editingPrice) {
-      const { error } = await supabase
-        .from('global_prices')
-        .update(priceData)
-        .eq('id', editingPrice.id);
+    console.log('Intentando guardar precio:', priceData);
+    console.log('Usuario actual:', profile?.id, 'Rol:', profile?.role);
 
-      if (error) {
-        console.error('Error updating price:', error);
-        showError('Error al actualizar el precio.');
-      } else {
-        showSuccess('Precio actualizado correctamente.');
-        setDialogOpen(false);
-        setEditingPrice(null);
-        resetForm();
-        fetchPrices();
-      }
-    } else {
-      const { error } = await supabase
-        .from('global_prices')
-        .insert([priceData]);
+    try {
+      if (editingPrice) {
+        const { data, error } = await supabase
+          .from('global_prices')
+          .update(priceData)
+          .eq('id', editingPrice.id)
+          .select();
 
-      if (error) {
-        console.error('Error creating price:', error);
-        showError('Error al crear el precio.');
+        console.log('Resultado de actualización:', { data, error });
+
+        if (error) {
+          console.error('Error updating price:', error);
+          showError(`Error al actualizar el precio: ${error.message}`);
+        } else {
+          showSuccess('Precio actualizado correctamente.');
+          setDialogOpen(false);
+          setEditingPrice(null);
+          resetForm();
+          fetchPrices();
+        }
       } else {
-        showSuccess('Precio creado correctamente.');
-        setDialogOpen(false);
-        resetForm();
-        fetchPrices();
+        const { data, error } = await supabase
+          .from('global_prices')
+          .insert([priceData])
+          .select();
+
+        console.log('Resultado de inserción:', { data, error });
+
+        if (error) {
+          console.error('Error creating price:', error);
+          showError(`Error al crear el precio: ${error.message}`);
+        } else {
+          showSuccess('Precio creado correctamente.');
+          setDialogOpen(false);
+          resetForm();
+          fetchPrices();
+        }
       }
+    } catch (err) {
+      console.error('Error inesperado:', err);
+      showError('Error inesperado al guardar el precio.');
     }
+    
     setLoading(false);
   };
 
@@ -124,18 +152,27 @@ const GlobalPrices = () => {
     if (!confirm('¿Estás seguro de que deseas eliminar este precio?')) return;
 
     setLoading(true);
-    const { error } = await supabase
-      .from('global_prices')
-      .delete()
-      .eq('id', id);
+    
+    try {
+      const { error } = await supabase
+        .from('global_prices')
+        .delete()
+        .eq('id', id);
 
-    if (error) {
-      console.error('Error deleting price:', error);
-      showError('Error al eliminar el precio.');
-    } else {
-      showSuccess('Precio eliminado correctamente.');
-      fetchPrices();
+      console.log('Resultado de eliminación:', { error });
+
+      if (error) {
+        console.error('Error deleting price:', error);
+        showError(`Error al eliminar el precio: ${error.message}`);
+      } else {
+        showSuccess('Precio eliminado correctamente.');
+        fetchPrices();
+      }
+    } catch (err) {
+      console.error('Error inesperado:', err);
+      showError('Error inesperado al eliminar el precio.');
     }
+    
     setLoading(false);
   };
 
@@ -264,9 +301,10 @@ const GlobalPrices = () => {
                       </Button>
                       <Button
                         type="submit"
+                        disabled={loading}
                         className="bg-primary-blue hover:bg-blue-700 text-white"
                       >
-                        {editingPrice ? 'Actualizar' : 'Crear'}
+                        {loading ? 'Guardando...' : (editingPrice ? 'Actualizar' : 'Crear')}
                       </Button>
                     </div>
                   </form>
