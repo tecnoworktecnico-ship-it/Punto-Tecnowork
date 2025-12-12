@@ -28,6 +28,10 @@ interface Order {
   locals: {
     name: string;
   };
+  order_files: {
+    file_name: string;
+    created_at: string;
+  }[];
 }
 
 const ClientOrders = () => {
@@ -56,6 +60,10 @@ const ClientOrders = () => {
         *,
         locals (
           name
+        ),
+        order_files (
+          file_name,
+          created_at
         )
       `)
       .eq('client_id', profile?.id)
@@ -82,6 +90,17 @@ const ClientOrders = () => {
 
     const config = statusConfig[status] || { label: status, variant: 'outline' };
     return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+  
+  const getOrderTitle = (order: Order) => {
+    if (order.order_files && order.order_files.length > 0) {
+      // Ordenar por fecha de creación para obtener el primer archivo
+      const sortedFiles = [...order.order_files].sort((a, b) => 
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+      return sortedFiles[0].file_name;
+    }
+    return `Pedido #${order.id.substring(0, 8)}...`;
   };
 
   if (sessionLoading || loading) {
@@ -139,7 +158,7 @@ const ClientOrders = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>ID</TableHead>
+                    <TableHead>Archivo Principal</TableHead>
                     <TableHead>Local</TableHead>
                     <TableHead>Total</TableHead>
                     <TableHead>Puntos</TableHead>
@@ -151,8 +170,8 @@ const ClientOrders = () => {
                 <TableBody>
                   {orders.map((order) => (
                     <TableRow key={order.id}>
-                      <TableCell className="font-mono text-sm">
-                        {order.id.substring(0, 8)}...
+                      <TableCell className="font-medium text-sm max-w-[200px] truncate">
+                        {getOrderTitle(order)}
                       </TableCell>
                       <TableCell className="font-medium">
                         {order.locals?.name}
