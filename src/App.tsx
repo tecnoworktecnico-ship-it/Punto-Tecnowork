@@ -9,7 +9,8 @@ import Login from "@/pages/Login";
 import NotFound from "@/pages/NotFound";
 import EmailVerificationError from "@/pages/EmailVerificationError";
 import AuthCallback from "@/pages/AuthCallback";
-import ResetPassword from "@/pages/ResetPassword"; // Importar la nueva página
+import ResetPassword from "@/pages/ResetPassword";
+import DebugRecovery from "@/pages/DebugRecovery";
 
 // Admin Pages
 import AdminDashboard from "@/pages/admin/Dashboard";
@@ -45,7 +46,8 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/verification-error" element={<EmailVerificationError />} />
           <Route path="/auth-callback" element={<AuthCallback />} />
-          <Route path="/reset-password" element={<ResetPassword />} /> {/* Nueva ruta */}
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/debug-recovery" element={<DebugRecovery />} />
 
           {/* Admin Routes */}
           <Route
