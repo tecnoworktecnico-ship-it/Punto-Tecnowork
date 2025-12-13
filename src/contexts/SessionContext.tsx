@@ -27,7 +27,7 @@ interface SessionContextType {
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
-const PUBLIC_PATHS = ['/', '/login', '/auth-callback', '/verification-error', '/reset-password'];
+const PUBLIC_PATHS = ['/', '/login', '/auth-callback', '/verification-error', '/reset-password', '/debug-recovery'];
 
 export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
@@ -149,7 +149,7 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
             setProfile(profileData);
             
             const currentPath = location.pathname;
-            if (PUBLIC_PATHS.includes(currentPath)) {
+            if (PUBLIC_PATHS.includes(currentPath) && currentPath !== '/reset-password') {
               redirectBasedOnRole(profileData.role, currentPath);
             }
           } else if (mounted && !isSigningOut.current) {
@@ -179,6 +179,12 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
         
         if (!mounted || isSigningOut.current) return;
 
+        // Si estamos en reset-password y es un evento de PASSWORD_RECOVERY, no hacer nada
+        if (location.pathname === '/reset-password' && event === 'PASSWORD_RECOVERY') {
+          console.log('SessionContext - Ignoring PASSWORD_RECOVERY event on reset-password page');
+          return;
+        }
+
         if (event === 'SIGNED_OUT') {
           console.log('SessionContext - User signed out');
           setSession(null);
@@ -196,6 +202,12 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
 
         if (event === 'SIGNED_IN' && currentSession) {
           console.log('SessionContext - User signed in');
+          
+          // Si estamos en reset-password, no redirigir
+          if (location.pathname === '/reset-password') {
+            console.log('SessionContext - On reset-password page, not redirecting');
+            return;
+          }
           
           setSession(currentSession);
           setUser(currentSession.user);

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -20,9 +20,17 @@ const ResetPassword = () => {
   const [checkingToken, setCheckingToken] = useState(true);
   const [tokenValid, setTokenValid] = useState(false);
   const [passwordUpdated, setPasswordUpdated] = useState(false);
+  const hasCheckedToken = useRef(false);
 
   useEffect(() => {
+    // Evitar que se ejecute múltiples veces
+    if (hasCheckedToken.current) {
+      console.log('ResetPassword - Token already checked, skipping');
+      return;
+    }
+
     const checkAndSetSession = async () => {
+      console.log('ResetPassword - Checking token...');
       console.log('ResetPassword - Full URL:', window.location.href);
       console.log('ResetPassword - Hash:', location.hash);
       
@@ -31,54 +39,52 @@ const ResetPassword = () => {
       const refreshToken = hashParams.get('refresh_token');
       const type = hashParams.get('type');
       
-      console.log('ResetPassword - Parsed params:', { 
+      console.log('ResetPassword - Hash params:', { 
         hasAccessToken: !!accessToken, 
         hasRefreshToken: !!refreshToken, 
         type,
         accessTokenPreview: accessToken ? accessToken.substring(0, 20) + '...' : 'none'
       });
       
-      if (accessToken && type === 'recovery') {
-        try {
-          console.log('ResetPassword - Setting session with recovery token');
-          
-          const { data, error } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken || '',
-          });
-          
-          if (error) {
-            console.error('ResetPassword - Error setting session:', error);
-            showError('El enlace de recuperación es inválido o ha expirado.');
-            setTokenValid(false);
-            setTimeout(() => navigate('/login', { replace: true }), 3000);
-          } else {
-            console.log('ResetPassword - Session set successfully:', !!data.session);
-            setTokenValid(true);
-          }
-        } catch (err) {
-          console.error('ResetPassword - Unexpected error:', err);
-          showError('Error al validar el enlace de recuperación.');
-          setTokenValid(false);
-          setTimeout(() => navigate('/login', { replace: true }), 3000);
-        }
-      } else {
+      if (!accessToken || type !== 'recovery') {
         console.error('ResetPassword - No valid recovery token found');
-        console.log('ResetPassword - Missing:', {
-          noAccessToken: !accessToken,
-          wrongType: type !== 'recovery',
-          actualType: type
-        });
         showError('No se encontró un enlace de recuperación válido.');
         setTokenValid(false);
+        setCheckingToken(false);
         setTimeout(() => navigate('/login', { replace: true }), 3000);
+        return;
       }
-      
-      setCheckingToken(false);
+
+      try {
+        console.log('ResetPassword - Setting session with recovery token');
+        hasCheckedToken.current = true;
+        
+        const { data, error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken || '',
+        });
+        
+        if (error) {
+          console.error('ResetPassword - Error setting session:', error);
+          showError('El enlace de recuperación es inválido o ha expirado.');
+          setTokenValid(false);
+          setTimeout(() => navigate('/login', { replace: true }), 3000);
+        } else {
+          console.log('ResetPassword - Session set successfully:', !!data.session);
+          setTokenValid(true);
+        }
+      } catch (err) {
+        console.error('ResetPassword - Unexpected error:', err);
+        showError('Error al validar el enlace de recuperación.');
+        setTokenValid(false);
+        setTimeout(() => navigate('/login', { replace: true }), 3000);
+      } finally {
+        setCheckingToken(false);
+      }
     };
     
     checkAndSetSession();
-  }, [location, navigate]);
+  }, [location.hash, navigate]);
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
