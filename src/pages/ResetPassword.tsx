@@ -21,6 +21,7 @@ const ResetPassword = () => {
   const [tokenValid, setTokenValid] = useState(false);
   const [passwordUpdated, setPasswordUpdated] = useState(false);
   const hasCheckedToken = useRef(false);
+  const isUpdating = useRef(false);
 
   useEffect(() => {
     // Evitar que se ejecute múltiples veces
@@ -89,6 +90,12 @@ const ResetPassword = () => {
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Evitar múltiples ejecuciones
+    if (isUpdating.current) {
+      console.log('ResetPassword - Already updating, skipping');
+      return;
+    }
+    
     if (newPassword.length < 6) {
       showError('La contraseña debe tener al menos 6 caracteres.');
       return;
@@ -99,6 +106,7 @@ const ResetPassword = () => {
       return;
     }
     
+    isUpdating.current = true;
     setLoading(true);
     
     try {
@@ -112,6 +120,7 @@ const ResetPassword = () => {
         console.error('Error updating password:', updateError);
         showError(`Error al actualizar la contraseña: ${updateError.message}`);
         setLoading(false);
+        isUpdating.current = false;
         return;
       }
       
@@ -119,16 +128,22 @@ const ResetPassword = () => {
       
       // Actualizar el campo password_changed en el perfil
       if (updateData.user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({ 
-            password_changed: true,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', updateData.user.id);
-          
-        if (profileError) {
-          console.error('Error updating profile:', profileError);
+        try {
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .update({ 
+              password_changed: true,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', updateData.user.id);
+            
+          if (profileError) {
+            console.error('Error updating profile:', profileError);
+          } else {
+            console.log('ResetPassword - Profile updated successfully');
+          }
+        } catch (profileErr) {
+          console.error('Error updating profile (non-critical):', profileErr);
         }
       }
       
@@ -137,6 +152,7 @@ const ResetPassword = () => {
       
       // Esperar 2 segundos antes de cerrar sesión y redirigir
       setTimeout(async () => {
+        console.log('ResetPassword - Signing out and redirecting...');
         await supabase.auth.signOut();
         navigate('/login', { replace: true });
       }, 2000);
@@ -145,6 +161,7 @@ const ResetPassword = () => {
       console.error('Unexpected error:', err);
       showError('Error inesperado al actualizar la contraseña.');
       setLoading(false);
+      isUpdating.current = false;
     }
   };
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSession } from '@/contexts/SessionContext';
 import { MadeWithDyad } from '@/components/made-with-dyad';
@@ -23,6 +23,7 @@ function Login() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
   const [hasRedirected, setHasRedirected] = useState(false);
+  const isRequestingReset = useRef(false);
   
   // Formulario de inicio de sesión
   const [loginData, setLoginData] = useState({
@@ -46,6 +47,12 @@ function Login() {
 
   // Redirigir si ya hay sesión activa (solo una vez)
   useEffect(() => {
+    // No redirigir si estamos solicitando reset de contraseña
+    if (isRequestingReset.current) {
+      console.log('Login - Reset in progress, not redirecting');
+      return;
+    }
+    
     if (!sessionLoading && session && profile && !hasRedirected) {
       console.log('Login - Redirecting user with role:', profile.role);
       setHasRedirected(true);
@@ -177,6 +184,7 @@ function Login() {
       return;
     }
     
+    isRequestingReset.current = true;
     setIsSubmitting(true);
     
     try {
@@ -197,6 +205,10 @@ function Login() {
       showError('Error inesperado');
     } finally {
       setIsSubmitting(false);
+      // Resetear el flag después de un delay
+      setTimeout(() => {
+        isRequestingReset.current = false;
+      }, 2000);
     }
   };
 
@@ -237,7 +249,7 @@ function Login() {
   }
 
   // Si ya hay sesión y estamos redirigiendo, mostrar loading
-  if (session && profile && hasRedirected) {
+  if (session && profile && hasRedirected && !isRequestingReset.current) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
         <Loader2 className="h-8 w-8 text-white animate-spin mr-2" />
