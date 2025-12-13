@@ -18,7 +18,7 @@ const APP_VERSION = import.meta.env.VITE_APP_VERSION || 'N/A';
 
 function Login() {
   const navigate = useNavigate();
-  const { session, loading: sessionLoading, profile } = useSession();
+  const { session, loading: sessionLoading, profile, setIsRequestingPasswordReset } = useSession();
   const [activeTab, setActiveTab] = useState<string>('sign_in');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
@@ -185,6 +185,7 @@ function Login() {
     }
     
     isRequestingReset.current = true;
+    setIsRequestingPasswordReset(true);
     setIsSubmitting(true);
     
     try {
@@ -220,7 +221,8 @@ function Login() {
       // Resetear el flag después de un delay más largo
       setTimeout(() => {
         isRequestingReset.current = false;
-      }, 3000);
+        setIsRequestingPasswordReset(false);
+      }, 5000);
     }
   };
 

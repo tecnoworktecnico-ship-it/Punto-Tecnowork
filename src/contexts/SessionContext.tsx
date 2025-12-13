@@ -23,6 +23,7 @@ interface SessionContextType {
   loading: boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  setIsRequestingPasswordReset: (value: boolean) => void;
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
@@ -38,6 +39,12 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
   const location = useLocation();
   const isSigningOut = useRef(false);
   const isInitialized = useRef(false);
+  const isRequestingPasswordReset = useRef(false);
+
+  const setIsRequestingPasswordReset = (value: boolean) => {
+    console.log('SessionContext - Setting isRequestingPasswordReset to:', value);
+    isRequestingPasswordReset.current = value;
+  };
 
   const fetchProfile = async (userId: string, retries = 3): Promise<Profile | null> => {
     for (let i = 0; i < retries; i++) {
@@ -179,6 +186,12 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
         
         if (!mounted || isSigningOut.current) return;
 
+        // Si estamos solicitando recuperación de contraseña, ignorar PASSWORD_RECOVERY y SIGNED_IN
+        if (isRequestingPasswordReset.current && (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN')) {
+          console.log('SessionContext - Ignoring', event, 'event during password reset request');
+          return;
+        }
+
         // Si estamos en reset-password y es un evento de PASSWORD_RECOVERY, no hacer nada
         if (location.pathname === '/reset-password' && event === 'PASSWORD_RECOVERY') {
           console.log('SessionContext - Ignoring PASSWORD_RECOVERY event on reset-password page');
@@ -282,7 +295,7 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
   };
 
   return (
-    <SessionContext.Provider value={{ session, user, profile, loading, signOut, refreshProfile }}>
+    <SessionContext.Provider value={{ session, user, profile, loading, signOut, refreshProfile, setIsRequestingPasswordReset }}>
       {children}
     </SessionContext.Provider>
   );
