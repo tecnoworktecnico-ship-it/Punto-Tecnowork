@@ -188,6 +188,17 @@ function Login() {
     setIsSubmitting(true);
     
     try {
+      console.log('Login - Requesting password reset for:', resetData.email);
+      
+      // Primero, cerrar cualquier sesión activa
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (currentSession) {
+        console.log('Login - Closing current session before reset');
+        await supabase.auth.signOut();
+        // Esperar un momento para que se complete el sign out
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
       const { error } = await supabase.auth.resetPasswordForEmail(resetData.email.trim(), {
         redirectTo: `${window.location.origin}/reset-password`,
       });
@@ -196,7 +207,8 @@ function Login() {
         console.error('Reset password error:', error);
         showError(error.message);
       } else {
-        showSuccess('Se ha enviado un correo para restablecer tu contraseña.');
+        console.log('Login - Password reset email sent successfully');
+        showSuccess('Se ha enviado un correo para restablecer tu contraseña. Revisa tu bandeja de entrada.');
         setResetData({ email: '' });
         setActiveTab('sign_in');
       }
@@ -205,10 +217,10 @@ function Login() {
       showError('Error inesperado');
     } finally {
       setIsSubmitting(false);
-      // Resetear el flag después de un delay
+      // Resetear el flag después de un delay más largo
       setTimeout(() => {
         isRequestingReset.current = false;
-      }, 2000);
+      }, 3000);
     }
   };
 
@@ -429,6 +441,12 @@ function Login() {
           {/* Formulario de Recuperación */}
           <TabsContent value="reset_password">
             <form onSubmit={handleResetPassword} className="space-y-4 mt-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
+                <p className="text-sm text-blue-800">
+                  Ingresa tu correo electrónico y te enviaremos un enlace para restablecer tu contraseña.
+                </p>
+              </div>
+              
               <div className="space-y-2">
                 <Label htmlFor="reset-email">Correo electrónico</Label>
                 <Input 
