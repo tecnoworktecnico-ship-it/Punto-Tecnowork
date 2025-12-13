@@ -191,7 +191,7 @@ function Login() {
     try {
       console.log('Login - Requesting password reset for:', resetData.email);
       
-      // Enviar el email de recuperación PRIMERO
+      // 1. Enviar el email de recuperación PRIMERO
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(resetData.email.trim(), {
         redirectTo: `${window.location.origin}/reset-password`,
       });
@@ -207,34 +207,34 @@ function Login() {
       
       console.log('Login - Password reset email sent successfully');
       
-      // DESPUÉS de enviar el email, cerrar cualquier sesión activa
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-      if (currentSession) {
-        console.log('Login - Closing current session after reset request');
-        await supabase.auth.signOut();
-        
-        // Esperar un momento para que se complete el sign out
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Forzar recarga de la página para limpiar completamente el estado
-        console.log('Login - Reloading page to clear session state');
+      // 2. INMEDIATAMENTE cerrar cualquier sesión (sin verificar si existe)
+      console.log('Login - Force closing any active session');
+      await supabase.auth.signOut();
+      
+      // 3. Limpiar storages
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      // 4. Esperar un momento para que se complete el sign out
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // 5. Mostrar mensaje de éxito
+      showSuccess('Se ha enviado un correo para restablecer tu contraseña. Revisa tu bandeja de entrada.');
+      setResetData({ email: '' });
+      setActiveTab('sign_in');
+      
+      // 6. Forzar recarga de la página para limpiar completamente el estado
+      console.log('Login - Forcing page reload to clear all state');
+      setTimeout(() => {
         window.location.reload();
-      } else {
-        showSuccess('Se ha enviado un correo para restablecer tu contraseña. Revisa tu bandeja de entrada.');
-        setResetData({ email: '' });
-        setActiveTab('sign_in');
-      }
+      }, 1000);
       
     } catch (error) {
       console.error('Unexpected error:', error);
       showError('Error inesperado');
-    } finally {
       setIsSubmitting(false);
-      // Resetear el flag después de un delay
-      setTimeout(() => {
-        isRequestingReset.current = false;
-        setIsRequestingPasswordReset(false);
-      }, 2000);
+      isRequestingReset.current = false;
+      setIsRequestingPasswordReset(false);
     }
   };
 
