@@ -186,15 +186,15 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
         
         if (!mounted || isSigningOut.current) return;
 
-        // Si estamos solicitando recuperación de contraseña, ignorar PASSWORD_RECOVERY y SIGNED_IN
-        if (isRequestingPasswordReset.current && (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN')) {
-          console.log('SessionContext - Ignoring', event, 'event during password reset request');
+        // Si estamos en reset-password, ignorar TODOS los eventos excepto SIGNED_OUT
+        if (location.pathname === '/reset-password' && event !== 'SIGNED_OUT') {
+          console.log('SessionContext - On reset-password page, ignoring', event, 'event');
           return;
         }
 
-        // Si estamos en reset-password y es un evento de PASSWORD_RECOVERY, no hacer nada
-        if (location.pathname === '/reset-password' && event === 'PASSWORD_RECOVERY') {
-          console.log('SessionContext - Ignoring PASSWORD_RECOVERY event on reset-password page');
+        // Si estamos solicitando recuperación de contraseña, ignorar PASSWORD_RECOVERY y SIGNED_IN
+        if (isRequestingPasswordReset.current && (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN')) {
+          console.log('SessionContext - Ignoring', event, 'event during password reset request');
           return;
         }
 
@@ -215,12 +215,6 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
 
         if (event === 'SIGNED_IN' && currentSession) {
           console.log('SessionContext - User signed in');
-          
-          // Si estamos en reset-password, no redirigir
-          if (location.pathname === '/reset-password') {
-            console.log('SessionContext - On reset-password page, not redirecting');
-            return;
-          }
           
           setSession(currentSession);
           setUser(currentSession.user);

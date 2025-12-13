@@ -21,7 +21,6 @@ const ResetPassword = () => {
   const [tokenValid, setTokenValid] = useState(false);
   const [passwordUpdated, setPasswordUpdated] = useState(false);
   const hasCheckedToken = useRef(false);
-  const isUpdating = useRef(false);
 
   useEffect(() => {
     // Evitar que se ejecute múltiples veces
@@ -90,8 +89,8 @@ const ResetPassword = () => {
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Evitar múltiples ejecuciones
-    if (isUpdating.current) {
+    // Solo usar loading para prevenir múltiples clicks
+    if (loading) {
       console.log('ResetPassword - Already updating, skipping');
       return;
     }
@@ -106,7 +105,6 @@ const ResetPassword = () => {
       return;
     }
     
-    isUpdating.current = true;
     setLoading(true);
     
     try {
@@ -120,7 +118,6 @@ const ResetPassword = () => {
         console.error('ResetPassword - Error updating password:', updateError);
         showError(`Error al actualizar la contraseña: ${updateError.message}`);
         setLoading(false);
-        isUpdating.current = false;
         return;
       }
       
@@ -148,10 +145,11 @@ const ResetPassword = () => {
         }
       }
       
+      console.log('ResetPassword - Setting passwordUpdated to true');
       setPasswordUpdated(true);
       showSuccess('¡Contraseña actualizada correctamente!');
       
-      // Esperar 1 segundo y luego cerrar sesión de forma agresiva
+      // Esperar 1.5 segundos y luego cerrar sesión de forma agresiva
       setTimeout(async () => {
         console.log('ResetPassword - Starting aggressive sign out...');
         
@@ -169,7 +167,7 @@ const ResetPassword = () => {
           console.log('ResetPassword - sessionStorage cleared');
           
           // 4. Esperar un momento para que se complete
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 300));
           
           // 5. Forzar recarga completa de la página para limpiar todo el estado
           console.log('ResetPassword - Forcing full page reload...');
@@ -180,13 +178,12 @@ const ResetPassword = () => {
           // Si hay error, forzar recarga de todas formas
           window.location.href = '/login';
         }
-      }, 1000);
+      }, 1500);
       
     } catch (err) {
       console.error('ResetPassword - Unexpected error:', err);
       showError('Error inesperado al actualizar la contraseña.');
       setLoading(false);
-      isUpdating.current = false;
     }
   };
 
