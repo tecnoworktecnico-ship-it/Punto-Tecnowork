@@ -182,9 +182,19 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
-        console.log('SessionContext - Auth event:', event, 'has session:', !!currentSession);
+        console.log('SessionContext - Auth event:', event, 'has session:', !!currentSession, 'current path:', location.pathname);
         
         if (!mounted || isSigningOut.current) return;
+
+        // IMPORTANTE: Ignorar PASSWORD_RECOVERY en TODAS las páginas excepto reset-password
+        if (event === 'PASSWORD_RECOVERY') {
+          if (location.pathname === '/reset-password') {
+            console.log('SessionContext - On reset-password page, ignoring PASSWORD_RECOVERY event');
+          } else {
+            console.log('SessionContext - Ignoring PASSWORD_RECOVERY event on', location.pathname);
+          }
+          return;
+        }
 
         // Si estamos en reset-password, ignorar TODOS los eventos excepto SIGNED_OUT
         if (location.pathname === '/reset-password' && event !== 'SIGNED_OUT') {
@@ -192,9 +202,9 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           return;
         }
 
-        // Si estamos solicitando recuperación de contraseña, ignorar PASSWORD_RECOVERY y SIGNED_IN
-        if (isRequestingPasswordReset.current && (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN')) {
-          console.log('SessionContext - Ignoring', event, 'event during password reset request');
+        // Si estamos solicitando recuperación de contraseña, ignorar SIGNED_IN
+        if (isRequestingPasswordReset.current && event === 'SIGNED_IN') {
+          console.log('SessionContext - Ignoring SIGNED_IN event during password reset request');
           return;
         }
 
