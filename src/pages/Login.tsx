@@ -191,38 +191,50 @@ function Login() {
     try {
       console.log('Login - Requesting password reset for:', resetData.email);
       
-      // Primero, cerrar cualquier sesión activa
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-      if (currentSession) {
-        console.log('Login - Closing current session before reset');
-        await supabase.auth.signOut();
-        // Esperar un momento para que se complete el sign out
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-      
-      const { error } = await supabase.auth.resetPasswordForEmail(resetData.email.trim(), {
+      // Enviar el email de recuperación PRIMERO
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(resetData.email.trim(), {
         redirectTo: `${window.location.origin}/reset-password`,
       });
       
-      if (error) {
-        console.error('Reset password error:', error);
-        showError(error.message);
+      if (resetError) {
+        console.error('Reset password error:', resetError);
+        showError(resetError.message);
+        setIsSubmitting(false);
+        isRequestingReset.current = false;
+        setIsRequestingPasswordReset(false);
+        return;
+      }
+      
+      console.log('Login - Password reset email sent successfully');
+      
+      // DESPUÉS de enviar el email, cerrar cualquier sesión activa
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (currentSession) {
+        console.log('Login - Closing current session after reset request');
+        await supabase.auth.signOut();
+        
+        // Esperar un momento para que se complete el sign out
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Forzar recarga de la página para limpiar completamente el estado
+        console.log('Login - Reloading page to clear session state');
+        window.location.reload();
       } else {
-        console.log('Login - Password reset email sent successfully');
         showSuccess('Se ha enviado un correo para restablecer tu contraseña. Revisa tu bandeja de entrada.');
         setResetData({ email: '' });
         setActiveTab('sign_in');
       }
+      
     } catch (error) {
       console.error('Unexpected error:', error);
       showError('Error inesperado');
     } finally {
       setIsSubmitting(false);
-      // Resetear el flag después de un delay más largo
+      // Resetear el flag después de un delay
       setTimeout(() => {
         isRequestingReset.current = false;
         setIsRequestingPasswordReset(false);
-      }, 5000);
+      }, 2000);
     }
   };
 
