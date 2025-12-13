@@ -117,18 +117,19 @@ const ResetPassword = () => {
       });
       
       if (updateError) {
-        console.error('Error updating password:', updateError);
+        console.error('ResetPassword - Error updating password:', updateError);
         showError(`Error al actualizar la contraseña: ${updateError.message}`);
         setLoading(false);
         isUpdating.current = false;
         return;
       }
       
-      console.log('ResetPassword - Password updated successfully');
+      console.log('ResetPassword - Password updated successfully, user:', updateData.user?.id);
       
       // Actualizar el campo password_changed en el perfil
       if (updateData.user) {
         try {
+          console.log('ResetPassword - Updating profile password_changed flag');
           const { error: profileError } = await supabase
             .from('profiles')
             .update({ 
@@ -138,12 +139,12 @@ const ResetPassword = () => {
             .eq('id', updateData.user.id);
             
           if (profileError) {
-            console.error('Error updating profile:', profileError);
+            console.error('ResetPassword - Error updating profile:', profileError);
           } else {
             console.log('ResetPassword - Profile updated successfully');
           }
         } catch (profileErr) {
-          console.error('Error updating profile (non-critical):', profileErr);
+          console.error('ResetPassword - Error updating profile (non-critical):', profileErr);
         }
       }
       
@@ -158,7 +159,7 @@ const ResetPassword = () => {
       }, 2000);
       
     } catch (err) {
-      console.error('Unexpected error:', err);
+      console.error('ResetPassword - Unexpected error:', err);
       showError('Error inesperado al actualizar la contraseña.');
       setLoading(false);
       isUpdating.current = false;
