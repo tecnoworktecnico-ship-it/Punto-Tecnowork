@@ -151,12 +151,36 @@ const ResetPassword = () => {
       setPasswordUpdated(true);
       showSuccess('¡Contraseña actualizada correctamente!');
       
-      // Esperar 2 segundos antes de cerrar sesión y redirigir
+      // Esperar 1 segundo y luego cerrar sesión de forma agresiva
       setTimeout(async () => {
-        console.log('ResetPassword - Signing out and redirecting...');
-        await supabase.auth.signOut();
-        navigate('/login', { replace: true });
-      }, 2000);
+        console.log('ResetPassword - Starting aggressive sign out...');
+        
+        try {
+          // 1. Cerrar sesión en Supabase
+          await supabase.auth.signOut();
+          console.log('ResetPassword - Supabase sign out completed');
+          
+          // 2. Limpiar localStorage
+          localStorage.clear();
+          console.log('ResetPassword - localStorage cleared');
+          
+          // 3. Limpiar sessionStorage
+          sessionStorage.clear();
+          console.log('ResetPassword - sessionStorage cleared');
+          
+          // 4. Esperar un momento para que se complete
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // 5. Forzar recarga completa de la página para limpiar todo el estado
+          console.log('ResetPassword - Forcing full page reload...');
+          window.location.href = '/login';
+          
+        } catch (err) {
+          console.error('ResetPassword - Error during cleanup:', err);
+          // Si hay error, forzar recarga de todas formas
+          window.location.href = '/login';
+        }
+      }, 1000);
       
     } catch (err) {
       console.error('ResetPassword - Unexpected error:', err);
@@ -205,7 +229,7 @@ const ResetPassword = () => {
               Tu contraseña ha sido cambiada exitosamente.
             </p>
             <p className="text-gray-500 text-sm">
-              Serás redirigido al login...
+              Redirigiendo al login...
             </p>
           </CardContent>
         </Card>
