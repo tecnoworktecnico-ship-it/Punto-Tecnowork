@@ -51,6 +51,8 @@ const ResetPassword = () => {
         showError('No se encontró un enlace de recuperación válido.');
         setTokenValid(false);
         setCheckingToken(false);
+        // Limpiar la bandera de recuperación si el token es inválido
+        localStorage.removeItem('is_in_recovery_flow');
         setTimeout(() => navigate('/login', { replace: true }), 3000);
         return;
       }
@@ -68,6 +70,7 @@ const ResetPassword = () => {
           console.error('ResetPassword - Error setting session:', error);
           showError('El enlace de recuperación es inválido o ha expirado.');
           setTokenValid(false);
+          localStorage.removeItem('is_in_recovery_flow');
           setTimeout(() => navigate('/login', { replace: true }), 3000);
         } else {
           console.log('ResetPassword - Session set successfully:', !!data.session);
@@ -77,6 +80,7 @@ const ResetPassword = () => {
         console.error('ResetPassword - Unexpected error:', err);
         showError('Error al validar el enlace de recuperación.');
         setTokenValid(false);
+        localStorage.removeItem('is_in_recovery_flow');
         setTimeout(() => navigate('/login', { replace: true }), 3000);
       } finally {
         setCheckingToken(false);
@@ -149,6 +153,9 @@ const ResetPassword = () => {
       setPasswordUpdated(true);
       showSuccess('¡Contraseña actualizada correctamente!');
       
+      // Limpiar la bandera de recuperación antes de la redirección final
+      localStorage.removeItem('is_in_recovery_flow');
+      
       // Esperar 1.5 segundos y luego cerrar sesión de forma agresiva
       setTimeout(async () => {
         console.log('ResetPassword - Starting aggressive sign out...');
@@ -158,9 +165,8 @@ const ResetPassword = () => {
           await supabase.auth.signOut();
           console.log('ResetPassword - Supabase sign out completed');
           
-          // 2. Limpiar localStorage
-          localStorage.clear();
-          console.log('ResetPassword - localStorage cleared');
+          // 2. Limpiar localStorage (ya limpiamos la bandera, pero por si acaso)
+          // No limpiamos todo localStorage aquí para no borrar otras configuraciones, solo la bandera.
           
           // 3. Limpiar sessionStorage
           sessionStorage.clear();

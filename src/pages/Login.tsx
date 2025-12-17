@@ -191,6 +191,9 @@ function Login() {
     try {
       console.log('Login - Requesting password reset for:', resetData.email);
       
+      // Establecer la bandera de recuperación antes de enviar el correo
+      localStorage.setItem('is_in_recovery_flow', 'true');
+      
       // 1. Enviar el email de recuperación PRIMERO
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(resetData.email.trim(), {
         redirectTo: `${window.location.origin}/reset-password`,
@@ -199,6 +202,7 @@ function Login() {
       if (resetError) {
         console.error('Reset password error:', resetError);
         showError(resetError.message);
+        localStorage.removeItem('is_in_recovery_flow'); // Limpiar si falla
         setIsSubmitting(false);
         isRequestingReset.current = false;
         setIsRequestingPasswordReset(false);
@@ -211,8 +215,8 @@ function Login() {
       console.log('Login - Force closing any active session');
       await supabase.auth.signOut();
       
-      // 3. Limpiar storages
-      localStorage.clear();
+      // 3. Limpiar storages (excepto la bandera de recuperación)
+      // Nota: No limpiamos localStorage aquí para mantener la bandera 'is_in_recovery_flow'
       sessionStorage.clear();
       
       // 4. Esperar un momento para que se complete el sign out
@@ -232,6 +236,7 @@ function Login() {
     } catch (error) {
       console.error('Unexpected error:', error);
       showError('Error inesperado');
+      localStorage.removeItem('is_in_recovery_flow'); // Limpiar si hay excepción
       setIsSubmitting(false);
       isRequestingReset.current = false;
       setIsRequestingPasswordReset(false);

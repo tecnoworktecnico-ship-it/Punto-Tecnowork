@@ -186,7 +186,7 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
         
         if (!mounted || isSigningOut.current) return;
 
-        // IMPORTANTE: Ignorar PASSWORD_RECOVERY en TODAS las páginas excepto reset-password
+        // 1. Manejar eventos de recuperación de contraseña
         if (event === 'PASSWORD_RECOVERY') {
           if (location.pathname === '/reset-password') {
             console.log('SessionContext - On reset-password page, ignoring PASSWORD_RECOVERY event');
@@ -196,34 +196,23 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           return;
         }
 
-        // Si estamos en reset-password, ignorar TODOS los eventos excepto SIGNED_OUT
+        // 2. Si estamos en reset-password, ignorar TODOS los eventos excepto SIGNED_OUT
         if (location.pathname === '/reset-password' && event !== 'SIGNED_OUT') {
           console.log('SessionContext - On reset-password page, ignoring', event, 'event');
           return;
         }
-
-        // Si estamos solicitando recuperación de contraseña, ignorar SIGNED_IN
-        if (isRequestingPasswordReset.current && event === 'SIGNED_IN') {
-          console.log('SessionContext - Ignoring SIGNED_IN event during password reset request');
-          return;
-        }
-
-        if (event === 'SIGNED_OUT') {
-          console.log('SessionContext - User signed out');
-          setSession(null);
-          setUser(null);
-          setProfile(null);
-          setLoading(false);
-          isInitialized.current = false;
-          
-          const currentPath = location.pathname;
-          if (!PUBLIC_PATHS.includes(currentPath)) {
-            navigate('/login', { replace: true });
-          }
-          return;
-        }
-
+        
+        // 3. Si estamos en una ruta pública y ocurre SIGNED_IN, verificar la bandera de recuperación
         if (event === 'SIGNED_IN' && currentSession) {
+          const isInRecoveryFlow = localStorage.getItem('is_in_recovery_flow') === 'true';
+          
+          if (isInRecoveryFlow && PUBLIC_PATHS.includes(location.pathname)) {
+            console.log('SessionContext - SIGNED_IN detected during recovery flow on public path. Ignoring auto-login.');
+            // No redirigimos ni cargamos el perfil, solo dejamos que ResetPassword.tsx maneje la sesión temporal.
+            // La bandera se limpiará en ResetPassword.tsx después de la actualización.
+            return;
+          }
+          
           console.log('SessionContext - User signed in');
           
           setSession(currentSession);
@@ -240,6 +229,21 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           } else {
             console.error('SessionContext - Failed to load profile');
             showError('Error al cargar el perfil. Por favor, contacta al administrador.');
+          }
+          return;
+        }
+
+        if (event === 'SIGNED_OUT') {
+          console.log('SessionContext - User signed out');
+          setSession(null);
+          setUser(null);
+          setProfile(null);
+          setLoading(false);
+          isInitialized.current = false;
+          
+          const currentPath = location.pathname;
+          if (!PUBLIC_PATHS.includes(currentPath)) {
+            navigate('/login', { replace: true });
           }
           return;
         }
