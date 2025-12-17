@@ -143,6 +143,26 @@ Nota: Esta configuración solo puede cambiarse desde la consola de Supabase y re
             </CardContent>
           </Card>
 
+          {/* Gestión de Pedidos */}
+          <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <Package className="h-8 w-8 text-primary-blue" />
+                <CardTitle className="text-primary-blue">Pedidos</CardTitle>
+              </div>
+              <CardDescription>Gestiona y supervisa todos los pedidos.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col space-y-2">
+              <Button 
+                variant="outline" 
+                className="w-full justify-start" 
+                onClick={() => navigate('/admin/orders')}
+              >
+                Ver Todos los Pedidos
+              </Button>
+            </CardContent>
+          </Card>
+
           <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader>
               <div className="flex items-center gap-3">
