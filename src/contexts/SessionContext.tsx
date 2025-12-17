@@ -30,6 +30,21 @@ const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
 const PUBLIC_PATHS = ['/', '/login', '/auth-callback', '/verification-error', '/reset-password', '/debug-recovery'];
 
+// Helper para verificar si el modo de recuperación está activo (cross-tab)
+const isRecoveryModeActive = () => {
+  const expiration = localStorage.getItem('supabase_password_recovery_mode');
+  if (!expiration) return false;
+  
+  const expirationTime = parseInt(expiration, 10);
+  const isActive = Date.now() < expirationTime;
+  
+  if (!isActive) {
+    // Auto-limpiar bandera expirada
+    localStorage.removeItem('supabase_password_recovery_mode');
+  }
+  return isActive;
+};
+
 export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -146,6 +161,14 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
         console.log('SessionContext - Current session:', !!currentSession);
 
         if (currentSession && mounted && !isSigningOut.current) {
+          // Bloquear la carga inicial si estamos en modo recuperación y en una ruta pública
+          if (isRecoveryModeActive() && PUBLIC_PATHS.includes(location.pathname)) {
+            console.log('SessionContext - Recovery mode active on init, blocking auto-login/redirection.');
+            setLoading(false);
+            isInitialized.current = true;
+            return;
+          }
+
           setSession(currentSession);
           setUser(currentSession.user);
           
@@ -204,12 +227,11 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
         
         // 3. Si estamos en una ruta pública y ocurre SIGNED_IN, verificar la bandera de recuperación
         if (event === 'SIGNED_IN' && currentSession) {
-          const isInRecoveryFlow = localStorage.getItem('is_in_recovery_flow') === 'true';
+          const recoveryActive = isRecoveryModeActive();
           
-          if (isInRecoveryFlow && PUBLIC_PATHS.includes(location.pathname)) {
+          if (recoveryActive && PUBLIC_PATHS.includes(location.pathname)) {
             console.log('SessionContext - SIGNED_IN detected during recovery flow on public path. Ignoring auto-login.');
-            // No redirigimos ni cargamos el perfil, solo dejamos que ResetPassword.tsx maneje la sesión temporal.
-            // La bandera se limpiará en ResetPassword.tsx después de la actualización.
+            // Bloquear el procesamiento de SIGNED_IN en pestañas que no son /reset-password
             return;
           }
           

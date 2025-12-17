@@ -191,8 +191,10 @@ function Login() {
     try {
       console.log('Login - Requesting password reset for:', resetData.email);
       
-      // Establecer la bandera de recuperación antes de enviar el correo
-      localStorage.setItem('is_in_recovery_flow', 'true');
+      // Establecer la bandera de recuperación con expiración (10 minutos)
+      const RECOVERY_EXPIRATION_MS = 10 * 60 * 1000;
+      const expirationTime = Date.now() + RECOVERY_EXPIRATION_MS;
+      localStorage.setItem('supabase_password_recovery_mode', expirationTime.toString());
       
       // 1. Enviar el email de recuperación PRIMERO
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(resetData.email.trim(), {
@@ -202,7 +204,7 @@ function Login() {
       if (resetError) {
         console.error('Reset password error:', resetError);
         showError(resetError.message);
-        localStorage.removeItem('is_in_recovery_flow'); // Limpiar si falla
+        localStorage.removeItem('supabase_password_recovery_mode'); // Limpiar si falla
         setIsSubmitting(false);
         isRequestingReset.current = false;
         setIsRequestingPasswordReset(false);
@@ -216,7 +218,6 @@ function Login() {
       await supabase.auth.signOut();
       
       // 3. Limpiar storages (excepto la bandera de recuperación)
-      // Nota: No limpiamos localStorage aquí para mantener la bandera 'is_in_recovery_flow'
       sessionStorage.clear();
       
       // 4. Esperar un momento para que se complete el sign out
@@ -236,7 +237,7 @@ function Login() {
     } catch (error) {
       console.error('Unexpected error:', error);
       showError('Error inesperado');
-      localStorage.removeItem('is_in_recovery_flow'); // Limpiar si hay excepción
+      localStorage.removeItem('supabase_password_recovery_mode'); // Limpiar si hay excepción
       setIsSubmitting(false);
       isRequestingReset.current = false;
       setIsRequestingPasswordReset(false);

@@ -52,7 +52,7 @@ const ResetPassword = () => {
         setTokenValid(false);
         setCheckingToken(false);
         // Limpiar la bandera de recuperación si el token es inválido
-        localStorage.removeItem('is_in_recovery_flow');
+        localStorage.removeItem('supabase_password_recovery_mode');
         setTimeout(() => navigate('/login', { replace: true }), 3000);
         return;
       }
@@ -70,7 +70,7 @@ const ResetPassword = () => {
           console.error('ResetPassword - Error setting session:', error);
           showError('El enlace de recuperación es inválido o ha expirado.');
           setTokenValid(false);
-          localStorage.removeItem('is_in_recovery_flow');
+          localStorage.removeItem('supabase_password_recovery_mode');
           setTimeout(() => navigate('/login', { replace: true }), 3000);
         } else {
           console.log('ResetPassword - Session set successfully:', !!data.session);
@@ -80,7 +80,7 @@ const ResetPassword = () => {
         console.error('ResetPassword - Unexpected error:', err);
         showError('Error al validar el enlace de recuperación.');
         setTokenValid(false);
-        localStorage.removeItem('is_in_recovery_flow');
+        localStorage.removeItem('supabase_password_recovery_mode');
         setTimeout(() => navigate('/login', { replace: true }), 3000);
       } finally {
         setCheckingToken(false);
@@ -154,7 +154,7 @@ const ResetPassword = () => {
       showSuccess('¡Contraseña actualizada correctamente!');
       
       // Limpiar la bandera de recuperación antes de la redirección final
-      localStorage.removeItem('is_in_recovery_flow');
+      localStorage.removeItem('supabase_password_recovery_mode');
       
       // Esperar 1.5 segundos y luego cerrar sesión de forma agresiva
       setTimeout(async () => {
@@ -165,17 +165,14 @@ const ResetPassword = () => {
           await supabase.auth.signOut();
           console.log('ResetPassword - Supabase sign out completed');
           
-          // 2. Limpiar localStorage (ya limpiamos la bandera, pero por si acaso)
-          // No limpiamos todo localStorage aquí para no borrar otras configuraciones, solo la bandera.
-          
-          // 3. Limpiar sessionStorage
+          // 2. Limpiar sessionStorage
           sessionStorage.clear();
           console.log('ResetPassword - sessionStorage cleared');
           
-          // 4. Esperar un momento para que se complete
+          // 3. Esperar un momento para que se complete
           await new Promise(resolve => setTimeout(resolve, 300));
           
-          // 5. Forzar recarga completa de la página para limpiar todo el estado
+          // 4. Forzar recarga completa de la página para limpiar todo el estado
           console.log('ResetPassword - Forcing full page reload...');
           window.location.href = '/login';
           
