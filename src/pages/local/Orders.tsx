@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { showSuccess, showError } from '@/utils/toast';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Eye, Store, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Eye, Store, RefreshCw, FileText } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -24,6 +24,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+interface OrderFile {
+  file_name: string;
+  copies: number;
+}
 
 interface OrderWithClient {
   order_id: string;
@@ -38,6 +49,8 @@ interface OrderWithClient {
   created_at: string;
   updated_at: string;
   file_count: number;
+  // Nuevo campo para almacenar los archivos
+  files: OrderFile[]; 
 }
 
 const LocalOrders = () => {
@@ -98,7 +111,26 @@ const LocalOrders = () => {
         return;
       }
 
-      setOrders(ordersData || []);
+      // Para cada pedido, obtener los archivos
+      const ordersWithFiles = await Promise.all(
+        (ordersData || []).map(async (order: OrderWithClient) => {
+          const { data: filesData, error: filesError } = await supabase
+            .from('order_files')
+            .select('file_name, copies')
+            .eq('order_id', order.order_id);
+
+          if (filesError) {
+            console.error(`Error fetching files for order ${order.order_id}:`, filesError);
+          }
+
+          return {
+            ...order,
+            files: filesData || [],
+          };
+        })
+      );
+
+      setOrders(ordersWithFiles);
     } catch (error) {
       console.error('Unexpected error:', error);
       showError('Error inesperado al cargar datos.');
@@ -168,6 +200,46 @@ const LocalOrders = () => {
     // Si no hay nombre, mostrar el email
     return order.client_email || 'Cliente desconocido';
   };
+  
+  const renderFilesList = (files: OrderFile[]) => {
+    if (files.length === 0) return 'Sin archivos';
+    
+    if (files.length === 1) {
+      return (
+        <div className="flex flex-col">
+          <span className="font-medium truncate max-w-[200px]">{files[0].file_name}</span>
+          <span className="text-xs text-gray-500">{files[0].copies} copia{files[0].copies > 1 ? 's' : ''}</span>
+        </div>
+      );
+    }
+
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex flex-col cursor-help">
+              <span className="font-medium flex items-center gap-1">
+                <FileText className="h-4 w-4 text-primary-blue" />
+                {files.length} archivos
+              </span>
+              <span className="text-xs text-gray-500">Ver detalles</span>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs">
+            <div className="space-y-1">
+              {files.map((file, idx) => (
+                <div key={idx} className="text-sm">
+                  <span className="font-medium">{file.file_name}</span>
+                  <span className="text-gray-400 ml-2">({file.copies}x)</span>
+                </div>
+              ))}
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  };
+
 
   const filteredOrders = filterStatus === 'all' 
     ? orders 
@@ -284,9 +356,7 @@ const LocalOrders = () => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="bg-primary-blue/10">
-                          {order.file_count} archivo{order.file_count !== 1 ? 's' : ''}
-                        </Badge>
+                        {renderFilesList(order.files)}
                       </TableCell>
                       <TableCell className="font-bold text-success-green">
                         ${order.total_price.toFixed(2)}
