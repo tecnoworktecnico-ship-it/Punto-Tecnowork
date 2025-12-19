@@ -18,12 +18,17 @@ const BrandingSettings = () => {
   const [poweredByLogoUrl, setPoweredByLogoUrl] = useState('');
   const [poweredByLogoUrl2, setPoweredByLogoUrl2] = useState('');
   const [loading, setLoading] = useState(true);
+  const [initialLoadDone, setInitialLoadDone] = useState(false); // Nueva bandera
 
   useEffect(() => {
     if (!sessionLoading && profile?.role !== 'admin') {
       showError('No tienes permiso para acceder a esta página.');
       navigate('/admin/dashboard');
+      return;
     }
+    
+    // Evitar recargar si ya se hizo la carga inicial
+    if (initialLoadDone) return;
 
     const fetchBranding = async () => {
       setLoading(true);
@@ -41,12 +46,13 @@ const BrandingSettings = () => {
         setPoweredByLogoUrl2(data.powered_by_logo_url_2 || '');
       }
       setLoading(false);
+      setInitialLoadDone(true); // Marcar como cargado
     };
 
     if (!sessionLoading && profile?.role === 'admin') {
       fetchBranding();
     }
-  }, [sessionLoading, profile, navigate]);
+  }, [sessionLoading, profile, navigate, initialLoadDone]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,6 +92,23 @@ const BrandingSettings = () => {
     } else {
       showSuccess('Configuración de branding guardada correctamente.');
     }
+    
+    // Después de guardar, forzamos la recarga de los datos para reflejar los cambios
+    // y luego establecemos loading a false.
+    // No necesitamos preocuparnos por el useEffect aquí gracias a initialLoadDone.
+    
+    // Recargar datos para asegurar que los estados locales se actualicen con la DB
+    const { data: updatedData } = await supabase
+      .from('branding')
+      .select('main_logo_url, powered_by_logo_url, powered_by_logo_url_2')
+      .single();
+      
+    if (updatedData) {
+      setMainLogoUrl(updatedData.main_logo_url || '');
+      setPoweredByLogoUrl(updatedData.powered_by_logo_url || '');
+      setPoweredByLogoUrl2(updatedData.powered_by_logo_url_2 || '');
+    }
+    
     setLoading(false);
   };
 
