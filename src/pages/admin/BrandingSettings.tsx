@@ -127,7 +127,7 @@ const BrandingSettings = () => {
 
   const handleClearLogo = (setter: React.Dispatch<React.SetStateAction<string>>) => {
     setter('');
-    showSuccess('URL limpiada. Haz clic en "Guardar Configuración" para aplicar el cambio.');
+    // No mostramos el toast aquí, ya que el usuario debe hacer clic en Guardar para confirmar el cambio.
   };
 
   if (sessionLoading || loading) {
@@ -179,8 +179,9 @@ const BrandingSettings = () => {
                   onClick={() => handleClearLogo(setMainLogoUrl)}
                   disabled={!mainLogoUrl}
                   title="Borrar Logo"
+                  className="flex-shrink-0 text-emphasis-red hover:bg-red-50"
                 >
-                  <Trash2 className="h-4 w-4 text-emphasis-red" />
+                  <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
               {mainLogoUrl && (
@@ -212,8 +213,9 @@ const BrandingSettings = () => {
                   onClick={() => handleClearLogo(setPoweredByLogoUrl)}
                   disabled={!poweredByLogoUrl}
                   title="Borrar Logo"
+                  className="flex-shrink-0 text-emphasis-red hover:bg-red-50"
                 >
-                  <Trash2 className="h-4 w-4 text-emphasis-red" />
+                  <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
               {poweredByLogoUrl && (
@@ -245,8 +247,9 @@ const BrandingSettings = () => {
                   onClick={() => handleClearLogo(setPoweredByLogoUrl2)}
                   disabled={!poweredByLogoUrl2}
                   title="Borrar Logo"
+                  className="flex-shrink-0 text-emphasis-red hover:bg-red-50"
                 >
-                  <Trash2 className="h-4 w-4 text-emphasis-red" />
+                  <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
               {poweredByLogoUrl2 && (
