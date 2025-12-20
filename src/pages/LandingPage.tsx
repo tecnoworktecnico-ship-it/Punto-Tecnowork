@@ -6,6 +6,7 @@ import { useSession } from "@/contexts/SessionContext";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import BrandingDisplay from "@/components/BrandingDisplay";
+import Footer from "@/components/Footer"; // Importar Footer
 
 const LandingPage = () => {
   const { loading, session } = useSession();
@@ -80,6 +81,8 @@ const LandingPage = () => {
           Iniciar Sesión / Registrarse
         </Button>
       </div>
+      {/* El Footer contiene los logos Powered By */}
+      <Footer /> 
       <MadeWithDyad />
     </div>
   );
