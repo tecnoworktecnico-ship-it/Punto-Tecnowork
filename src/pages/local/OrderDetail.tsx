@@ -108,7 +108,7 @@ const LocalOrderDetail = () => {
 
       if (error) {
         console.error('Error updating order status:', error);
-        showError('Error al actualizar el estado del pedido.');
+        showError(`Error al actualizar el estado del pedido: ${error.message}`); // Mostrar error específico
         throw error;
       } else {
         showSuccess(`Estado del pedido actualizado a ${newStatus.replace('_', ' ')}.`);

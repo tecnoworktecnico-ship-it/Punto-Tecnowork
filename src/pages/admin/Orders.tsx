@@ -30,7 +30,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { getStatusBadge } from '@/utils/order-status'; // Importar utilidad
+import { getStatusBadge, OrderStatus } from '@/utils/order-status'; // Importar OrderStatus
 
 interface OrderFile {
   file_name: string;
@@ -45,7 +45,7 @@ interface OrderWithDetails {
   client_last_name: string | null;
   local_id: string;
   local_name: string;
-  status: string;
+  status: OrderStatus; // Usar OrderStatus tipado
   total_price: number;
   points_earned: number;
   created_at: string;
@@ -115,7 +115,7 @@ const AdminOrders = () => {
     }
   };
 
-  const handleStatusChange = async (orderId: string, newStatus: string) => {
+  const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
     setLoading(true);
 
     try {
@@ -129,7 +129,7 @@ const AdminOrders = () => {
 
       if (error) {
         console.error('Error updating order status:', error);
-        showError('Error al actualizar el estado del pedido.');
+        showError(`Error al actualizar el estado del pedido: ${error.message}`); // Mostrar error específico
       } else {
         showSuccess('Estado del pedido actualizado correctamente.');
         
@@ -311,11 +311,11 @@ const AdminOrders = () => {
                       <TableCell>
                         <Select
                           value={order.status}
-                          onValueChange={(value) => handleStatusChange(order.order_id, value)}
+                          onValueChange={(value) => handleStatusChange(order.order_id, value as OrderStatus)}
                           disabled={loading}
                         >
                           <SelectTrigger className="w-[140px]">
-                            {getStatusBadge(order.status as OrderStatus)}
+                            {getStatusBadge(order.status)}
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="pending">Pendiente</SelectItem>
