@@ -95,7 +95,8 @@ const ClientDashboard = () => {
     // Confiar en SessionContext para recargar el perfil
   };
 
-  const needsPasswordChange = profile && !profile.password_changed;
+  // Condición estricta: solo si password_changed es false (creado por admin)
+  const needsPasswordChange = profile && profile.password_changed === false;
   
   const displayName = profile?.first_name || user?.email;
 

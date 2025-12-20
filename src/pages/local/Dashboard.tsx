@@ -72,7 +72,8 @@ const LocalDashboard = () => {
     // Confiar en SessionContext para recargar el perfil
   };
 
-  const needsPasswordChange = profile && !profile.password_changed;
+  // Condición estricta: solo si password_changed es false (creado por admin)
+  const needsPasswordChange = profile && profile.password_changed === false;
   const pendingOrders = orderStatusStats.find(s => s.name === 'PENDING')?.value || 0;
 
   if (loadingPrices && !localInfo) {
