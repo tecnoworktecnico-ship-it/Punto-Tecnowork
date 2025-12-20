@@ -32,12 +32,13 @@ const BrandingSettings = () => {
 
     const fetchBranding = async () => {
       setLoading(true);
+      // Usar maybeSingle() para manejar el caso de que no haya filas sin lanzar 406
       const { data, error } = await supabase
         .from('branding')
         .select('main_logo_url, powered_by_logo_url, powered_by_logo_url_2')
-        .single();
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
         console.error('Error fetching branding settings:', error);
         showError('Error al cargar la configuración de branding.');
       } else if (data) {
@@ -58,58 +59,64 @@ const BrandingSettings = () => {
     e.preventDefault();
     setLoading(true);
 
-    const { data: existingBranding, error: fetchError } = await supabase
-      .from('branding')
-      .select('id')
-      .single();
-
-    let error;
-    if (existingBranding) {
-      const { error: updateError } = await supabase
+    try {
+      // 1. Verificar si existe una configuración de branding (usando maybeSingle)
+      const { data: existingBranding, error: fetchError } = await supabase
         .from('branding')
-        .update({ 
-          main_logo_url: mainLogoUrl, 
-          powered_by_logo_url: poweredByLogoUrl,
-          powered_by_logo_url_2: poweredByLogoUrl2,
-          updated_at: new Date().toISOString() 
-        })
-        .eq('id', existingBranding.id);
-      error = updateError;
-    } else {
-      const { error: insertError } = await supabase
-        .from('branding')
-        .insert({ 
-          main_logo_url: mainLogoUrl, 
-          powered_by_logo_url: poweredByLogoUrl,
-          powered_by_logo_url_2: poweredByLogoUrl2
-        });
-      error = insertError;
-    }
+        .select('id')
+        .maybeSingle();
 
-    if (error) {
-      console.error('Error saving branding settings:', error);
-      showError('Error al guardar la configuración de branding.');
-    } else {
-      showSuccess('Configuración de branding guardada correctamente.');
-    }
-    
-    // Después de guardar, forzamos la recarga de los datos para reflejar los cambios
-    // y luego establecemos loading a false.
-    // No necesitamos preocuparnos por el useEffect aquí gracias a initialLoadDone.
-    
-    // Recargar datos para asegurar que los estados locales se actualicen con la DB
-    const { data: updatedData } = await supabase
-      .from('branding')
-      .select('main_logo_url, powered_by_logo_url, powered_by_logo_url_2')
-      .single();
+      if (fetchError) {
+        throw new Error(`Error al verificar existencia: ${fetchError.message}`);
+      }
+
+      const brandingData = { 
+        main_logo_url: mainLogoUrl, 
+        powered_by_logo_url: poweredByLogoUrl,
+        powered_by_logo_url_2: poweredByLogoUrl2,
+        updated_at: new Date().toISOString() 
+      };
+
+      let error;
+      if (existingBranding) {
+        // Actualizar
+        const { error: updateError } = await supabase
+          .from('branding')
+          .update(brandingData)
+          .eq('id', existingBranding.id);
+        error = updateError;
+      } else {
+        // Insertar
+        const { error: insertError } = await supabase
+          .from('branding')
+          .insert(brandingData);
+        error = insertError;
+      }
+
+      if (error) {
+        console.error('Error saving branding settings:', error);
+        showError('Error al guardar la configuración de branding.');
+      } else {
+        showSuccess('Configuración de branding guardada correctamente.');
+      }
       
-    if (updatedData) {
-      setMainLogoUrl(updatedData.main_logo_url || '');
-      setPoweredByLogoUrl(updatedData.powered_by_logo_url || '');
-      setPoweredByLogoUrl2(updatedData.powered_by_logo_url_2 || '');
+      // 2. Recargar datos para asegurar que los estados locales se actualicen con la DB (usando maybeSingle)
+      const { data: updatedData } = await supabase
+        .from('branding')
+        .select('main_logo_url, powered_by_logo_url, powered_by_logo_url_2')
+        .maybeSingle();
+        
+      if (updatedData) {
+        setMainLogoUrl(updatedData.main_logo_url || '');
+        setPoweredByLogoUrl(updatedData.powered_by_logo_url || '');
+        setPoweredByLogoUrl2(updatedData.powered_by_logo_url_2 || '');
+      }
+    } catch (err) {
+      console.error('Error inesperado en handleSave:', err);
+      showError(err instanceof Error ? err.message : 'Error inesperado al guardar el branding.');
+    } finally {
+      setLoading(false);
     }
-    
-    setLoading(false);
   };
 
   if (sessionLoading || loading) {

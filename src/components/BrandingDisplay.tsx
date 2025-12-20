@@ -5,32 +5,38 @@ import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface BrandingDisplayProps {
-  type: 'main' | 'poweredBy';
+  type: 'main' | 'poweredBy' | 'poweredBy2';
   className?: string;
 }
 
 const BrandingDisplay: React.FC<BrandingDisplayProps> = ({ type, className }) => {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  // No necesitamos un estado de error explícito para la UI si siempre mostramos el fallback
-  // pero mantenemos el console.error para depuración.
 
   useEffect(() => {
     const fetchBranding = async () => {
       setLoading(true);
+      
+      const selectColumn = type === 'main' 
+        ? 'main_logo_url' 
+        : type === 'poweredBy' 
+          ? 'powered_by_logo_url' 
+          : 'powered_by_logo_url_2';
+
       const { data, error } = await supabase
         .from('branding')
-        .select(type === 'main' ? 'main_logo_url' : 'powered_by_logo_url')
-        .single();
+        .select(selectColumn)
+        .maybeSingle(); // Usar maybeSingle para manejar el caso de no haber filas
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 significa que no se encontraron filas, lo cual es esperado si no hay branding
+      if (error) {
         console.error('Error fetching branding:', error);
-        setLogoUrl(null); // Asegurarse de que sea null para activar el fallback
+        setLogoUrl(null);
       } else if (data) {
-        const url = type === 'main' ? data.main_logo_url : data.powered_by_logo_url;
-        setLogoUrl(url);
+        // La columna seleccionada es dinámica, accedemos a ella por su nombre
+        const url = data[selectColumn as keyof typeof data];
+        setLogoUrl(url || null);
       } else {
-        setLogoUrl(null); // No hay datos o error PGRST116, así que no hay logo
+        setLogoUrl(null); // No hay datos
       }
       setLoading(false);
     };
@@ -43,11 +49,10 @@ const BrandingDisplay: React.FC<BrandingDisplayProps> = ({ type, className }) =>
   }
 
   if (logoUrl) {
-    return <img src={logoUrl} alt={type === 'main' ? "Main Logo" : "Powered By Logo"} className={className} />;
+    return <img src={logoUrl} alt={type === 'main' ? "Main Logo" : `Powered By Logo ${type.slice(-1)}`} className={className} />;
   }
 
-  // Si no hay logoUrl (ya sea porque no se ha subido o hubo un error de carga),
-  // mostramos "Tecnowork" como fallback.
+  // Si no hay logoUrl, mostramos "Tecnowork" como fallback.
   return (
     <div className={`flex items-center justify-center font-bold text-text-carbon text-xl ${className}`}>
       Tecnowork
