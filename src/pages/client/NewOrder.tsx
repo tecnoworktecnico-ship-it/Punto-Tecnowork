@@ -175,7 +175,7 @@ const NewOrder = () => {
         .insert({
           client_id: profile?.id,
           local_id: selectedLocal,
-          status: 'pending',
+          status: 'pending', // Usar 'pending' (con guion bajo)
           total_price: total,
           points_earned: points,
         })
@@ -381,7 +381,7 @@ const NewOrder = () => {
                     title="Precios del Local"
                     description={
                       localInfo?.can_edit_prices 
-                        ? "Este local tiene precios personalizados"
+                        ? "Precios personalizados de tu local"
                         : "Precios estándar"
                     }
                     showCustomBadge={false}
