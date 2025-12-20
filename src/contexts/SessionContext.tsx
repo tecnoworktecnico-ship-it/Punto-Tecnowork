@@ -70,29 +70,40 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           .from('profiles')
           .select('*')
           .eq('id', userId)
-          .single();
+          .maybeSingle(); // Usar maybeSingle para evitar errores 406 si no existe
 
         if (profileError) {
           console.error(`Error fetching profile (attempt ${i + 1}):`, profileError);
           
-          if (profileError.code === '42P17' || profileError.code === 'PGRST301') {
-            if (i < retries - 1) {
-              console.log('Waiting before retry...');
-              await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
-              continue;
-            }
+          if (i < retries - 1) {
+            console.log('Waiting before retry...');
+            await new Promise(resolve => setTimeout(resolve, 500 * (i + 1))); // Reducir tiempo de espera
+            continue;
           }
           
           return null;
         }
         
-        console.log('SessionContext - Profile fetched successfully:', profileData);
-        return profileData;
+        if (profileData) {
+          console.log('SessionContext - Profile fetched successfully:', profileData);
+          return profileData as Profile;
+        }
+        
+        // Si no hay datos (null), esperar y reintentar si es necesario (puede ser un problema de latencia del trigger)
+        if (i < retries - 1) {
+          console.log('Profile data is null, waiting before retry...');
+          await new Promise(resolve => setTimeout(resolve, 500 * (i + 1)));
+          continue;
+        }
+        
+        return null;
       } catch (error) {
         console.error(`Unexpected error fetching profile (attempt ${i + 1}):`, error);
         if (i < retries - 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+          await new Promise(resolve => setTimeout(resolve, 500 * (i + 1)));
+          continue;
         }
+        return null;
       }
     }
     
@@ -184,7 +195,7 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
             }
           } else if (mounted && !isSigningOut.current) {
             console.error('SessionContext - Could not load profile');
-            showError('Error al cargar el perfil. Por favor, intenta cerrar sesión y volver a iniciar.');
+            // No mostrar error aquí, ya que podría ser un usuario recién creado sin perfil aún
           }
         }
         
@@ -231,7 +242,6 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           
           if (recoveryActive && PUBLIC_PATHS.includes(location.pathname)) {
             console.log('SessionContext - SIGNED_IN detected during recovery flow on public path. Ignoring auto-login.');
-            // Bloquear el procesamiento de SIGNED_IN en pestañas que no son /reset-password
             return;
           }
           
@@ -240,17 +250,23 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           setSession(currentSession);
           setUser(currentSession.user);
           
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          // Reducir el delay de 1000ms a 300ms
+          await new Promise(resolve => setTimeout(resolve, 300));
           
-          const profileData = await fetchProfile(currentSession.user.id);
-          
-          if (profileData && mounted) {
-            console.log('SessionContext - Profile loaded, role:', profileData.role);
-            setProfile(profileData);
-            redirectBasedOnRole(profileData.role, location.pathname);
-          } else {
-            console.error('SessionContext - Failed to load profile');
-            showError('Error al cargar el perfil. Por favor, contacta al administrador.');
+          try {
+            const profileData = await fetchProfile(currentSession.user.id);
+            
+            if (profileData && mounted) {
+              console.log('SessionContext - Profile loaded, role:', profileData.role);
+              setProfile(profileData);
+              redirectBasedOnRole(profileData.role, location.pathname);
+            } else if (mounted) {
+              console.error('SessionContext - Failed to load profile');
+              showError('Error al cargar el perfil. Por favor, contacta al administrador.');
+            }
+          } catch (err) {
+            console.error('SessionContext - Error in SIGNED_IN handler:', err);
+            showError('Error inesperado al procesar el inicio de sesión.');
           }
           return;
         }
