@@ -72,7 +72,7 @@ Nota: Esta configuración solo puede cambiarse desde la consola de Supabase y re
       <AppHeader title="Dashboard de Administración" />
       
       <main className="flex-grow p-4">
-        <div className="w-full max-w-7xl mx-auto p-8 space-y-8 bg-white rounded-lg shadow-lg">
+        <div className="w-full max-w-7xl mx-auto p-8 space-y-8 bg-white/80 backdrop-blur-sm rounded-lg shadow-lg">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-4xl font-bold text-text-carbon">Resumen General</h1>
             <Button 
@@ -140,7 +140,6 @@ Nota: Esta configuración solo puede cambiarse desde la consola de Supabase y re
               </CardContent>
             </Card>
 
-            {/* Gestión de Pedidos */}
             <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <div className="flex items-center gap-3">

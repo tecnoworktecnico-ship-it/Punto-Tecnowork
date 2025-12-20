@@ -30,6 +30,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { getStatusBadge } from '@/utils/order-status'; // Importar utilidad
 
 interface OrderFile {
   file_name: string;
@@ -175,19 +176,6 @@ const LocalOrders = () => {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-      pending: { label: 'Pendiente', variant: 'secondary' },
-      in_progress: { label: 'En Proceso', variant: 'default' },
-      ready: { label: 'Listo', variant: 'outline' },
-      completed: { label: 'Completado', variant: 'default' },
-      cancelled: { label: 'Cancelado', variant: 'destructive' },
-    };
-
-    const config = statusConfig[status] || { label: status, variant: 'outline' };
-    return <Badge variant={config.variant}>{config.label}</Badge>;
-  };
-
   const getClientDisplayName = (order: OrderWithClient) => {
     const firstName = order.client_first_name || '';
     const lastName = order.client_last_name || '';
@@ -282,7 +270,7 @@ const LocalOrders = () => {
   return (
     <div className="min-h-screen p-4 bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
       <div className="max-w-6xl mx-auto">
-        <Card className="bg-white rounded-lg shadow-lg">
+        <Card className="bg-white/80 backdrop-blur-sm rounded-lg shadow-lg">
           <CardHeader>
             <div className="flex items-center justify-between mb-4">
               <Button
@@ -371,7 +359,7 @@ const LocalOrders = () => {
                           disabled={loading}
                         >
                           <SelectTrigger className="w-[140px]">
-                            {getStatusBadge(order.status)}
+                            {getStatusBadge(order.status as OrderStatus)}
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="pending">Pendiente</SelectItem>

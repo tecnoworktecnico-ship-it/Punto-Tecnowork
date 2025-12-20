@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { Loader2 } from 'lucide-react';
 
 interface OrderTrend {
@@ -31,7 +31,13 @@ const OrderTrendChart: React.FC<OrderTrendChartProps> = ({ data, loading }) => {
       </CardHeader>
       <CardContent className="h-64">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+          <AreaChart data={data} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+            <defs>
+              <linearGradient id="colorUv" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#4285F4" stopOpacity={0.8}/>
+                <stop offset="95%" stopColor="#4285F4" stopOpacity={0}/>
+              </linearGradient>
+            </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
             <XAxis dataKey="date" stroke="#323232" tickFormatter={(tick) => new Date(tick).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} />
             <YAxis stroke="#323232" allowDecimals={false} />
@@ -40,8 +46,9 @@ const OrderTrendChart: React.FC<OrderTrendChartProps> = ({ data, loading }) => {
               labelFormatter={(label) => `Fecha: ${new Date(label).toLocaleDateString('es-ES')}`}
               formatter={(value, name) => [`${value} pedidos`, 'Total']}
             />
+            <Area type="monotone" dataKey="count" stroke="#4285F4" fillOpacity={1} fill="url(#colorUv)" />
             <Line type="monotone" dataKey="count" stroke="#4285F4" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 8 }} />
-          </LineChart>
+          </AreaChart>
         </ResponsiveContainer>
       </CardContent>
     </Card>

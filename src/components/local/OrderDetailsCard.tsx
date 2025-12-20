@@ -4,24 +4,11 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { LocalOrder, OrderStatus } from '@/types/order';
 import { User, DollarSign, Clock, Calendar } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { getStatusBadge } from '@/utils/order-status'; // Importar utilidad
 
 interface OrderDetailsCardProps {
   order: LocalOrder;
 }
-
-const getStatusBadge = (status: OrderStatus) => {
-  const statusConfig: Record<OrderStatus, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-    pending: { label: 'Pendiente', variant: 'secondary' },
-    in_progress: { label: 'En Proceso', variant: 'default' },
-    ready: { label: 'Listo', variant: 'outline' },
-    completed: { label: 'Completado', variant: 'default' },
-    cancelled: { label: 'Cancelado', variant: 'destructive' },
-  };
-
-  const config = statusConfig[status] || { label: status, variant: 'outline' };
-  return <Badge variant={config.variant} className="capitalize">{config.label}</Badge>;
-};
 
 const OrderDetailsCard: React.FC<OrderDetailsCardProps> = ({ order }) => {
   const clientName = `${order.profiles?.first_name || 'Cliente'} ${order.profiles?.last_name || 'Desconocido'}`.trim();

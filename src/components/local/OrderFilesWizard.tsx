@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { getStatusConfig } from '@/utils/order-status'; // Importar utilidad
 
 interface OrderFilesWizardProps {
   order: LocalOrder;
@@ -68,16 +69,7 @@ const OrderFilesWizard: React.FC<OrderFilesWizardProps> = ({ order, onStatusUpda
     }
   };
 
-  const getStatusColor = (status: OrderStatus) => {
-    switch (status) {
-      case 'pending': return 'bg-secondary-yellow/20 text-secondary-yellow';
-      case 'in_progress': return 'bg-primary-blue/20 text-primary-blue';
-      case 'ready': return 'bg-success-green/20 text-success-green';
-      case 'completed': return 'bg-gray-200 text-gray-700';
-      case 'cancelled': return 'bg-emphasis-red/20 text-emphasis-red';
-      default: return 'bg-gray-100 text-gray-500';
-    }
-  };
+  const currentStatusConfig = getStatusConfig(order.status);
 
   return (
     <Card className="shadow-lg">
@@ -145,8 +137,8 @@ const OrderFilesWizard: React.FC<OrderFilesWizardProps> = ({ order, onStatusUpda
               <label className="text-sm font-medium text-gray-700">
                 Estado Actual:
               </label>
-              <Badge className={`mt-1 text-lg font-bold ${getStatusColor(order.status)}`}>
-                {order.status.replace('_', ' ').toUpperCase()}
+              <Badge variant="outline" className={`mt-1 text-lg font-bold ${currentStatusConfig.className}`}>
+                {currentStatusConfig.label}
               </Badge>
             </div>
 

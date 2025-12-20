@@ -105,7 +105,7 @@ const ClientDashboard = () => {
       <AppHeader title={`Bienvenido, ${displayName}!`} />
       
       <main className="flex-grow p-4">
-        <div className="w-full max-w-6xl mx-auto p-8 space-y-6 bg-white rounded-lg shadow-lg">
+        <div className="w-full max-w-6xl mx-auto p-8 space-y-6 bg-white/80 backdrop-blur-sm rounded-lg shadow-lg">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-4xl font-bold text-text-carbon">Tu Centro de Cliente</h1>
           </div>

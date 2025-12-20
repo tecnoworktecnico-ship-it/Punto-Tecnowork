@@ -89,7 +89,7 @@ const LocalDashboard = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
         <AppHeader title="Dashboard de Local" showSignOut={true} />
-        <Card className="w-full max-w-md p-6 bg-white rounded-lg shadow-lg text-center mt-8">
+        <Card className="w-full max-w-md p-6 bg-white/80 backdrop-blur-sm rounded-lg shadow-lg text-center mt-8">
           <CardHeader>
             <CardTitle className="text-2xl font-bold text-text-carbon">Local No Asignado</CardTitle>
           </CardHeader>
@@ -112,7 +112,7 @@ const LocalDashboard = () => {
       <AppHeader title={`Dashboard - ${localInfo?.name || 'Local'}`} />
       
       <main className="flex-grow p-4">
-        <div className="w-full max-w-6xl mx-auto p-8 space-y-6 bg-white rounded-lg shadow-lg">
+        <div className="w-full max-w-6xl mx-auto p-8 space-y-6 bg-white/80 backdrop-blur-sm rounded-lg shadow-lg">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-4xl font-bold text-text-carbon">Gestión de {localInfo?.name || 'Local'}</h1>
             <Button 

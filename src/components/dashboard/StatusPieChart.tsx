@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend, Label } from 'recharts';
 import { Loader2 } from 'lucide-react';
 
 interface Stat {
@@ -51,13 +51,20 @@ const StatusPieChart: React.FC<StatusPieChartProps> = ({ data, loading }) => {
               innerRadius={60}
               outerRadius={80}
               fill="#8884d8"
-              paddingAngle={5}
+              paddingAngle={3} // Añadir padding para el efecto de borde redondeado
               dataKey="value"
               labelLine={false}
+              cornerRadius={5} // Bordes redondeados
             >
               {data.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}
+              <Label 
+                value={`Total: ${total}`} 
+                position="center" 
+                className="font-bold text-text-carbon" 
+                style={{ fontSize: '16px', fill: 'var(--text-carbon)' }}
+              />
             </Pie>
             <Tooltip 
               contentStyle={{ backgroundColor: 'white', border: '1px solid #ccc', borderRadius: '4px' }}
