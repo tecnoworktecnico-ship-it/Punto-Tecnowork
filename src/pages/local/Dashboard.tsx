@@ -17,6 +17,7 @@ import StatCard from '@/components/dashboard/StatCard';
 import ClientRankingTable from '@/components/dashboard/ClientRankingTable';
 import PriceList from '@/components/PriceList';
 import { Badge } from '@/components/ui/badge';
+import Footer from '@/components/Footer';
 
 const LocalDashboard = () => {
   const { user, profile, signOut } = useSession();
@@ -98,6 +99,7 @@ const LocalDashboard = () => {
             </Button>
           </CardContent>
         </Card>
+        <Footer />
       </div>
     );
   }
@@ -199,7 +201,7 @@ const LocalDashboard = () => {
                 description={
                   localInfo?.can_edit_prices 
                     ? "Precios personalizados de tu local (los marcados como 'Global' usan el precio base)"
-                    : "Precios globales aplicados a tu local"
+                    : "Precios estándar"
                 }
                 showCustomBadge={localInfo?.can_edit_prices || false}
               />
@@ -293,6 +295,7 @@ const LocalDashboard = () => {
           </TabsContent>
         </Tabs>
       </div>
+      <Footer />
     </div>
   );
 };

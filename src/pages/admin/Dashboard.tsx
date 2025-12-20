@@ -29,6 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import Footer from '@/components/Footer';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -268,6 +269,7 @@ Nota: Esta configuración solo puede cambiarse desde la consola de Supabase y re
           </Card>
         </div>
       </div>
+      <Footer />
     </div>
   );
 };

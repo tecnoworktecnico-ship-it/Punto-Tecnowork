@@ -12,6 +12,7 @@ import { Settings, LayoutDashboard, Star, Gift, ShoppingBag, Sparkles } from 'lu
 import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
 import { Badge } from '@/components/ui/badge';
+import Footer from '@/components/Footer';
 
 interface FeaturedReward {
   id: string;
@@ -263,6 +264,7 @@ const ClientDashboard = () => {
           </TabsContent>
         </Tabs>
       </div>
+      <Footer />
     </div>
   );
 };
