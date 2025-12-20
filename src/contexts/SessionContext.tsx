@@ -5,6 +5,7 @@ import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { showSuccess, showError } from '@/utils/toast';
+import { Loader2 } from 'lucide-react'; // Importar Loader2
 
 interface Profile {
   id: string;
@@ -296,6 +297,7 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
         if (event === 'TOKEN_REFRESHED' && currentSession) {
           setSession(currentSession);
           setUser(currentSession.user);
+          await refreshProfile();
         }
 
         if (event === 'USER_UPDATED' && currentSession) {
@@ -346,6 +348,15 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
       }, 500);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <Loader2 className="h-8 w-8 text-primary-blue animate-spin mr-2" />
+        <p className="text-primary-blue text-xl">Cargando autenticación...</p>
+      </div>
+    );
+  }
 
   return (
     <SessionContext.Provider value={{ session, user, profile, loading, signOut, refreshProfile, setIsRequestingPasswordReset }}>

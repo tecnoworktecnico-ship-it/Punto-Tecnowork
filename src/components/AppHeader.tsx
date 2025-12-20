@@ -40,7 +40,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
         {/* Acciones y Perfil */}
         <div className="flex items-center gap-3">
           {showSignOut && (
-            <div className="hidden md:flex flex-col items-end text-sm">
+            <div className="flex flex-col items-end text-sm">
               <span className="font-medium text-text-carbon truncate max-w-[150px]">{displayName}</span>
               <span className="text-xs text-gray-500 capitalize">{profile?.role || 'Cargando...'}</span>
             </div>

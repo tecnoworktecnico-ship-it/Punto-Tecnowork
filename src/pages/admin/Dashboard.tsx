@@ -79,7 +79,7 @@ Nota: Esta configuración solo puede cambiarse desde la consola de Supabase y re
               onClick={refreshData} 
               disabled={loading}
               variant="outline"
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 bg-white text-primary-blue border-primary-blue hover:bg-gray-100"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               Actualizar Datos

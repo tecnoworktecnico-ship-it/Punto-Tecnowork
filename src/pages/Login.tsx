@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { showSuccess, showError } from '@/utils/toast';
 import { Loader2 } from 'lucide-react';
+import Footer from '@/components/Footer'; // Importar Footer
 
 // Obtener la versión de la aplicación
 const APP_VERSION = import.meta.env.VITE_APP_VERSION || 'N/A';
@@ -499,6 +500,7 @@ function Login() {
         </Tabs>
       </div>
       <MadeWithDyad />
+      <Footer />
     </div>
   );
 }
