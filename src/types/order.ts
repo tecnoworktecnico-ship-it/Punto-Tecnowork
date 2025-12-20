@@ -1,4 +1,4 @@
-export type OrderStatus = 'pending' | 'in_progress' | 'ready' | 'completed' | 'cancelled';
+export type OrderStatus = 'pending' | 'processing' | 'ready' | 'completed' | 'cancelled';
 
 export interface OrderFile {
   id: string;

@@ -152,7 +152,7 @@ const OrderFilesWizard: React.FC<OrderFilesWizardProps> = ({ order, onStatusUpda
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="pending">Pendiente</SelectItem>
-                  <SelectItem value="in_progress">En Proceso</SelectItem>
+                  <SelectItem value="processing">En Proceso</SelectItem>
                   <SelectItem value="ready">Listo para Recoger</SelectItem>
                   <SelectItem value="completed">Completado</SelectItem>
                   <SelectItem value="cancelled">Cancelado</SelectItem>

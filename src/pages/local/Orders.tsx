@@ -298,7 +298,7 @@ const LocalOrders = () => {
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
                     <SelectItem value="pending">Pendientes</SelectItem>
-                    <SelectItem value="in_progress">En Proceso</SelectItem>
+                    <SelectItem value="processing">En Proceso</SelectItem>
                     <SelectItem value="ready">Listos</SelectItem>
                     <SelectItem value="completed">Completados</SelectItem>
                     <SelectItem value="cancelled">Cancelados</SelectItem>
@@ -363,7 +363,7 @@ const LocalOrders = () => {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="pending">Pendiente</SelectItem>
-                            <SelectItem value="in_progress">En Proceso</SelectItem>
+                            <SelectItem value="processing">En Proceso</SelectItem>
                             <SelectItem value="ready">Listo</SelectItem>
                             <SelectItem value="completed">Completado</SelectItem>
                             <SelectItem value="cancelled">Cancelado</SelectItem>
