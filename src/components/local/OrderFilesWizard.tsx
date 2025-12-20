@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LocalOrder, OrderFile, OrderStatus } from '@/types/order';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,6 +29,13 @@ const OrderFilesWizard: React.FC<OrderFilesWizardProps> = ({ order, onStatusUpda
   const [statusLoading, setStatusLoading] = useState(false);
   const [newStatus, setNewStatus] = useState<OrderStatus>(order.status);
 
+  // Sincronizar el estado local del Select con el estado del pedido cuando el prop cambie
+  useEffect(() => {
+    if (order.status !== newStatus) {
+      setNewStatus(order.status);
+    }
+  }, [order.status]);
+
   const handleDownload = async (file: OrderFile) => {
     setLoadingFile(file.id);
     try {
@@ -56,12 +63,17 @@ const OrderFilesWizard: React.FC<OrderFilesWizardProps> = ({ order, onStatusUpda
   };
 
   const handleStatusChange = async (status: OrderStatus) => {
+    // Usar el estado local para la verificación inicial
     if (status === order.status) return;
     
     setStatusLoading(true);
     try {
-      await onStatusUpdate(status);
-      setNewStatus(status);
+      // Llama a la función del padre que actualiza la DB y recarga el pedido (prop 'order')
+      await onStatusUpdate(status); 
+      
+      // Ya no necesitamos llamar setNewStatus(status) aquí, ya que el useEffect se encargará
+      // de sincronizar el estado local cuando el prop 'order.status' cambie después de la recarga del padre.
+      
     } catch (error) {
       // Error handled by parent component (OrderDetail)
     } finally {
