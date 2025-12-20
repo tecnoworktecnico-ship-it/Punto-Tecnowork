@@ -145,39 +145,27 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
 
     const initSession = async () => {
       // Solo inicializar una vez
-      if (isInitialized.current) {
-        console.log('SessionContext - Already initialized, skipping');
+      if (isInitialized.current || isSigningOut.current) {
+        console.log('SessionContext - Already initialized or signing out, skipping init');
         return;
       }
       
       console.log('SessionContext - Initializing session...');
-      
-      // Si estamos cerrando sesión, no hacer nada
-      if (isSigningOut.current) {
-        console.log('SessionContext - Sign out in progress, skipping init');
-        return;
-      }
       
       try {
         const { data: { session: currentSession }, error } = await supabase.auth.getSession();
         
         if (error) {
           console.error('SessionContext - Error getting session:', error);
-          if (mounted) {
-            setLoading(false);
-            isInitialized.current = true;
-          }
           return;
         }
 
         console.log('SessionContext - Current session:', !!currentSession);
 
-        if (currentSession && mounted && !isSigningOut.current) {
+        if (currentSession && mounted) {
           // Bloquear la carga inicial si estamos en modo recuperación y en una ruta pública
           if (isRecoveryModeActive() && PUBLIC_PATHS.includes(location.pathname)) {
             console.log('SessionContext - Recovery mode active on init, blocking auto-login/redirection.');
-            setLoading(false);
-            isInitialized.current = true;
             return;
           }
 
@@ -186,7 +174,7 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           
           const profileData = await fetchProfile(currentSession.user.id);
           
-          if (profileData && mounted && !isSigningOut.current) {
+          if (profileData && mounted) {
             console.log('SessionContext - Profile loaded, role:', profileData.role);
             setProfile(profileData);
             
@@ -194,18 +182,14 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
             if (PUBLIC_PATHS.includes(currentPath) && currentPath !== '/reset-password') {
               redirectBasedOnRole(profileData.role, currentPath);
             }
-          } else if (mounted && !isSigningOut.current) {
+          } else if (mounted) {
             console.error('SessionContext - Could not load profile');
             // No mostrar error aquí, ya que podría ser un usuario recién creado sin perfil aún
           }
         }
-        
-        if (mounted) {
-          setLoading(false);
-          isInitialized.current = true;
-        }
       } catch (err) {
         console.error('SessionContext - Initialization error:', err);
+      } finally {
         if (mounted) {
           setLoading(false);
           isInitialized.current = true;

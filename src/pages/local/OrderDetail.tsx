@@ -19,7 +19,10 @@ const LocalOrderDetail = () => {
   const [loading, setLoading] = useState(true);
 
   const fetchOrder = useCallback(async () => {
-    if (!orderId || !profile?.id) return;
+    if (!orderId || !profile?.id) {
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
 
@@ -34,13 +37,13 @@ const LocalOrderDetail = () => {
       if (localError) {
         console.error('Error fetching local:', localError);
         showError('Error al cargar los datos del local.');
-        setLoading(false);
+        setOrder(null);
         return;
       }
 
       const localId = local.id;
 
-      // 2. Obtener el pedido, archivos y auditoría (sin unir perfiles)
+      // 2. Obtener el pedido, archivos y auditoría
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .select(`
@@ -57,16 +60,22 @@ const LocalOrderDetail = () => {
         showError('Pedido no encontrado o no tienes permiso para verlo.');
         setOrder(null);
       } else {
+        // 2.1 Obtener el perfil del cliente
+        const { data: clientProfileData } = await supabase
+          .from('profiles')
+          .select('first_name, last_name')
+          .eq('id', orderData.client_id)
+          .single();
+
         // Asegurar que order_audit esté ordenado por created_at
         const sortedAudit = (orderData.order_audit || []).sort((a: any, b: any) => 
           new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         );
         
-        // Crear un objeto profiles vacío para mantener la compatibilidad con la interfaz
         const orderWithProfiles = {
           ...orderData,
           order_audit: sortedAudit,
-          profiles: {
+          profiles: clientProfileData || {
             first_name: "Cliente",
             last_name: orderData.client_id.substring(0, 8) + "..."
           }
