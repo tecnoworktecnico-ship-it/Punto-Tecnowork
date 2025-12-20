@@ -238,6 +238,13 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
         
         // 3. Si estamos en una ruta pública y ocurre SIGNED_IN, verificar la bandera de recuperación
         if (event === 'SIGNED_IN' && currentSession) {
+          
+          // **NUEVA LÓGICA DE PREVENCIÓN DE RE-FETCH INNECESARIO**
+          if (isInitialized.current && !PUBLIC_PATHS.includes(location.pathname)) {
+            console.log('SessionContext - Already initialized on private route, ignoring redundant SIGNED_IN event.');
+            return;
+          }
+          
           const recoveryActive = isRecoveryModeActive();
           
           if (recoveryActive && PUBLIC_PATHS.includes(location.pathname)) {

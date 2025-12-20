@@ -20,6 +20,32 @@ const BrandingSettings = () => {
   const [loading, setLoading] = useState(true);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
 
+  const fetchBranding = async () => {
+    setLoading(true);
+    try {
+      // Usar maybeSingle() para manejar el caso de que no haya filas sin lanzar 406
+      const { data, error } = await supabase
+        .from('branding')
+        .select('id, main_logo_url, powered_by_logo_url, powered_by_logo_url_2')
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error fetching branding settings:', error);
+        showError('Error al cargar la configuración de branding.');
+      } else if (data) {
+        setMainLogoUrl(data.main_logo_url || '');
+        setPoweredByLogoUrl(data.powered_by_logo_url || '');
+        setPoweredByLogoUrl2(data.powered_by_logo_url_2 || '');
+      }
+    } catch (err) {
+      console.error('Unexpected error fetching branding:', err);
+      showError('Error inesperado al cargar la configuración.');
+    } finally {
+      setLoading(false);
+      setInitialLoadDone(true);
+    }
+  };
+
   useEffect(() => {
     if (!sessionLoading && profile?.role !== 'admin') {
       showError('No tienes permiso para acceder a esta página.');
@@ -27,35 +53,7 @@ const BrandingSettings = () => {
       return;
     }
     
-    if (initialLoadDone) return;
-
-    const fetchBranding = async () => {
-      setLoading(true);
-      try {
-        // Usar maybeSingle() para manejar el caso de que no haya filas sin lanzar 406
-        const { data, error } = await supabase
-          .from('branding')
-          .select('main_logo_url, powered_by_logo_url, powered_by_logo_url_2')
-          .maybeSingle();
-
-        if (error) {
-          console.error('Error fetching branding settings:', error);
-          showError('Error al cargar la configuración de branding.');
-        } else if (data) {
-          setMainLogoUrl(data.main_logo_url || '');
-          setPoweredByLogoUrl(data.powered_by_logo_url || '');
-          setPoweredByLogoUrl2(data.powered_by_logo_url_2 || '');
-        }
-      } catch (err) {
-        console.error('Unexpected error fetching branding:', err);
-        showError('Error inesperado al cargar la configuración.');
-      } finally {
-        setLoading(false);
-        setInitialLoadDone(true);
-      }
-    };
-
-    if (!sessionLoading && profile?.role === 'admin') {
+    if (!sessionLoading && profile?.role === 'admin' && !initialLoadDone) {
       fetchBranding();
     }
   }, [sessionLoading, profile, navigate, initialLoadDone]);
@@ -106,17 +104,9 @@ const BrandingSettings = () => {
         showSuccess('Configuración de branding guardada correctamente.');
       }
       
-      // 2. Recargar datos para asegurar que los estados locales se actualicen con la DB (usando maybeSingle)
-      const { data: updatedData } = await supabase
-        .from('branding')
-        .select('main_logo_url, powered_by_logo_url, powered_by_logo_url_2')
-        .maybeSingle();
-        
-      if (updatedData) {
-        setMainLogoUrl(updatedData.main_logo_url || '');
-        setPoweredByLogoUrl(updatedData.powered_by_logo_url || '');
-        setPoweredByLogoUrl2(updatedData.powered_by_logo_url_2 || '');
-      }
+      // 2. Recargar datos para asegurar que los estados locales se actualicen con la DB
+      await fetchBranding();
+      
     } catch (err) {
       console.error('Error inesperado en handleSave:', err);
       showError(err instanceof Error ? err.message : 'Error inesperado al guardar el branding.');
@@ -125,9 +115,44 @@ const BrandingSettings = () => {
     }
   };
 
-  const handleClearLogo = (setter: React.Dispatch<React.SetStateAction<string>>) => {
-    setter('');
-    // No mostramos el toast aquí, ya que el usuario debe hacer clic en Guardar para confirmar el cambio.
+  const handleClearLogo = async (
+    field: 'main_logo_url' | 'powered_by_logo_url' | 'powered_by_logo_url_2', 
+    setter: React.Dispatch<React.SetStateAction<string>>
+  ) => {
+    if (!confirm('¿Estás seguro de que deseas eliminar este logo?')) return;
+    
+    setLoading(true);
+    setter(''); // Limpiar el estado local inmediatamente
+
+    try {
+      const { data: existingBranding, error: fetchError } = await supabase
+        .from('branding')
+        .select('id')
+        .maybeSingle();
+        
+      if (fetchError) throw new Error(fetchError.message);
+      
+      if (existingBranding) {
+        const { error: updateError } = await supabase
+          .from('branding')
+          .update({ [field]: null, updated_at: new Date().toISOString() })
+          .eq('id', existingBranding.id);
+          
+        if (updateError) throw new Error(updateError.message);
+        
+        showSuccess('Logo eliminado correctamente. Recuerda que puedes pegar una nueva URL y guardar.');
+        
+        // Forzar recarga para actualizar la vista previa y el estado
+        await fetchBranding();
+      } else {
+        showError('No se encontró configuración de branding para actualizar.');
+      }
+    } catch (err) {
+      console.error('Error clearing logo:', err);
+      showError(`Error al eliminar el logo: ${err instanceof Error ? err.message : 'Error desconocido'}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (sessionLoading || loading) {
@@ -176,8 +201,8 @@ const BrandingSettings = () => {
                   type="button" 
                   variant="outline" 
                   size="icon" 
-                  onClick={() => handleClearLogo(setMainLogoUrl)}
-                  disabled={!mainLogoUrl}
+                  onClick={() => handleClearLogo('main_logo_url', setMainLogoUrl)}
+                  disabled={!mainLogoUrl || loading}
                   title="Borrar Logo"
                   className="flex-shrink-0 text-emphasis-red hover:bg-red-50"
                 >
@@ -210,8 +235,8 @@ const BrandingSettings = () => {
                   type="button" 
                   variant="outline" 
                   size="icon" 
-                  onClick={() => handleClearLogo(setPoweredByLogoUrl)}
-                  disabled={!poweredByLogoUrl}
+                  onClick={() => handleClearLogo('powered_by_logo_url', setPoweredByLogoUrl)}
+                  disabled={!poweredByLogoUrl || loading}
                   title="Borrar Logo"
                   className="flex-shrink-0 text-emphasis-red hover:bg-red-50"
                 >
@@ -244,8 +269,8 @@ const BrandingSettings = () => {
                   type="button" 
                   variant="outline" 
                   size="icon" 
-                  onClick={() => handleClearLogo(setPoweredByLogoUrl2)}
-                  disabled={!poweredByLogoUrl2}
+                  onClick={() => handleClearLogo('powered_by_logo_url_2', setPoweredByLogoUrl2)}
+                  disabled={!poweredByLogoUrl2 || loading}
                   title="Borrar Logo"
                   className="flex-shrink-0 text-emphasis-red hover:bg-red-50"
                 >
