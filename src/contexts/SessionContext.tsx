@@ -56,6 +56,7 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
   const isSigningOut = useRef(false);
   const isInitialized = useRef(false);
   const isRequestingPasswordReset = useRef(false);
+  const mounted = useRef(true); // Usar useRef para mounted
 
   const setIsRequestingPasswordReset = (value: boolean) => {
     console.log('SessionContext - Setting isRequestingPasswordReset to:', value);
@@ -71,14 +72,14 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           .from('profiles')
           .select('*')
           .eq('id', userId)
-          .maybeSingle(); // Usar maybeSingle para evitar errores 406 si no existe
+          .maybeSingle();
 
         if (profileError) {
           console.error(`Error fetching profile (attempt ${i + 1}):`, profileError);
           
           if (i < retries - 1) {
             console.log('Waiting before retry...');
-            await new Promise(resolve => setTimeout(resolve, 500 * (i + 1))); // Reducir tiempo de espera
+            await new Promise(resolve => setTimeout(resolve, 500 * (i + 1)));
             continue;
           }
           
@@ -90,7 +91,6 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           return profileData as Profile;
         }
         
-        // Si no hay datos (null), esperar y reintentar si es necesario (puede ser un problema de latencia del trigger)
         if (i < retries - 1) {
           console.log('Profile data is null, waiting before retry...');
           await new Promise(resolve => setTimeout(resolve, 500 * (i + 1)));
@@ -123,12 +123,10 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
   const redirectBasedOnRole = (role: string, currentPath: string) => {
     console.log('SessionContext - Redirecting based on role:', role, 'current path:', currentPath);
     
-    // No redirigir si ya estamos en la ruta correcta
     if (role === 'admin' && currentPath.startsWith('/admin')) return;
     if (role === 'local' && currentPath.startsWith('/local')) return;
     if (role === 'client' && currentPath.startsWith('/client')) return;
     
-    // Solo redirigir si estamos en una ruta pública
     if (!PUBLIC_PATHS.includes(currentPath)) return;
     
     if (role === 'admin') {
@@ -141,14 +139,22 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
   };
 
   useEffect(() => {
-    let mounted = true;
-
+    mounted.current = true;
+    
     const initSession = async () => {
-      // Solo inicializar una vez
       if (isInitialized.current || isSigningOut.current) {
         console.log('SessionContext - Already initialized or signing out, skipping init');
         return;
       }
+      
+      // Problema 1: Timeout de seguridad
+      const timeoutId = setTimeout(() => {
+        if (!isInitialized.current && mounted.current) {
+          console.warn('SessionContext - Initialization timeout (10s), forcing loading to false');
+          setLoading(false);
+          isInitialized.current = true;
+        }
+      }, 10000);
       
       console.log('SessionContext - Initializing session...');
       
@@ -162,9 +168,21 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
 
         console.log('SessionContext - Current session:', !!currentSession);
 
-        if (currentSession && mounted) {
+        if (currentSession && mounted.current && !isSigningOut.current) {
+          
+          // Problema 3: Verificar si la sesión está expirada (y NO estamos en recovery)
+          const expiresAt = currentSession.expires_at;
+          const isOnResetPage = location.pathname === '/reset-password';
+          const recoveryActive = isRecoveryModeActive();
+          
+          if (expiresAt && expiresAt * 1000 < Date.now() && !isOnResetPage && !recoveryActive) {
+            console.warn('SessionContext - Session token expired, clearing session');
+            await supabase.auth.signOut();
+            return; // Dejar que el finally y el listener manejen el estado final
+          }
+          
           // Bloquear la carga inicial si estamos en modo recuperación y en una ruta pública
-          if (isRecoveryModeActive() && PUBLIC_PATHS.includes(location.pathname)) {
+          if (recoveryActive && PUBLIC_PATHS.includes(location.pathname)) {
             console.log('SessionContext - Recovery mode active on init, blocking auto-login/redirection.');
             return;
           }
@@ -174,7 +192,7 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           
           const profileData = await fetchProfile(currentSession.user.id);
           
-          if (profileData && mounted) {
+          if (profileData && mounted.current) {
             console.log('SessionContext - Profile loaded, role:', profileData.role);
             setProfile(profileData);
             
@@ -182,15 +200,16 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
             if (PUBLIC_PATHS.includes(currentPath) && currentPath !== '/reset-password') {
               redirectBasedOnRole(profileData.role, currentPath);
             }
-          } else if (mounted) {
+          } else if (mounted.current) {
             console.error('SessionContext - Could not load profile');
-            // No mostrar error aquí, ya que podría ser un usuario recién creado sin perfil aún
           }
         }
       } catch (err) {
         console.error('SessionContext - Initialization error:', err);
       } finally {
-        if (mounted) {
+        // Asegurar que el timeout se limpie y el estado de carga se desactive
+        clearTimeout(timeoutId);
+        if (mounted.current) {
           setLoading(false);
           isInitialized.current = true;
         }
@@ -203,7 +222,7 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
       async (event, currentSession) => {
         console.log('SessionContext - Auth event:', event, 'has session:', !!currentSession, 'current path:', location.pathname);
         
-        if (!mounted || isSigningOut.current) return;
+        if (!mounted.current || isSigningOut.current) return;
 
         // 1. Manejar eventos de recuperación de contraseña
         if (event === 'PASSWORD_RECOVERY') {
@@ -212,6 +231,19 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           } else {
             console.log('SessionContext - Ignoring PASSWORD_RECOVERY event on', location.pathname);
           }
+          return;
+        }
+        
+        // Problema 2: Manejar INITIAL_SESSION explícitamente
+        if (event === 'INITIAL_SESSION') {
+          console.log('SessionContext - INITIAL_SESSION event, has session:', !!currentSession);
+          
+          // Si no hay sesión, asegurar que loading sea false
+          if (!currentSession && mounted.current) {
+            setLoading(false);
+            isInitialized.current = true;
+          }
+          // Si hay sesión, los eventos SIGNED_IN o TOKEN_REFRESHED la manejarán
           return;
         }
 
@@ -224,7 +256,7 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
         // 3. Si estamos en una ruta pública y ocurre SIGNED_IN, verificar la bandera de recuperación
         if (event === 'SIGNED_IN' && currentSession) {
           
-          // **NUEVA LÓGICA DE PREVENCIÓN DE RE-FETCH INNECESARIO**
+          // **PREVENCIÓN DE RE-FETCH INNECESARIO**
           if (isInitialized.current && !PUBLIC_PATHS.includes(location.pathname)) {
             console.log('SessionContext - Already initialized on private route, ignoring redundant SIGNED_IN event.');
             return;
@@ -242,17 +274,16 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           setSession(currentSession);
           setUser(currentSession.user);
           
-          // Reducir el delay de 1000ms a 300ms
           await new Promise(resolve => setTimeout(resolve, 300));
           
           try {
             const profileData = await fetchProfile(currentSession.user.id);
             
-            if (profileData && mounted) {
+            if (profileData && mounted.current) {
               console.log('SessionContext - Profile loaded, role:', profileData.role);
               setProfile(profileData);
               redirectBasedOnRole(profileData.role, location.pathname);
-            } else if (mounted) {
+            } else if (mounted.current) {
               console.error('SessionContext - Failed to load profile');
               showError('Error al cargar el perfil. Por favor, contacta al administrador.');
             }
@@ -293,10 +324,11 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
     );
 
     return () => {
-      mounted = false;
+      mounted.current = false;
       subscription.unsubscribe();
     };
-  }, [location.pathname, navigate]);
+  // Problema 4: Quitar location.pathname de las dependencias
+  }, [navigate]);
 
   const signOut = async () => {
     try {
