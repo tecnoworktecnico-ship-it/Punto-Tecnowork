@@ -163,6 +163,9 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
         
         if (error) {
           console.error('SessionContext - Error getting session:', error);
+          clearTimeout(timeoutId);
+          setLoading(false);
+          isInitialized.current = true;
           return;
         }
 
@@ -170,6 +173,33 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
 
         if (currentSession && mounted.current && !isSigningOut.current) {
           
+          // NUEVO: Verificar que la sesión sea realmente válida haciendo una prueba
+          try {
+            const { data: testUser, error: testError } = await supabase.auth.getUser();
+            
+            if (testError || !testUser?.user) {
+              console.warn('SessionContext - Session token invalid, clearing localStorage and signing out.');
+              // Limpiar el token corrupto
+              const storageKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+              if (storageKey) {
+                localStorage.removeItem(storageKey);
+              }
+              await supabase.auth.signOut();
+              setLoading(false);
+              isInitialized.current = true;
+              clearTimeout(timeoutId);
+              return;
+            }
+          } catch (verifyError) {
+            console.error('SessionContext - Error verifying session:', verifyError);
+            // Si hay error verificando, limpiar y empezar fresh
+            await supabase.auth.signOut();
+            setLoading(false);
+            isInitialized.current = true;
+            clearTimeout(timeoutId);
+            return;
+          }
+
           // Problema 3: Verificar si la sesión está expirada (y NO estamos en recovery)
           const expiresAt = currentSession.expires_at;
           const isOnResetPage = location.pathname === '/reset-password';
@@ -178,12 +208,16 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           if (expiresAt && expiresAt * 1000 < Date.now() && !isOnResetPage && !recoveryActive) {
             console.warn('SessionContext - Session token expired, clearing session');
             await supabase.auth.signOut();
+            clearTimeout(timeoutId); // Limpiar el timeout de seguridad
             return; // Dejar que el finally y el listener manejen el estado final
           }
           
           // Bloquear la carga inicial si estamos en modo recuperación y en una ruta pública
           if (recoveryActive && PUBLIC_PATHS.includes(location.pathname)) {
             console.log('SessionContext - Recovery mode active on init, blocking auto-login/redirection.');
+            clearTimeout(timeoutId);
+            setLoading(false);
+            isInitialized.current = true;
             return;
           }
 
@@ -327,7 +361,6 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
       mounted.current = false;
       subscription.unsubscribe();
     };
-  // Problema 4: Quitar location.pathname de las dependencias
   }, [navigate]);
 
   const signOut = async () => {
