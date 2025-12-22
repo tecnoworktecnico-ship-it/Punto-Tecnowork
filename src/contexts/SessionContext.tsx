@@ -147,14 +147,20 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
         return;
       }
       
-      // Problema 1: Timeout de seguridad
+      // Timeout reducido a 5 segundos (más rápido porque sessionStorage es más confiable)
       const timeoutId = setTimeout(() => {
         if (!isInitialized.current && mounted.current) {
-          console.warn('SessionContext - Initialization timeout (10s), forcing loading to false');
+          console.warn('SessionContext - Initialization timeout (5s), forcing loading to false');
+          // Limpiar sessionStorage si hay timeout
+          Object.keys(sessionStorage).forEach(key => {
+            if (key.startsWith('sb-')) {
+              sessionStorage.removeItem(key);
+            }
+          });
           setLoading(false);
           isInitialized.current = true;
         }
-      }, 10000);
+      }, 5000);
       
       console.log('SessionContext - Initializing session...');
       
@@ -173,34 +179,7 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
 
         if (currentSession && mounted.current && !isSigningOut.current) {
           
-          // NUEVO: Verificar que la sesión sea realmente válida haciendo una prueba
-          try {
-            const { data: testUser, error: testError } = await supabase.auth.getUser();
-            
-            if (testError || !testUser?.user) {
-              console.warn('SessionContext - Session token invalid, clearing localStorage and signing out.');
-              // Limpiar el token corrupto
-              const storageKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
-              if (storageKey) {
-                localStorage.removeItem(storageKey);
-              }
-              await supabase.auth.signOut();
-              setLoading(false);
-              isInitialized.current = true;
-              clearTimeout(timeoutId);
-              return;
-            }
-          } catch (verifyError) {
-            console.error('SessionContext - Error verifying session:', verifyError);
-            // Si hay error verificando, limpiar y empezar fresh
-            await supabase.auth.signOut();
-            setLoading(false);
-            isInitialized.current = true;
-            clearTimeout(timeoutId);
-            return;
-          }
-
-          // Problema 3: Verificar si la sesión está expirada (y NO estamos en recovery)
+          // Verificar si la sesión está expirada (y NO estamos en recovery)
           const expiresAt = currentSession.expires_at;
           const isOnResetPage = location.pathname === '/reset-password';
           const recoveryActive = isRecoveryModeActive();
@@ -209,7 +188,9 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
             console.warn('SessionContext - Session token expired, clearing session');
             await supabase.auth.signOut();
             clearTimeout(timeoutId); // Limpiar el timeout de seguridad
-            return; // Dejar que el finally y el listener manejen el estado final
+            setLoading(false);
+            isInitialized.current = true;
+            return;
           }
           
           // Bloquear la carga inicial si estamos en modo recuperación y en una ruta pública
@@ -235,7 +216,9 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
               redirectBasedOnRole(profileData.role, currentPath);
             }
           } else if (mounted.current) {
-            console.error('SessionContext - Could not load profile');
+            console.error('SessionContext - Could not load profile, clearing session');
+            // Si no se puede cargar el perfil (ej. RLS falla o no existe), forzar cierre de sesión
+            await supabase.auth.signOut();
           }
         }
       } catch (err) {
@@ -320,10 +303,12 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
             } else if (mounted.current) {
               console.error('SessionContext - Failed to load profile');
               showError('Error al cargar el perfil. Por favor, contacta al administrador.');
+              await supabase.auth.signOut(); // Forzar cierre de sesión si el perfil falla
             }
           } catch (err) {
             console.error('SessionContext - Error in SIGNED_IN handler:', err);
             showError('Error inesperado al procesar el inicio de sesión.');
+            await supabase.auth.signOut(); // Forzar cierre de sesión si hay error
           }
           return;
         }
