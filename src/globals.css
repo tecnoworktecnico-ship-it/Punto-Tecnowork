@@ -117,5 +117,6 @@
     background: linear-gradient(135deg, var(--primary-blue) 0%, #8A2BE2 100%); /* Blue to Violet */
     background-size: 200% 200%;
     animation: gradient-move 10s ease infinite;
+    overscroll-behavior-y: contain; /* Evita el pull-to-refresh en móvil */
   }
 }
