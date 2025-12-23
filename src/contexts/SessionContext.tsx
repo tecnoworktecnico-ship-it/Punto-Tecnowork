@@ -147,20 +147,15 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
         return;
       }
       
-      // Timeout reducido a 5 segundos (más rápido porque sessionStorage es más confiable)
+      // Timeout aumentado a 10 segundos
       const timeoutId = setTimeout(() => {
         if (!isInitialized.current && mounted.current) {
-          console.warn('SessionContext - Initialization timeout (5s), forcing loading to false');
-          // Limpiar sessionStorage si hay timeout
-          Object.keys(sessionStorage).forEach(key => {
-            if (key.startsWith('sb-')) {
-              sessionStorage.removeItem(key);
-            }
-          });
+          console.warn('SessionContext - Initialization timeout (10s), forcing loading to false');
+          // Eliminamos la limpieza de sessionStorage aquí
           setLoading(false);
           isInitialized.current = true;
         }
-      }, 5000);
+      }, 10000); 
       
       console.log('SessionContext - Initializing session...');
       
