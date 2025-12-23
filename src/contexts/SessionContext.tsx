@@ -147,15 +147,6 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
         return;
       }
       
-      // Timeout aumentado a 10 segundos
-      const timeoutId = setTimeout(() => {
-        if (!isInitialized.current && mounted.current) {
-          console.warn('SessionContext - Initialization timeout (10s), forcing loading to false');
-          setLoading(false);
-          isInitialized.current = true;
-        }
-      }, 10000); 
-      
       console.log('SessionContext - Initializing session...');
       
       try {
@@ -163,9 +154,6 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
         
         if (error) {
           console.error('SessionContext - Error getting session:', error);
-          clearTimeout(timeoutId);
-          setLoading(false);
-          isInitialized.current = true;
           return;
         }
 
@@ -173,26 +161,20 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
 
         if (currentSession && mounted.current && !isSigningOut.current) {
           
-          // Verificar si la sesión está expirada (y NO estamos en recovery)
-          const expiresAt = currentSession.expires_at;
           const isOnResetPage = location.pathname === '/reset-password';
           const recoveryActive = isRecoveryModeActive();
           
+          // Check session expiration (only if not on reset page or in recovery flow)
+          const expiresAt = currentSession.expires_at;
           if (expiresAt && expiresAt * 1000 < Date.now() && !isOnResetPage && !recoveryActive) {
             console.warn('SessionContext - Session token expired, clearing session');
             await supabase.auth.signOut();
-            clearTimeout(timeoutId); // Limpiar el timeout de seguridad
-            setLoading(false);
-            isInitialized.current = true;
             return;
           }
           
           // Bloquear la carga inicial si estamos en modo recuperación y en una ruta pública
           if (recoveryActive && PUBLIC_PATHS.includes(location.pathname)) {
             console.log('SessionContext - Recovery mode active on init, blocking auto-login/redirection.');
-            clearTimeout(timeoutId);
-            setLoading(false);
-            isInitialized.current = true;
             return;
           }
 
@@ -212,15 +194,12 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           } else if (mounted.current) {
             console.error('SessionContext - Could not load profile, keeping session but showing error.');
             showError('Error al cargar el perfil. Es posible que la conexión sea inestable.');
-            // Mantenemos la sesión activa, pero el perfil es nulo.
             setProfile(null); 
           }
         }
       } catch (err) {
         console.error('SessionContext - Initialization error:', err);
       } finally {
-        // Asegurar que el timeout se limpie y el estado de carga se desactive
-        clearTimeout(timeoutId);
         if (mounted.current) {
           setLoading(false);
           isInitialized.current = true;
@@ -246,32 +225,19 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           return;
         }
         
-        // Problema 2: Manejar INITIAL_SESSION explícitamente
-        if (event === 'INITIAL_SESSION') {
-          console.log('SessionContext - INITIAL_SESSION event, has session:', !!currentSession);
-          
-          // Si no hay sesión, asegurar que loading sea false
-          if (!currentSession && mounted.current) {
-            setLoading(false);
-            isInitialized.current = true;
-          }
-          // Si hay sesión, los eventos SIGNED_IN o TOKEN_REFRESHED la manejarán
-          return;
-        }
-
         // 2. Si estamos en reset-password, ignorar TODOS los eventos excepto SIGNED_OUT
         if (location.pathname === '/reset-password' && event !== 'SIGNED_OUT') {
           console.log('SessionContext - On reset-password page, ignoring', event, 'event');
           return;
         }
         
-        // 3. Si estamos en una ruta pública y ocurre SIGNED_IN, verificar la bandera de recuperación
+        // 3. Manejar SIGNED_IN
         if (event === 'SIGNED_IN' && currentSession) {
           
-          // **PREVENCIÓN DE RE-FETCH INNECESARIO**
-          if (isInitialized.current && !PUBLIC_PATHS.includes(location.pathname)) {
-            console.log('SessionContext - Already initialized on private route, ignoring redundant SIGNED_IN event.');
-            return;
+          // Prevenir re-fetch si el usuario ya está cargado
+          if (user?.id === currentSession.user.id) {
+             console.log('SessionContext - SIGNED_IN event detected, but user is already loaded. Skipping profile fetch/redirection.');
+             return;
           }
           
           const recoveryActive = isRecoveryModeActive();
@@ -286,6 +252,11 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           setSession(currentSession);
           setUser(currentSession.user);
           
+          // Asegurarse de que loading se mantenga true si la inicialización aún no terminó
+          if (!isInitialized.current) {
+             setLoading(true);
+          }
+          
           await new Promise(resolve => setTimeout(resolve, 300));
           
           try {
@@ -298,12 +269,16 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
             } else if (mounted.current) {
               console.error('SessionContext - Failed to load profile, keeping session but showing error.');
               showError('Error al cargar el perfil. Es posible que la conexión sea inestable.');
-              setProfile(null); // Mantener sesión, pero perfil nulo
+              setProfile(null); 
             }
           } catch (err) {
             console.error('SessionContext - Error in SIGNED_IN handler:', err);
             showError('Error inesperado al procesar el inicio de sesión.');
-            // No forzar signOut aquí
+          } finally {
+             if (mounted.current) {
+                setLoading(false);
+                isInitialized.current = true;
+             }
           }
           return;
         }
@@ -341,7 +316,7 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
       mounted.current = false;
       subscription.unsubscribe();
     };
-  }, [navigate]);
+  }, [navigate, user?.id]); // Añadir user?.id como dependencia para el chequeo de redundancia
 
   const signOut = async () => {
     try {
