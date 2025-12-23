@@ -8,36 +8,31 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // ============================================
-// SISTEMA HÍBRIDO: localStorage + sessionStorage heartbeat
-// Soluciona: pull-to-refresh en móviles + cierre de pestaña en desktop
+// SISTEMA HÍBRIDO: modo banking solo en desktop
+// En móvil: sesión persiste durante pull-to-refresh
+// En desktop: sesión se limpia al cerrar pestaña
 // ============================================
 
 const SESSION_HEARTBEAT_KEY = 'app_session_heartbeat';
 
-// Verificar si es una nueva pestaña/ventana (vs pull-to-refresh)
-const isNewBrowserSession = () => {
-  const heartbeat = sessionStorage.getItem(SESSION_HEARTBEAT_KEY);
-  return !heartbeat;
-};
+// Detectar si es dispositivo móvil
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-// Si es una nueva sesión de navegador (pestaña cerrada y reabierta),
-// limpiar tokens antiguos de localStorage
-if (isNewBrowserSession()) {
-  console.log('New browser session detected, clearing old auth tokens');
-  Object.keys(localStorage).forEach(key => {
-    if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
-      localStorage.removeItem(key);
-    }
-  });
+// Solo en desktop: verificar si es nueva pestaña y limpiar tokens
+if (!isMobile) {
+  const heartbeat = sessionStorage.getItem(SESSION_HEARTBEAT_KEY);
+  if (!heartbeat) {
+    console.log('Desktop: New browser session detected, clearing old auth tokens');
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+        localStorage.removeItem(key);
+      }
+    });
+  }
 }
 
-// Establecer el heartbeat para indicar que la pestaña está activa
+// Establecer heartbeat (útil para desktop)
 sessionStorage.setItem(SESSION_HEARTBEAT_KEY, Date.now().toString());
-
-// Actualizar el heartbeat periódicamente (cada 30 segundos)
-setInterval(() => {
-  sessionStorage.setItem(SESSION_HEARTBEAT_KEY, Date.now().toString());
-}, 30000);
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
