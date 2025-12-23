@@ -9,10 +9,11 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 // ============================================
 // SISTEMA HÍBRIDO: modo banking solo en desktop
-// En móvil: sesión persiste durante pull-to-refresh
-// En desktop: sesión se limpia al cerrar pestaña
+// COMENTADO: Esta lógica es demasiado agresiva y causa pérdida de sesión en refrescos rápidos.
+// Se usará la persistencia estándar de Supabase (localStorage).
 // ============================================
 
+/*
 const SESSION_HEARTBEAT_KEY = 'app_session_heartbeat';
 
 // Detectar si es dispositivo móvil
@@ -33,6 +34,7 @@ if (!isMobile) {
 
 // Establecer heartbeat (útil para desktop)
 sessionStorage.setItem(SESSION_HEARTBEAT_KEY, Date.now().toString());
+*/
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
