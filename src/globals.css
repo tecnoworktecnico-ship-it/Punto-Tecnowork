@@ -111,11 +111,16 @@
     @apply border-border;
   }
 
+  /* Modificación para permitir scroll nativo pero bloquear pull-to-refresh */
   html, body {
-    overscroll-behavior-y: none !important;
-    overscroll-behavior: none !important;
+    overscroll-behavior-y: contain !important; /* Bloquea el refresh pero permite scroll */
     height: 100%;
-    overflow: hidden;
+    overflow-y: auto !important; /* ¡Vuelve a activar el scroll! */
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #root {
+    height: 100%;
   }
 
   body {
