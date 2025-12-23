@@ -151,7 +151,6 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
       const timeoutId = setTimeout(() => {
         if (!isInitialized.current && mounted.current) {
           console.warn('SessionContext - Initialization timeout (10s), forcing loading to false');
-          // Eliminamos la limpieza de sessionStorage aquí
           setLoading(false);
           isInitialized.current = true;
         }
@@ -211,9 +210,10 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
               redirectBasedOnRole(profileData.role, currentPath);
             }
           } else if (mounted.current) {
-            console.error('SessionContext - Could not load profile, clearing session');
-            // Si no se puede cargar el perfil (ej. RLS falla o no existe), forzar cierre de sesión
-            await supabase.auth.signOut();
+            console.error('SessionContext - Could not load profile, keeping session but showing error.');
+            showError('Error al cargar el perfil. Es posible que la conexión sea inestable.');
+            // Mantenemos la sesión activa, pero el perfil es nulo.
+            setProfile(null); 
           }
         }
       } catch (err) {
@@ -296,14 +296,14 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
               setProfile(profileData);
               redirectBasedOnRole(profileData.role, location.pathname);
             } else if (mounted.current) {
-              console.error('SessionContext - Failed to load profile');
-              showError('Error al cargar el perfil. Por favor, contacta al administrador.');
-              await supabase.auth.signOut(); // Forzar cierre de sesión si el perfil falla
+              console.error('SessionContext - Failed to load profile, keeping session but showing error.');
+              showError('Error al cargar el perfil. Es posible que la conexión sea inestable.');
+              setProfile(null); // Mantener sesión, pero perfil nulo
             }
           } catch (err) {
             console.error('SessionContext - Error in SIGNED_IN handler:', err);
             showError('Error inesperado al procesar el inicio de sesión.');
-            await supabase.auth.signOut(); // Forzar cierre de sesión si hay error
+            // No forzar signOut aquí
           }
           return;
         }
