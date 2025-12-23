@@ -23,18 +23,19 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ allowedRoles, children }) => {
       return;
     }
 
-    // Si la carga inicial terminó y la sesión falta, iniciamos un período de gracia en móvil.
-    if (isMobile && !session && !isWaitingForSession) {
-      console.log('AuthGuard: Mobile detected, session missing, starting grace period.');
+    // Si la carga inicial terminó y la sesión falta, iniciamos un período de gracia (3000ms)
+    // Esto aplica a todos los dispositivos para dar tiempo a Supabase a inicializar.
+    if (!session && !isWaitingForSession) {
+      console.log('AuthGuard: Session missing, starting 3000ms grace period.');
       setIsWaitingForSession(true);
       
       const timer = setTimeout(() => {
-        // Si después de 5000ms, la sesión sigue faltando, permitimos la redirección.
+        // Si después de 3000ms, la sesión sigue faltando, permitimos la redirección.
         if (!session) {
           console.log('AuthGuard: Grace period expired, redirecting to login.');
           setIsWaitingForSession(false);
         }
-      }, 5000); // 5000ms período de gracia
+      }, 3000); // 3000ms período de gracia para todos
 
       return () => clearTimeout(timer);
     }
@@ -44,11 +45,11 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ allowedRoles, children }) => {
       setIsWaitingForSession(false);
     }
 
-  }, [loading, session, isMobile, isWaitingForSession]);
+  }, [loading, session, isWaitingForSession]);
 
 
-  // Mostrar cargando si la sesión está cargando O si estamos en el período de gracia móvil
-  if (loading || (isMobile && !session && isWaitingForSession)) {
+  // Mostrar cargando si la sesión está cargando O si estamos en el período de gracia
+  if (loading || (!session && isWaitingForSession)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
         <p className="text-white text-xl">Cargando autenticación...</p>
