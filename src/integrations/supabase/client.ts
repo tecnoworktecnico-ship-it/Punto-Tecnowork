@@ -7,28 +7,37 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Supabase URL or Anon Key is missing. Please check your .env file.');
 }
 
-// Versión de la app para invalidar sesiones antiguas en deploys nuevos
-const APP_SESSION_VERSION = import.meta.env.VITE_APP_VERSION || '1.0.0';
-const SESSION_VERSION_KEY = 'app_session_version';
+// ============================================
+// SISTEMA HÍBRIDO: localStorage + sessionStorage heartbeat
+// Soluciona: pull-to-refresh en móviles + cierre de pestaña en desktop
+// ============================================
 
-// Verificar si hay una versión antigua y limpiar si es necesario
-const storedVersion = sessionStorage.getItem(SESSION_VERSION_KEY);
-if (storedVersion !== APP_SESSION_VERSION) {
-  console.log('App version changed, clearing old session data');
-  // Limpiar cualquier dato de sesión antigua en sessionStorage
-  Object.keys(sessionStorage).forEach(key => {
-    if (key.startsWith('sb-')) {
-      sessionStorage.removeItem(key);
-    }
-  });
-  // Limpiar cualquier token de auth persistido en localStorage (por si acaso)
+const SESSION_HEARTBEAT_KEY = 'app_session_heartbeat';
+
+// Verificar si es una nueva pestaña/ventana (vs pull-to-refresh)
+const isNewBrowserSession = () => {
+  const heartbeat = sessionStorage.getItem(SESSION_HEARTBEAT_KEY);
+  return !heartbeat;
+};
+
+// Si es una nueva sesión de navegador (pestaña cerrada y reabierta),
+// limpiar tokens antiguos de localStorage
+if (isNewBrowserSession()) {
+  console.log('New browser session detected, clearing old auth tokens');
   Object.keys(localStorage).forEach(key => {
     if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
       localStorage.removeItem(key);
     }
   });
-  sessionStorage.setItem(SESSION_VERSION_KEY, APP_SESSION_VERSION);
 }
+
+// Establecer el heartbeat para indicar que la pestaña está activa
+sessionStorage.setItem(SESSION_HEARTBEAT_KEY, Date.now().toString());
+
+// Actualizar el heartbeat periódicamente (cada 30 segundos)
+setInterval(() => {
+  sessionStorage.setItem(SESSION_HEARTBEAT_KEY, Date.now().toString());
+}, 30000);
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
@@ -36,27 +45,26 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     detectSessionInUrl: true,
     flowType: 'pkce',
-    // Usar sessionStorage en lugar de localStorage
     storage: {
       getItem: (key) => {
         try {
-          return sessionStorage.getItem(key);
+          return localStorage.getItem(key);
         } catch {
           return null;
         }
       },
       setItem: (key, value) => {
         try {
-          sessionStorage.setItem(key, value);
+          localStorage.setItem(key, value);
         } catch {
-          // Ignorar errores de storage
+          // Ignorar errores
         }
       },
       removeItem: (key) => {
         try {
-          sessionStorage.removeItem(key);
+          localStorage.removeItem(key);
         } catch {
-          // Ignorar errores de storage
+          // Ignorar errores
         }
       },
     },
