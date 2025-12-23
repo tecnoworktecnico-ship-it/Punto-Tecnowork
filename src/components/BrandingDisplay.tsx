@@ -12,15 +12,9 @@ interface BrandingDisplayProps {
 const BrandingDisplay: React.FC<BrandingDisplayProps> = ({ type, className }) => {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    let isMounted = true;
-    let timeoutId: NodeJS.Timeout;
-
-    const fetchBranding = async (currentAttempt: number) => {
-      if (!isMounted) return;
-      
+    const fetchBranding = async () => {
       setLoading(true);
       
       const selectColumn = type === 'main' 
@@ -29,57 +23,26 @@ const BrandingDisplay: React.FC<BrandingDisplayProps> = ({ type, className }) =>
           ? 'powered_by_logo_url' 
           : 'powered_by_logo_url_2';
 
-      try {
-        const { data, error } = await supabase
-          .from('branding')
-          .select(selectColumn)
-          .maybeSingle();
+      const { data, error } = await supabase
+        .from('branding')
+        .select(selectColumn)
+        .maybeSingle(); // Usar maybeSingle para manejar el caso de no haber filas
 
-        if (!isMounted) return;
-
-        if (error) {
-          console.error(`Error fetching branding (Attempt ${currentAttempt + 1}):`, error);
-          
-          if (currentAttempt < 1) { // Intentar una vez más
-            timeoutId = setTimeout(() => {
-              setAttempt(currentAttempt + 1);
-            }, 1000);
-            return;
-          }
-          
-          setLogoUrl(null);
-        } else if (data) {
-          const url = data[selectColumn as keyof typeof data];
-          setLogoUrl(url || null);
-        } else {
-          setLogoUrl(null);
-        }
-      } catch (err) {
-        console.error(`Unexpected error fetching branding (Attempt ${currentAttempt + 1}):`, err);
-        if (currentAttempt < 1) {
-          timeoutId = setTimeout(() => {
-            setAttempt(currentAttempt + 1);
-          }, 1000);
-          return;
-        }
+      if (error) {
+        console.error('Error fetching branding:', error);
         setLogoUrl(null);
-      } finally {
-        if (isMounted && currentAttempt >= 1) {
-          setLoading(false);
-        } else if (isMounted && currentAttempt === 0 && !timeoutId) {
-          // Si la primera carga fue exitosa
-          setLoading(false);
-        }
+      } else if (data) {
+        // La columna seleccionada es dinámica, accedemos a ella por su nombre
+        const url = data[selectColumn as keyof typeof data];
+        setLogoUrl(url || null);
+      } else {
+        setLogoUrl(null); // No hay datos
       }
+      setLoading(false);
     };
 
-    fetchBranding(attempt);
-
-    return () => {
-      isMounted = false;
-      clearTimeout(timeoutId);
-    };
-  }, [type, attempt]);
+    fetchBranding();
+  }, [type]);
 
   if (loading) {
     return <Skeleton className={`h-12 w-32 ${className}`} />;
