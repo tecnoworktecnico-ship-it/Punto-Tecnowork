@@ -29,12 +29,12 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ allowedRoles, children }) => {
       setIsWaitingForSession(true);
       
       const timer = setTimeout(() => {
-        // Si después de 2000ms, la sesión sigue faltando, permitimos la redirección.
+        // Si después de 5000ms, la sesión sigue faltando, permitimos la redirección.
         if (!session) {
           console.log('AuthGuard: Grace period expired, redirecting to login.');
           setIsWaitingForSession(false);
         }
-      }, 2000); // 2000ms período de gracia
+      }, 5000); // 5000ms período de gracia
 
       return () => clearTimeout(timer);
     }
