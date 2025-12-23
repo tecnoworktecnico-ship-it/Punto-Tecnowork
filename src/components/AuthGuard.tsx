@@ -1,9 +1,10 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useSession } from '@/contexts/SessionContext';
 import { showError } from '@/utils/toast';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface AuthGuardProps {
   allowedRoles: string[];
@@ -12,8 +13,42 @@ interface AuthGuardProps {
 
 const AuthGuard: React.FC<AuthGuardProps> = ({ allowedRoles, children }) => {
   const { session, user, profile, loading } = useSession();
+  const isMobile = useIsMobile();
+  const [isWaitingForSession, setIsWaitingForSession] = useState(false);
 
-  if (loading) {
+  useEffect(() => {
+    if (loading) {
+      // Reset waiting state while loading
+      setIsWaitingForSession(false);
+      return;
+    }
+
+    // Si la carga inicial terminó y la sesión falta, iniciamos un período de gracia en móvil.
+    if (isMobile && !session && !isWaitingForSession) {
+      console.log('AuthGuard: Mobile detected, session missing, starting grace period.');
+      setIsWaitingForSession(true);
+      
+      const timer = setTimeout(() => {
+        // Si después de 500ms, la sesión sigue faltando, permitimos la redirección.
+        if (!session) {
+          console.log('AuthGuard: Grace period expired, redirecting to login.');
+          setIsWaitingForSession(false);
+        }
+      }, 500); // 500ms período de gracia
+
+      return () => clearTimeout(timer);
+    }
+    
+    // Si la sesión está presente, detenemos la espera.
+    if (session && isWaitingForSession) {
+      setIsWaitingForSession(false);
+    }
+
+  }, [loading, session, isMobile, isWaitingForSession]);
+
+
+  // Mostrar cargando si la sesión está cargando O si estamos en el período de gracia móvil
+  if (loading || (isMobile && !session && isWaitingForSession)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
         <p className="text-white text-xl">Cargando autenticación...</p>
