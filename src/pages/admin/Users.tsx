@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/contexts/SessionContext';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +40,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import PageWrapper from '@/components/PageWrapper';
+import AnimatedHeader from '@/components/AnimatedHeader';
+import ContentCard from '@/components/ContentCard';
 
 interface User {
   id: string;
@@ -299,9 +302,14 @@ const Users = () => {
     if (!userItem) return;
 
     if (newRole === 'local' && !userItem.local_name) {
-      showError('Para asignar el rol "Local", primero debes asignar un local a este usuario desde la sección de Gestión de Locales.');
-      navigate('/admin/locals');
-      return;
+      // Permitir cambiar a 'local' si el usuario ya tiene un local asignado (local_name existe)
+      // Si no tiene local asignado, advertir.
+      const currentLocal = locals.find(l => l.manager_id === userId);
+      if (!currentLocal) {
+        showError('Para asignar el rol "Local", primero debes asignar un local a este usuario desde la sección de Gestión de Locales.');
+        navigate('/admin/locals');
+        return;
+      }
     }
 
     if (!confirm(`¿Estás seguro de que deseas cambiar el rol de ${userItem.email} a ${newRole}?`)) return;
@@ -311,47 +319,21 @@ const Users = () => {
     try {
       console.log(`Actualizando rol de usuario ${userId} a ${newRole}`);
       
-      // Método 1: Actualizar directamente en la tabla profiles
-      const { error: directUpdateError } = await supabase
-        .from('profiles')
-        .update({ 
-          role: newRole,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', userId);
-        
-      if (directUpdateError) {
-        console.error('Error updating role directly:', directUpdateError);
-        throw new Error(`Error actualizando rol directamente: ${directUpdateError.message}`);
-      }
+      // Usar la función RPC para manejar la lógica de desasignación de local si el rol cambia
+      const { data: rpcResult, error: rpcError } = await supabase.rpc('admin_update_user_role', {
+        target_user_id: userId,
+        new_role: newRole,
+      });
       
-      // Método 2: También usar la función RPC como respaldo
-      try {
-        const { data: rpcResult, error: rpcError } = await supabase.rpc('admin_update_user_role', {
-          target_user_id: userId,
-          new_role: newRole,
-        });
-        
-        if (rpcError) {
-          console.error('Error updating role with RPC (non-critical):', rpcError);
-          // No lanzar error aquí, ya que la actualización directa funcionó
-        } else {
-          console.log('RPC result:', rpcResult);
-        }
-      } catch (rpcErr) {
-        console.error('Exception in RPC call (non-critical):', rpcErr);
-        // No lanzar error aquí, ya que la actualización directa funcionó
+      if (rpcError) {
+        console.error('Error updating role with RPC:', rpcError);
+        throw new Error(`Error actualizando rol: ${rpcError.message}`);
       }
       
       // Esperar un momento para que los cambios se propaguen
       await new Promise(resolve => setTimeout(resolve, 500));
       
       showSuccess(`Rol actualizado correctamente a ${newRole}. El usuario deberá volver a iniciar sesión para que el cambio surta efecto.`);
-      
-      // Actualizar la lista de usuarios localmente
-      setUsers(users.map(u => 
-        u.id === userId ? { ...u, role: newRole } : u
-      ));
       
       // Recargar los datos para asegurarnos de que todo está actualizado
       setTimeout(() => {
@@ -404,306 +386,307 @@ const Users = () => {
   }
 
   return (
-    <div className="min-h-screen p-4 bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
-      <div className="max-w-6xl mx-auto">
-        <Card className="bg-white rounded-lg shadow-lg">
-          <CardHeader>
-            <div className="flex items-center justify-between mb-4">
-              <Button
-                variant="ghost"
-                onClick={() => navigate('/admin/dashboard')}
-                className="flex items-center gap-2 text-text-carbon hover:text-primary-blue"
-              >
-                <ArrowLeft className="h-5 w-5" />
-                Volver al Dashboard
-              </Button>
-              <div className="flex gap-2">
-                <Button
-                  onClick={fetchData}
-                  variant="outline"
-                  className="flex items-center gap-2"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Actualizar
-                </Button>
-                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button
-                      onClick={openCreateDialog}
-                      className="bg-primary-blue hover:bg-blue-700 text-white flex items-center gap-2"
-                    >
-                      <UserPlus className="h-5 w-5" />
-                      Nuevo Usuario
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-[500px]">
-                    <DialogHeader>
-                      <DialogTitle>Crear Nuevo Usuario</DialogTitle>
-                      <DialogDescription>
-                        Completa los datos para crear un nuevo usuario. Se enviará un correo de verificación.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                      <div>
-                        <Label htmlFor="email">Correo Electrónico *</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          value={formData.email}
-                          onChange={(e) =>
-                            setFormData({ ...formData, email: e.target.value })
-                          }
-                          required
-                          placeholder="usuario@ejemplo.com"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="first_name">Nombre *</Label>
-                        <Input
-                          id="first_name"
-                          value={formData.first_name}
-                          onChange={(e) =>
-                            setFormData({ ...formData, first_name: e.target.value })
-                          }
-                          required
-                          placeholder="Nombre"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="last_name">Apellido *</Label>
-                        <Input
-                          id="last_name"
-                          value={formData.last_name}
-                          onChange={(e) =>
-                            setFormData({ ...formData, last_name: e.target.value })
-                          }
-                          required
-                          placeholder="Apellido"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="phone_number">Número de Teléfono *</Label>
-                        <Input
-                          id="phone_number"
-                          type="tel"
-                          value={formData.phone_number}
-                          onChange={(e) =>
-                            setFormData({ ...formData, phone_number: e.target.value })
-                          }
-                          required
-                          placeholder="Ej: 555-1234"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="role">Rol *</Label>
-                        <Select
-                          value={formData.role}
-                          onValueChange={(value) =>
-                            setFormData({ ...formData, role: value })
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecciona un rol" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="client">Cliente</SelectItem>
-                            <SelectItem value="local">Local</SelectItem>
-                            <SelectItem value="admin">Administrador</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      {formData.role === 'local' && locals.length > 0 && (
+    <PageWrapper showFooter={true} showMadeWithDyad={true}>
+      <AnimatedHeader 
+        title="Gestión de Usuarios" 
+        showSignOut={true} 
+        showBackButton={true} 
+        backPath="/admin/dashboard"
+      />
+      
+      <main className="p-4">
+        <div className="max-w-6xl mx-auto pt-8 pb-12">
+          <ContentCard>
+            <CardHeader>
+              <div className="flex items-center justify-between mb-4">
+                <h1 className="text-3xl font-bold text-text-carbon">
+                  Gestión de Usuarios
+                </h1>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={fetchData}
+                    variant="outline"
+                    className="flex items-center gap-2 hover-scale"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    Actualizar
+                  </Button>
+                  <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button
+                        onClick={openCreateDialog}
+                        className="bg-primary-blue hover:bg-blue-700 text-white flex items-center gap-2 hover-scale btn-shimmer"
+                      >
+                        <UserPlus className="h-5 w-5" />
+                        Nuevo Usuario
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[500px]">
+                      <DialogHeader>
+                        <DialogTitle>Crear Nuevo Usuario</DialogTitle>
+                        <DialogDescription>
+                          Completa los datos para crear un nuevo usuario. Se enviará un correo de verificación.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
-                          <Label htmlFor="local_id">Asignar Local</Label>
+                          <Label htmlFor="email">Correo Electrónico *</Label>
+                          <Input
+                            id="email"
+                            type="email"
+                            value={formData.email}
+                            onChange={(e) =>
+                              setFormData({ ...formData, email: e.target.value })
+                            }
+                            required
+                            placeholder="usuario@ejemplo.com"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="first_name">Nombre *</Label>
+                          <Input
+                            id="first_name"
+                            value={formData.first_name}
+                            onChange={(e) =>
+                              setFormData({ ...formData, first_name: e.target.value })
+                            }
+                            required
+                            placeholder="Nombre"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="last_name">Apellido *</Label>
+                          <Input
+                            id="last_name"
+                            value={formData.last_name}
+                            onChange={(e) =>
+                              setFormData({ ...formData, last_name: e.target.value })
+                            }
+                            required
+                            placeholder="Apellido"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="phone_number">Número de Teléfono *</Label>
+                          <Input
+                            id="phone_number"
+                            type="tel"
+                            value={formData.phone_number}
+                            onChange={(e) =>
+                              setFormData({ ...formData, phone_number: e.target.value })
+                            }
+                            required
+                            placeholder="Ej: 555-1234"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="role">Rol *</Label>
                           <Select
-                            value={formData.local_id}
+                            value={formData.role}
                             onValueChange={(value) =>
-                              setFormData({ ...formData, local_id: value })
+                              setFormData({ ...formData, role: value })
                             }
                           >
                             <SelectTrigger>
-                              <SelectValue placeholder="Selecciona un local" />
+                              <SelectValue placeholder="Selecciona un rol" />
                             </SelectTrigger>
                             <SelectContent>
-                              {locals.map((local) => (
-                                <SelectItem key={local.id} value={local.id}>
-                                  {local.name}
-                                </SelectItem>
-                              ))}
+                              <SelectItem value="client">Cliente</SelectItem>
+                              <SelectItem value="local">Local</SelectItem>
+                              <SelectItem value="admin">Administrador</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
-                      )}
-                      <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
-                        <p className="text-sm text-yellow-800">
-                          <strong>Nota:</strong> La contraseña temporal será "TempPass123!". 
-                          El usuario deberá cambiarla en su primer inicio de sesión.
-                        </p>
-                      </div>
-                      <div className="flex gap-2 justify-end">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => {
-                            setDialogOpen(false);
-                            resetForm();
-                          }}
-                        >
-                          Cancelar
-                        </Button>
-                        <Button
-                          type="submit"
-                          disabled={loading}
-                          className="bg-primary-blue hover:bg-blue-700 text-white"
-                        >
-                          {loading ? 'Creando...' : 'Crear Usuario'}
-                        </Button>
-                      </div>
-                    </form>
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </div>
-            <CardTitle className="text-3xl font-bold text-text-carbon">
-              Gestión de Usuarios
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {users.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                No hay usuarios registrados. Crea uno nuevo para comenzar.
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Correo</TableHead>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Teléfono</TableHead>
-                    <TableHead>Rol</TableHead>
-                    <TableHead>Verificado</TableHead>
-                    <TableHead>Local Asignado</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users.map((userItem) => (
-                    <TableRow key={userItem.id}>
-                      <TableCell className="font-medium">
-                        {userItem.email || 'Sin correo'}
-                        {userItem.id === user?.id && (
-                          <Badge variant="outline" className="ml-2 text-xs">
-                            Tú
-                          </Badge>
+                        {formData.role === 'local' && locals.length > 0 && (
+                          <div>
+                            <Label htmlFor="local_id">Asignar Local</Label>
+                            <Select
+                              value={formData.local_id}
+                              onValueChange={(value) =>
+                                setFormData({ ...formData, local_id: value })
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecciona un local" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {locals.map((local) => (
+                                  <SelectItem key={local.id} value={local.id}>
+                                    {local.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
                         )}
-                      </TableCell>
-                      <TableCell>
-                        {userItem.first_name || userItem.last_name 
-                          ? `${userItem.first_name || ''} ${userItem.last_name || ''}`.trim()
-                          : 'Sin nombre'}
-                      </TableCell>
-                      <TableCell className="text-sm text-gray-600">
-                        {userItem.phone_number || 'N/A'}
-                      </TableCell>
-                      <TableCell>
-                        <Select
-                          value={userItem.role}
-                          onValueChange={(value) => updateUserRole(userItem.id, value)}
-                          disabled={userItem.id === user?.id || updatingRole === userItem.id}
-                        >
-                          <SelectTrigger className="w-[130px]">
-                            <SelectValue>
-                              {updatingRole === userItem.id ? (
-                                <div className="flex items-center">
-                                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                  Actualizando...
-                                </div>
-                              ) : (
-                                <Badge 
-                                  variant={
-                                    userItem.role === 'admin' 
-                                      ? 'destructive' 
-                                      : userItem.role === 'local' 
-                                      ? 'default' 
-                                      : 'secondary'
-                                  }
-                                >
-                                  {userItem.role === 'admin' 
-                                    ? 'Administrador' 
-                                    : userItem.role === 'local' 
-                                    ? 'Local' 
-                                    : 'Cliente'}
-                                </Badge>
-                              )}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="client">Cliente</SelectItem>
-                            <SelectItem value="local">Local</SelectItem>
-                            <SelectItem value="admin">Administrador</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="flex items-center">
-                                {userItem.email_confirmed_at ? (
-                                  <CheckCircle className="h-5 w-5 text-success-green" />
-                                ) : (
-                                  <XCircle className="h-5 w-5 text-emphasis-red" />
-                                )}
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              {userItem.email_confirmed_at 
-                                ? `Verificado el ${new Date(userItem.email_confirmed_at).toLocaleDateString()}` 
-                                : 'Email no verificado'}
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </TableCell>
-                      <TableCell>
-                        {userItem.local_name || 'No asignado'}
-                      </TableCell>
-                      <TableCell className="text-right">
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+                          <p className="text-sm text-yellow-800">
+                            <strong>Nota:</strong> La contraseña temporal será "TempPass123!". 
+                            El usuario deberá cambiarla en su primer inicio de sesión.
+                          </p>
+                        </div>
                         <div className="flex gap-2 justify-end">
-                          {!userItem.email_confirmed_at && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              setDialogOpen(false);
+                              resetForm();
+                            }}
+                          >
+                            Cancelar
+                          </Button>
+                          <Button
+                            type="submit"
+                            disabled={loading}
+                            className="bg-primary-blue hover:bg-blue-700 text-white hover-scale"
+                          >
+                            {loading ? 'Creando...' : 'Crear Usuario'}
+                          </Button>
+                        </div>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {users.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No hay usuarios registrados. Crea uno nuevo para comenzar.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Correo</TableHead>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Teléfono</TableHead>
+                      <TableHead>Rol</TableHead>
+                      <TableHead>Verificado</TableHead>
+                      <TableHead>Local Asignado</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {users.map((userItem) => (
+                      <TableRow key={userItem.id}>
+                        <TableCell className="font-medium">
+                          {userItem.email || 'Sin correo'}
+                          {userItem.id === user?.id && (
+                            <Badge variant="outline" className="ml-2 text-xs">
+                              Tú
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {userItem.first_name || userItem.last_name 
+                            ? `${userItem.first_name || ''} ${userItem.last_name || ''}`.trim()
+                            : 'Sin nombre'}
+                        </TableCell>
+                        <TableCell className="text-sm text-gray-600">
+                          {userItem.phone_number || 'N/A'}
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={userItem.role}
+                            onValueChange={(value) => updateUserRole(userItem.id, value)}
+                            disabled={userItem.id === user?.id || updatingRole === userItem.id}
+                          >
+                            <SelectTrigger className="w-[130px]">
+                              <SelectValue>
+                                {updatingRole === userItem.id ? (
+                                  <div className="flex items-center">
+                                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                    Actualizando...
+                                  </div>
+                                ) : (
+                                  <Badge 
+                                    variant={
+                                      userItem.role === 'admin' 
+                                        ? 'destructive' 
+                                        : userItem.role === 'local' 
+                                        ? 'default' 
+                                        : 'secondary'
+                                    }
+                                  >
+                                    {userItem.role === 'admin' 
+                                      ? 'Administrador' 
+                                      : userItem.role === 'local' 
+                                      ? 'Local' 
+                                      : 'Cliente'}
+                                  </Badge>
+                                )}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="client">Cliente</SelectItem>
+                              <SelectItem value="local">Local</SelectItem>
+                              <SelectItem value="admin">Administrador</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center">
+                                  {userItem.email_confirmed_at ? (
+                                    <CheckCircle className="h-5 w-5 text-success-green" />
+                                  ) : (
+                                    <XCircle className="h-5 w-5 text-emphasis-red" />
+                                  )}
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {userItem.email_confirmed_at 
+                                  ? `Verificado el ${new Date(userItem.email_confirmed_at).toLocaleDateString()}` 
+                                  : 'Email no verificado'}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </TableCell>
+                        <TableCell>
+                          {userItem.local_name || 'No asignado'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex gap-2 justify-end">
+                            {!userItem.email_confirmed_at && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => resendVerificationEmail(userItem.email)}
+                                disabled={resendingEmail === userItem.email}
+                                className="text-primary-blue hover:text-blue-700 hover-scale"
+                              >
+                                {resendingEmail === userItem.email ? (
+                                  <RefreshCw className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Mail className="h-4 w-4" />
+                                )}
+                              </Button>
+                            )}
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => resendVerificationEmail(userItem.email)}
-                              disabled={resendingEmail === userItem.email}
-                              className="text-primary-blue hover:text-blue-700"
+                              onClick={() => handleDelete(userItem.id)}
+                              disabled={userItem.id === user?.id}
+                              className="text-emphasis-red hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed hover-scale"
                             >
-                              {resendingEmail === userItem.email ? (
-                                <RefreshCw className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Mail className="h-4 w-4" />
-                              )}
+                              <Trash2 className="h-4 w-4" />
                             </Button>
-                          )}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDelete(userItem.id)}
-                            disabled={userItem.id === user?.id}
-                            className="text-emphasis-red hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </ContentCard>
+        </div>
+      </main>
+    </PageWrapper>
   );
 };
 

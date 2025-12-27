@@ -8,7 +8,7 @@ import { CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { showSuccess, showError } from '@/utils/toast';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Eye, RefreshCw, FileText, Loader2 } from 'lucide-react';
+import { ArrowLeft, Eye, Store, RefreshCw, FileText, Loader2 } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -40,14 +40,13 @@ interface OrderFile {
   copies: number;
 }
 
-interface OrderWithDetails {
+interface OrderWithClient {
   order_id: string;
   client_id: string;
   client_email: string;
   client_first_name: string | null;
   client_last_name: string | null;
   local_id: string;
-  local_name: string;
   status: OrderStatus;
   total_price: number;
   points_earned: number;
@@ -57,42 +56,67 @@ interface OrderWithDetails {
   files: OrderFile[]; 
 }
 
-const AdminOrders = () => {
+const LocalOrders = () => {
   const { profile, loading: sessionLoading } = useSession();
   const navigate = useNavigate();
-  const [orders, setOrders] = useState<OrderWithDetails[]>([]);
+  const [orders, setOrders] = useState<OrderWithClient[]>([]);
+  const [localId, setLocalId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [localNotFound, setLocalNotFound] = useState(false);
 
   useEffect(() => {
-    if (!sessionLoading && profile?.role !== 'admin') {
+    if (!sessionLoading && profile?.role !== 'local') {
       showError('No tienes permiso para acceder a esta página.');
-      navigate('/admin/dashboard');
+      navigate('/local/dashboard');
     }
 
-    if (!sessionLoading && profile?.role === 'admin') {
-      fetchOrders();
+    if (!sessionLoading && profile?.role === 'local') {
+      fetchLocalAndOrders();
     }
   }, [sessionLoading, profile, navigate]);
 
-  const fetchOrders = async () => {
+  const fetchLocalAndOrders = async () => {
     setLoading(true);
+    setLocalNotFound(false);
 
     try {
-      // Usar la función RPC para obtener todos los pedidos con detalles
+      // Obtener el local del manager
+      const { data: local, error: localError } = await supabase
+        .from('locals')
+        .select('id')
+        .eq('manager_id', profile?.id)
+        .single();
+
+      if (localError) {
+        if (localError.code === 'PGRST116') {
+          setLocalNotFound(true);
+          setLoading(false);
+          return;
+        }
+        
+        console.error('Error fetching local:', localError);
+        showError('Error al cargar los datos del local.');
+        setLoading(false);
+        return;
+      }
+
+      setLocalId(local.id);
+
+      // Usar la función RPC para obtener pedidos con información del cliente
       const { data: ordersData, error: ordersError } = await supabase
-        .rpc('get_all_orders_with_details');
+        .rpc('get_local_orders_with_client_info', { target_local_id: local.id });
 
       if (ordersError) {
         console.error('Error fetching orders:', ordersError);
-        showError('Error al cargar los pedidos: ' + ordersError.message);
+        showError('Error al cargar los pedidos.');
         setLoading(false);
         return;
       }
 
       // Para cada pedido, obtener los archivos
       const ordersWithFiles = await Promise.all(
-        (ordersData || []).map(async (order: OrderWithDetails) => {
+        (ordersData || []).map(async (order: OrderWithClient) => {
           const { data: filesData, error: filesError } = await supabase
             .from('order_files')
             .select('file_name, copies')
@@ -140,11 +164,11 @@ const AdminOrders = () => {
         await supabase.from('order_audit').insert({
           order_id: orderId,
           user_id: profile?.id,
-          action: 'status_change_admin',
+          action: 'status_change',
           details: { new_status: newStatus }
         });
 
-        fetchOrders();
+        fetchLocalAndOrders();
       }
     } catch (error) {
       console.error('Unexpected error:', error);
@@ -154,7 +178,7 @@ const AdminOrders = () => {
     }
   };
 
-  const getClientDisplayName = (order: OrderWithDetails) => {
+  const getClientDisplayName = (order: OrderWithClient) => {
     const firstName = order.client_first_name || '';
     const lastName = order.client_last_name || '';
     const fullName = `${firstName} ${lastName}`.trim();
@@ -163,6 +187,7 @@ const AdminOrders = () => {
       return fullName;
     }
     
+    // Si no hay nombre, mostrar el email
     return order.client_email || 'Cliente desconocido';
   };
   
@@ -172,7 +197,7 @@ const AdminOrders = () => {
     if (files.length === 1) {
       return (
         <div className="flex flex-col">
-          <span className="font-medium truncate max-w-[150px]">{files[0].file_name}</span>
+          <span className="font-medium truncate max-w-[200px]">{files[0].file_name}</span>
           <span className="text-xs text-gray-500">{files[0].copies} copia{files[0].copies > 1 ? 's' : ''}</span>
         </div>
       );
@@ -219,31 +244,53 @@ const AdminOrders = () => {
     );
   }
 
-  if (profile?.role !== 'admin') {
+  if (profile?.role !== 'local') {
     return null;
+  }
+  
+  if (localNotFound) {
+    return (
+      <PageWrapper centerContent={true} showFooter={true} showMadeWithDyad={true}>
+        <ContentCard className="w-full max-w-md p-6 text-center">
+          <Store className="h-16 w-16 text-emphasis-red mx-auto mb-4" />
+          <CardTitle className="text-2xl font-bold text-text-carbon mb-2">Local No Asignado</CardTitle>
+          <CardContent>
+            <p className="text-gray-600 mb-4">
+              Tu cuenta de manager no está asignada a ningún local. Por favor, contacta al administrador para que te asigne un local.
+            </p>
+            <Button 
+              onClick={() => navigate('/local/dashboard')}
+              className="bg-primary-blue hover:bg-blue-700 text-white hover-scale"
+            >
+              Volver al Dashboard
+            </Button>
+          </CardContent>
+        </ContentCard>
+      </PageWrapper>
+    );
   }
 
   return (
     <PageWrapper showFooter={true} showMadeWithDyad={true}>
       <AnimatedHeader 
-        title="Gestión de Pedidos (Admin)" 
+        title="Gestión de Pedidos" 
         showSignOut={true} 
         showBackButton={true} 
-        backPath="/admin/dashboard"
+        backPath="/local/dashboard"
       />
       
       <main className="p-4">
-        <div className="max-w-7xl mx-auto pt-8 pb-12">
+        <div className="max-w-6xl mx-auto pt-8 pb-12">
           <ContentCard>
             <CardHeader>
               <div className="flex items-center justify-between mb-4">
                 <h1 className="text-3xl font-bold text-text-carbon">
-                  Gestión de Pedidos (Administrador)
+                  Gestión de Pedidos
                 </h1>
                 <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
-                    onClick={fetchOrders}
+                    onClick={fetchLocalAndOrders}
                     className="flex items-center gap-2 hover-scale"
                     disabled={loading}
                   >
@@ -277,21 +324,18 @@ const AdminOrders = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>ID Pedido</TableHead>
                       <TableHead>Cliente</TableHead>
-                      <TableHead>Local</TableHead>
                       <TableHead>Archivos</TableHead>
                       <TableHead>Total</TableHead>
+                      <TableHead>Puntos</TableHead>
                       <TableHead>Estado</TableHead>
                       <TableHead>Fecha</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredOrders.map((order) => (
                       <TableRow key={order.order_id}>
-                        <TableCell className="font-mono text-sm">
-                          {order.order_id.substring(0, 8)}...
-                        </TableCell>
                         <TableCell>
                           <div className="flex flex-col">
                             <span className="font-medium text-text-carbon">
@@ -302,14 +346,14 @@ const AdminOrders = () => {
                             </span>
                           </div>
                         </TableCell>
-                        <TableCell className="font-medium">
-                          {order.local_name || 'Local Eliminado'}
-                        </TableCell>
                         <TableCell>
                           {renderFilesList(order.files)}
                         </TableCell>
                         <TableCell className="font-bold text-success-green">
                           ${order.total_price.toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-secondary-yellow font-medium">
+                          {order.points_earned} pts
                         </TableCell>
                         <TableCell>
                           <Select
@@ -342,6 +386,17 @@ const AdminOrders = () => {
                             </span>
                           </div>
                         </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => navigate(`/local/orders/${order.order_id}`)}
+                            className="flex items-center gap-1 hover-scale"
+                          >
+                            <Eye className="h-4 w-4" />
+                            Ver
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -355,4 +410,4 @@ const AdminOrders = () => {
   );
 };
 
-export default AdminOrders;
+export default LocalOrders;

@@ -6,10 +6,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { showSuccess, showError } from '@/utils/toast';
 import { Loader2, Lock, CheckCircle } from 'lucide-react';
 import BrandingDisplay from '@/components/BrandingDisplay';
+import PageWrapper from '@/components/PageWrapper';
+import ContentCard from '@/components/ContentCard';
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -184,7 +186,7 @@ const ResetPassword = () => {
       }, 1500);
       
     } catch (err) {
-      console.error('ResetPassword - Unexpected error:', err);
+      console.error('Unexpected error:', err);
       showError('Error inesperado al actualizar la contraseña.');
       setLoading(false);
     }
@@ -201,9 +203,9 @@ const ResetPassword = () => {
 
   if (!tokenValid) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
-        <Card className="w-full max-w-md p-6 bg-white rounded-lg shadow-lg">
-          <CardContent className="text-center py-8">
+      <PageWrapper centerContent={true} showFooter={false} showMadeWithDyad={false}>
+        <ContentCard className="w-full max-w-md p-6 text-center">
+          <CardContent className="py-8">
             <p className="text-emphasis-red text-lg mb-4">
               El enlace de recuperación es inválido o ha expirado.
             </p>
@@ -211,16 +213,16 @@ const ResetPassword = () => {
               Serás redirigido al login en unos segundos...
             </p>
           </CardContent>
-        </Card>
-      </div>
+        </ContentCard>
+      </PageWrapper>
     );
   }
 
   if (passwordUpdated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
-        <Card className="w-full max-w-md p-6 bg-white rounded-lg shadow-lg">
-          <CardContent className="text-center py-8">
+      <PageWrapper centerContent={true} showFooter={false} showMadeWithDyad={false}>
+        <ContentCard className="w-full max-w-md p-6 text-center">
+          <CardContent className="py-8">
             <CheckCircle className="h-16 w-16 text-success-green mx-auto mb-4" />
             <p className="text-success-green text-2xl font-bold mb-4">
               ¡Contraseña Actualizada!
@@ -232,14 +234,14 @@ const ResetPassword = () => {
               Redirigiendo al login...
             </p>
           </CardContent>
-        </Card>
-      </div>
+        </ContentCard>
+      </PageWrapper>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
-      <Card className="w-full max-w-md p-6 bg-white rounded-lg shadow-lg">
+    <PageWrapper centerContent={true} showFooter={false} showMadeWithDyad={false}>
+      <ContentCard className="w-full max-w-md p-6">
         <CardHeader className="space-y-2">
           <div className="flex justify-center mb-4">
             <BrandingDisplay type="main" className="h-16" />
@@ -297,8 +299,8 @@ const ResetPassword = () => {
             </Button>
           </form>
         </CardContent>
-      </Card>
-    </div>
+      </ContentCard>
+    </PageWrapper>
   );
 };
 

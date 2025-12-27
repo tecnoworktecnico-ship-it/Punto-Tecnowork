@@ -3,17 +3,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSession } from '@/contexts/SessionContext';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
 import ProfileSettings from '@/components/ProfileSettings';
 import PasswordChangeAlert from '@/components/PasswordChangeAlert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Settings, LayoutDashboard, Star, Gift, ShoppingBag, Sparkles } from 'lucide-react';
+import { Settings, LayoutDashboard, Star, Gift, ShoppingBag, Sparkles, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
 import { Badge } from '@/components/ui/badge';
-import Footer from '@/components/Footer';
-import AppHeader from '@/components/AppHeader'; // Importar AppHeader
+import PageWrapper from '@/components/PageWrapper';
+import AnimatedHeader from '@/components/AnimatedHeader';
+import ContentCard from '@/components/ContentCard';
 
 interface FeaturedReward {
   id: string;
@@ -101,174 +102,176 @@ const ClientDashboard = () => {
   const displayName = profile?.first_name || user?.email;
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move text-text-on-color">
-      <AppHeader title={`Bienvenido, ${displayName}!`} />
+    <PageWrapper showFooter={true} showMadeWithDyad={true}>
+      <AnimatedHeader title={`Bienvenido, ${displayName}!`} />
       
-      <main className="flex-grow p-4">
-        <div className="w-full max-w-6xl mx-auto p-8 space-y-6 bg-white/80 backdrop-blur-sm rounded-lg shadow-lg">
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-4xl font-bold text-text-carbon">Tu Centro de Cliente</h1>
-          </div>
-          
-          {needsPasswordChange && (
-            <PasswordChangeAlert onNavigateToSettings={() => setActiveTab('settings')} />
-          )}
-
-          {/* Tarjeta de Puntos Destacada */}
-          <Card className="bg-secondary-yellow/20 border-secondary-yellow shadow-xl">
-            <CardContent className="p-6 flex justify-between items-center flex-wrap gap-4">
-              <div>
-                <p className="text-xl font-semibold text-text-carbon mb-1">Tus Puntos Actuales</p>
-                {loadingPoints ? (
-                  <div className="h-8 w-24 bg-gray-200 rounded animate-pulse"></div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <Star className="h-8 w-8 text-secondary-yellow fill-secondary-yellow" />
-                    <span className="text-5xl font-extrabold text-text-carbon">
-                      {userPoints}
-                    </span>
-                  </div>
-                )}
-              </div>
-              <Button 
-                onClick={() => navigate('/client/rewards')}
-                className="bg-primary-blue hover:bg-blue-700 text-white text-lg px-6 py-3 flex items-center gap-2"
-              >
-                <Gift className="h-6 w-6" />
-                Canjear Recompensas
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 md:w-1/3">
-              <TabsTrigger value="dashboard" className="flex items-center gap-2">
-                <LayoutDashboard className="h-4 w-4" /> Dashboard
-              </TabsTrigger>
-              <TabsTrigger value="settings" className="flex items-center gap-2">
-                <Settings className="h-4 w-4" /> Configuración
-              </TabsTrigger>
-            </TabsList>
+      <main className="p-4">
+        <div className="w-full max-w-6xl mx-auto pt-8 pb-12 space-y-6">
+          <ContentCard className="p-8 space-y-6">
+            <div className="flex justify-between items-center mb-6">
+              <h1 className="text-4xl font-bold text-text-carbon">Tu Centro de Cliente</h1>
+            </div>
             
-            <TabsContent value="dashboard" className="mt-6 space-y-6">
-              <p className="text-xl text-gray-600">Tu centro de gestión de pedidos y recompensas.</p>
+            {needsPasswordChange && (
+              <PasswordChangeAlert onNavigateToSettings={() => setActiveTab('settings')} />
+            )}
 
-              {/* Sección de Premios Destacados */}
-              {!loadingRewards && featuredRewards.length > 0 && (
-                <Card className="bg-gradient-to-r from-purple-50 to-pink-50 border-purple-300 shadow-lg">
-                  <CardHeader>
-                    <CardTitle className="text-2xl font-bold text-purple-700 flex items-center gap-2">
-                      <Sparkles className="h-6 w-6" />
-                      ¡Premios Destacados!
-                    </CardTitle>
-                    <CardDescription className="text-purple-600">
-                      Canjea tus puntos por increíbles recompensas. {totalRewardsCount > 3 && `¡Hay ${totalRewardsCount} premios disponibles!`}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {featuredRewards.map((reward) => {
-                        const canAfford = userPoints !== null && userPoints >= reward.points_cost;
-                        
-                        return (
-                          <Card 
-                            key={reward.id} 
-                            className={`overflow-hidden transition-all hover:shadow-xl ${canAfford ? 'border-success-green border-2' : 'border-gray-200'}`}
-                          >
-                            {reward.image_url && (
-                              <div className="h-32 bg-gray-100 overflow-hidden">
-                                <img 
-                                  src={reward.image_url} 
-                                  alt={reward.name}
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                            )}
-                            <CardContent className="p-4">
-                              <h4 className="font-bold text-lg text-text-carbon mb-2 line-clamp-1">
-                                {reward.name}
-                              </h4>
-                              {reward.description && (
-                                <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-                                  {reward.description}
-                                </p>
+            {/* Tarjeta de Puntos Destacada */}
+            <ContentCard delay={100} className="bg-secondary-yellow/20 border-secondary-yellow shadow-xl">
+              <CardContent className="p-6 flex justify-between items-center flex-wrap gap-4">
+                <div>
+                  <p className="text-xl font-semibold text-text-carbon mb-1">Tus Puntos Actuales</p>
+                  {loadingPoints ? (
+                    <div className="h-8 w-24 bg-gray-200 rounded animate-pulse"></div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Star className="h-8 w-8 text-secondary-yellow fill-secondary-yellow" />
+                      <span className="text-5xl font-extrabold text-text-carbon">
+                        {userPoints}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <Button 
+                  onClick={() => navigate('/client/rewards')}
+                  className="bg-primary-blue hover:bg-blue-700 text-white text-lg px-6 py-3 flex items-center gap-2 hover-scale btn-shimmer"
+                >
+                  <Gift className="h-6 w-6" />
+                  Canjear Recompensas
+                </Button>
+              </CardContent>
+            </ContentCard>
+
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-2 md:w-1/3">
+                <TabsTrigger value="dashboard" className="flex items-center gap-2">
+                  <LayoutDashboard className="h-4 w-4" /> Dashboard
+                </TabsTrigger>
+                <TabsTrigger value="settings" className="flex items-center gap-2">
+                  <Settings className="h-4 w-4" /> Configuración
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="dashboard" className="mt-6 space-y-6">
+                <p className="text-xl text-gray-600">Tu centro de gestión de pedidos y recompensas.</p>
+
+                {/* Sección de Premios Destacados */}
+                {!loadingRewards && featuredRewards.length > 0 && (
+                  <ContentCard delay={300} className="bg-gradient-to-r from-purple-50 to-pink-50 border-purple-300 shadow-lg">
+                    <CardHeader>
+                      <CardTitle className="text-2xl font-bold text-purple-700 flex items-center gap-2">
+                        <Sparkles className="h-6 w-6" />
+                        ¡Premios Destacados!
+                      </CardTitle>
+                      <CardDescription className="text-purple-600">
+                        Canjea tus puntos por increíbles recompensas. {totalRewardsCount > 3 && `¡Hay ${totalRewardsCount} premios disponibles!`}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {featuredRewards.map((reward, index) => {
+                          const canAfford = userPoints !== null && userPoints >= reward.points_cost;
+                          
+                          return (
+                            <ContentCard 
+                              key={reward.id} 
+                              delay={400 + index * 100}
+                              className={`overflow-hidden transition-all hover:shadow-xl ${canAfford ? 'border-success-green border-2' : 'border-gray-200'}`}
+                            >
+                              {reward.image_url && (
+                                <div className="h-32 bg-gray-100 overflow-hidden">
+                                  <img 
+                                    src={reward.image_url} 
+                                    alt={reward.name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
                               )}
-                              <div className="flex items-center justify-between">
-                                <Badge 
-                                  variant={canAfford ? "default" : "secondary"}
-                                  className={`${canAfford ? 'bg-success-green' : 'bg-gray-400'} text-white`}
-                                >
-                                  <Star className="h-3 w-3 mr-1" />
-                                  {reward.points_cost} pts
-                                </Badge>
-                                {canAfford && (
-                                  <span className="text-xs text-success-green font-semibold">
-                                    ¡Puedes canjearlo!
-                                  </span>
+                              <CardContent className="p-4">
+                                <h4 className="font-bold text-lg text-text-carbon mb-2 line-clamp-1">
+                                  {reward.name}
+                                </h4>
+                                {reward.description && (
+                                  <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                                    {reward.description}
+                                  </p>
                                 )}
-                              </div>
-                            </CardContent>
-                          </Card>
-                        );
-                      })}
-                    </div>
-                    <div className="mt-4 text-center">
-                      <Button 
-                        onClick={() => navigate('/client/rewards')}
-                        className="bg-purple-600 hover:bg-purple-700 text-white"
-                      >
-                        Ver Todos los Premios ({totalRewardsCount})
+                                <div className="flex items-center justify-between">
+                                  <Badge 
+                                    variant={canAfford ? "default" : "secondary"}
+                                    className={`${canAfford ? 'bg-success-green' : 'bg-gray-400'} text-white`}
+                                  >
+                                    <Star className="h-3 w-3 mr-1" />
+                                    {reward.points_cost} pts
+                                  </Badge>
+                                  {canAfford && (
+                                    <span className="text-xs text-success-green font-semibold">
+                                      ¡Puedes canjearlo!
+                                    </span>
+                                  )}
+                                </div>
+                              </CardContent>
+                            </ContentCard>
+                          );
+                        })}
+                      </div>
+                      <div className="mt-4 text-center">
+                        <Button 
+                          onClick={() => navigate('/client/rewards')}
+                          className="bg-purple-600 hover:bg-purple-700 text-white hover-scale"
+                        >
+                          Ver Todos los Premios ({totalRewardsCount})
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </ContentCard>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <ContentCard delay={700} className="bg-gray-50 shadow-md">
+                    <CardHeader>
+                      <CardTitle className="text-primary-blue flex items-center gap-2">
+                        <ShoppingBag className="h-5 w-5" /> Mis Pedidos
+                      </CardTitle>
+                      <CardDescription>Revisa el estado de tus pedidos y tu historial.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex flex-col space-y-2">
+                      <Button className="w-full hover-scale" onClick={() => navigate('/client/new-order')}>
+                        Realizar Nuevo Pedido
                       </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+                      <Button variant="outline" className="w-full hover-scale" onClick={() => navigate('/client/orders')}>
+                        Ver Mis Pedidos
+                      </Button>
+                    </CardContent>
+                  </ContentCard>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card className="bg-gray-50 shadow-md">
-                  <CardHeader>
-                    <CardTitle className="text-primary-blue flex items-center gap-2">
-                      <ShoppingBag className="h-5 w-5" /> Mis Pedidos
-                    </CardTitle>
-                    <CardDescription>Revisa el estado de tus pedidos y tu historial.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex flex-col space-y-2">
-                    <Button className="w-full" onClick={() => navigate('/client/new-order')}>
-                      Realizar Nuevo Pedido
-                    </Button>
-                    <Button variant="outline" className="w-full" onClick={() => navigate('/client/orders')}>
-                      Ver Mis Pedidos
-                    </Button>
-                  </CardContent>
-                </Card>
+                  <ContentCard delay={800} className="bg-gray-50 shadow-md">
+                    <CardHeader>
+                      <CardTitle className="text-primary-blue flex items-center gap-2">
+                        <Star className="h-5 w-5" /> Puntos y Recompensas
+                      </CardTitle>
+                      <CardDescription>Consulta tu historial de puntos y canjes.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex flex-col space-y-2">
+                      <Button variant="outline" className="w-full hover-scale" onClick={() => navigate('/client/rewards')}>
+                        Ver Recompensas Disponibles
+                      </Button>
+                      <Button variant="outline" className="w-full hover-scale" onClick={() => navigate('/client/points')}>
+                        Historial de Puntos
+                      </Button>
+                    </CardContent>
+                  </ContentCard>
+                </div>
+              </TabsContent>
 
-                <Card className="bg-gray-50 shadow-md">
-                  <CardHeader>
-                    <CardTitle className="text-primary-blue flex items-center gap-2">
-                      <Star className="h-5 w-5" /> Puntos y Recompensas
-                    </CardTitle>
-                    <CardDescription>Consulta tu historial de puntos y canjes.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex flex-col space-y-2">
-                    <Button variant="outline" className="w-full" onClick={() => navigate('/client/rewards')}>
-                      Ver Recompensas Disponibles
-                    </Button>
-                    <Button variant="outline" className="w-full" onClick={() => navigate('/client/points')}>
-                      Historial de Puntos
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="settings" className="mt-6">
-              <ProfileSettings onProfileUpdate={handleProfileUpdate} />
-            </TabsContent>
-          </Tabs>
+              <TabsContent value="settings" className="mt-6">
+                <ProfileSettings onProfileUpdate={handleProfileUpdate} />
+              </TabsContent>
+            </Tabs>
+          </ContentCard>
         </div>
       </main>
-      <Footer />
-    </div>
+    </PageWrapper>
   );
 };
 

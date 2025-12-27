@@ -12,7 +12,9 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { showSuccess, showError } from '@/utils/toast';
 import { Loader2 } from 'lucide-react';
-import Footer from '@/components/Footer'; // Importar Footer
+import Footer from '@/components/Footer';
+import PageWrapper from '@/components/PageWrapper';
+import ContentCard from '@/components/ContentCard';
 
 // Obtener la versión de la aplicación
 const APP_VERSION = import.meta.env.VITE_APP_VERSION || 'N/A';
@@ -292,15 +294,8 @@ function Login() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-6 sm:p-4 bg-gradient-to-br from-primary-blue via-purple-600 to-pink-500 bg-[length:400%_400%] animate-gradient-move relative overflow-hidden">
-      
-      {/* Blobs flotantes decorativos - RESPONSIVE */}
-      <div className="blob blob-1 bg-blue-400 -top-10 -left-10 sm:top-10 sm:-left-20 animate-blob-float" />
-      <div className="blob blob-2 bg-purple-500 -bottom-10 -right-10 sm:-bottom-20 sm:-right-20 animate-blob-float-reverse animation-delay-200" />
-      <div className="blob blob-3 bg-pink-400 top-1/3 -right-10 sm:top-1/2 sm:left-1/4 animate-blob-float animation-delay-400 hidden sm:block" />
-      
-      {/* Tarjeta principal con glassmorphism - MOBILE OPTIMIZED */}
-      <div className="w-full max-w-md p-5 sm:p-8 space-y-4 sm:space-y-6 glass-card rounded-2xl sm:rounded-3xl shadow-premium animate-card-enter relative z-10">
+    <PageWrapper centerContent={true} showFooter={false} showMadeWithDyad={false}>
+      <ContentCard className="w-full max-w-md p-5 sm:p-8 space-y-4 sm:space-y-6 relative z-10">
         
         {/* Logo con efecto de levitación */}
         <div className="mb-4 sm:mb-6">
@@ -536,14 +531,10 @@ function Login() {
             </form>
           </TabsContent>
         </Tabs>
-      </div>
+      </ContentCard>
       
-      {/* Footer con efecto de entrada */}
-      <div className="animate-fade-in-up animation-delay-500 relative z-10 mt-4">
-        <MadeWithDyad />
-        <Footer />
-      </div>
-    </div>
+      {/* Footer y MadeWithDyad se manejan en PageWrapper */}
+    </PageWrapper>
   );
 }
 
