@@ -124,3 +124,299 @@ html, body {
     animation: gradient-move 10s ease infinite;
   }
 }
+
+/* ============================================
+   ANIMACIONES Y EFECTOS VISUALES PREMIUM
+   MOBILE-FIRST DESIGN
+   ============================================ */
+
+/* Animación de gradiente en el fondo */
+@keyframes gradient-move {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Animación de blobs flotantes - más sutil en móvil */
+@keyframes blob-float {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(10px, -15px) scale(1.05);
+  }
+  50% {
+    transform: translate(-10px, 10px) scale(0.95);
+  }
+  75% {
+    transform: translate(15px, 5px) scale(1.02);
+  }
+}
+
+@keyframes blob-float-reverse {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(-15px, 10px) scale(0.97);
+  }
+  50% {
+    transform: translate(10px, -10px) scale(1.05);
+  }
+  75% {
+    transform: translate(-5px, -15px) scale(1);
+  }
+}
+
+/* Animación de levitación del logo - más sutil */
+@keyframes levitate {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+/* Animación de entrada de tarjeta */
+@keyframes card-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Animación de shimmer para botones */
+@keyframes shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+/* Animación de entrada escalonada */
+@keyframes fade-in-up {
+  0% {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ============================================
+   CLASES UTILITARIAS DE ANIMACIÓN
+   ============================================ */
+
+.animate-blob-float {
+  animation: blob-float 8s ease-in-out infinite;
+}
+
+.animate-blob-float-reverse {
+  animation: blob-float-reverse 10s ease-in-out infinite;
+}
+
+.animate-levitate {
+  animation: levitate 3s ease-in-out infinite;
+}
+
+.animate-card-enter {
+  animation: card-enter 0.5s ease-out forwards;
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.4s ease-out forwards;
+  opacity: 0; /* Inicial para que la animación funcione */
+}
+
+/* Delays para animaciones escalonadas */
+.animation-delay-100 { animation-delay: 0.1s; }
+.animation-delay-200 { animation-delay: 0.2s; }
+.animation-delay-300 { animation-delay: 0.3s; }
+.animation-delay-400 { animation-delay: 0.4s; }
+.animation-delay-500 { animation-delay: 0.5s; }
+
+/* ============================================
+   EFECTOS VISUALES - MOBILE FIRST
+   ============================================ */
+
+/* Texto con gradiente */
+.text-gradient {
+  background: linear-gradient(135deg, #4285F4 0%, #8B5CF6 50%, #EC4899 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Sombras - más sutiles en móvil */
+.shadow-premium {
+  box-shadow: 
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+@media (min-width: 768px) {
+  .shadow-premium {
+    box-shadow: 
+      0 4px 6px -1px rgba(0, 0, 0, 0.1),
+      0 2px 4px -2px rgba(0, 0, 0, 0.1),
+      0 20px 25px -5px rgba(0, 0, 0, 0.15),
+      0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* Glassmorphism mejorado */
+.glass-card {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+@media (min-width: 768px) {
+  .glass-card {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+}
+
+/* Botón con efecto shimmer - solo en dispositivos con hover */
+.btn-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+@media (hover: hover) {
+  .btn-shimmer::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.3) 50%,
+      transparent 100%
+    );
+    transition: left 0.5s ease;
+  }
+
+  .btn-shimmer:hover::after {
+    left: 100%;
+  }
+}
+
+/* Efecto de escala en hover - solo en dispositivos con hover */
+.hover-scale {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+@media (hover: hover) {
+  .hover-scale:hover {
+    transform: scale(1.02);
+  }
+}
+
+/* Active state para móviles (reemplaza hover) */
+.hover-scale:active {
+  transform: scale(0.98);
+}
+
+/* Blob decorativo - RESPONSIVE */
+.blob {
+  border-radius: 50%;
+  filter: blur(40px);
+  opacity: 0.4;
+  position: absolute;
+  pointer-events: none;
+}
+
+@media (min-width: 768px) {
+  .blob {
+    filter: blur(60px);
+    opacity: 0.6;
+  }
+}
+
+/* Blobs específicos - tamaños móviles */
+.blob-1 {
+  width: 150px;
+  height: 150px;
+}
+
+.blob-2 {
+  width: 180px;
+  height: 180px;
+}
+
+.blob-3 {
+  width: 120px;
+  height: 120px;
+}
+
+@media (min-width: 768px) {
+  .blob-1 {
+    width: 288px;
+    height: 288px;
+  }
+  
+  .blob-2 {
+    width: 384px;
+    height: 384px;
+  }
+  
+  .blob-3 {
+    width: 256px;
+    height: 256px;
+  }
+}
+
+/* Input con efecto focus premium - touch-friendly */
+.input-premium {
+  min-height: 48px; /* Touch target mínimo */
+  font-size: 16px; /* Evita zoom en iOS */
+}
+
+.input-premium:focus {
+  box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.2);
+  border-color: #4285F4;
+  outline: none;
+}
+
+/* Botón touch-friendly */
+.btn-touch {
+  min-height: 48px;
+  touch-action: manipulation; /* Evita doble-tap zoom */
+}
+
+/* Reducir animaciones si el usuario lo prefiere */
+@media (prefers-reduced-motion: reduce) {
+  .animate-blob-float,
+  .animate-blob-float-reverse,
+  .animate-levitate,
+  .animate-card-enter,
+  .animate-fade-in-up {
+    animation: none;
+  }
+  
+  .animate-fade-in-up {
+    opacity: 1;
+  }
+}
