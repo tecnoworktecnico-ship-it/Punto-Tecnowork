@@ -1,12 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
+import { MadeWithDyad } from "@/components/made-with-dyad";
 import { useSession } from "@/contexts/SessionContext";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import BrandingDisplay from "@/components/BrandingDisplay";
-import PageWrapper from "@/components/PageWrapper";
-import ContentCard from "@/components/ContentCard";
 
 const LandingPage = () => {
   const { loading, session } = useSession();
@@ -67,23 +66,22 @@ const LandingPage = () => {
   }
 
   return (
-    <PageWrapper centerContent={true} showFooter={true} showMadeWithDyad={true}>
-      <ContentCard className="w-full max-w-md p-5 sm:p-8 text-center">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move text-text-on-color">
+      <div className="text-center bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
         <div className="mb-6">
-          <div className="animate-levitate">
-            <BrandingDisplay type="main" className="h-16 sm:h-20 mx-auto mb-3 sm:mb-4 drop-shadow-lg" />
-          </div>
+          <BrandingDisplay type="main" className="h-20 mx-auto mb-4" />
           <h1 className="text-4xl font-bold text-text-carbon">Bienvenido a Punto Tecnowork</h1>
         </div>
         <p className="text-xl text-gray-600 mb-6">Tu solución integral para gestión de pedidos y recompensas.</p>
         <Button 
-          className="bg-primary-blue hover:bg-blue-700 text-white font-bold py-2 px-4 rounded hover-scale btn-shimmer btn-touch"
+          className="bg-primary-blue hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
           onClick={() => navigate('/login')}
         >
           Iniciar Sesión / Registrarse
         </Button>
-      </ContentCard>
-    </PageWrapper>
+      </div>
+      <MadeWithDyad />
+    </div>
   );
 };
 

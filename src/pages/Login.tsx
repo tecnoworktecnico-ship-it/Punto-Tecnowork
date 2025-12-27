@@ -12,9 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { showSuccess, showError } from '@/utils/toast';
 import { Loader2 } from 'lucide-react';
-import Footer from '@/components/Footer';
-import PageWrapper from '@/components/PageWrapper';
-import ContentCard from '@/components/ContentCard';
+import Footer from '@/components/Footer'; // Importar Footer
 
 // Obtener la versión de la aplicación
 const APP_VERSION = import.meta.env.VITE_APP_VERSION || 'N/A';
@@ -294,50 +292,29 @@ function Login() {
   }
 
   return (
-    <PageWrapper centerContent={true} showFooter={false} showMadeWithDyad={false}>
-      <ContentCard className="w-full max-w-md p-5 sm:p-8 space-y-4 sm:space-y-6 relative z-10">
-        
-        {/* Logo con efecto de levitación */}
-        <div className="mb-4 sm:mb-6">
-          <div className="animate-levitate">
-            <BrandingDisplay type="main" className="h-16 sm:h-20 mx-auto mb-3 sm:mb-4 drop-shadow-lg" />
-          </div>
-          <h2 className="text-2xl sm:text-3xl font-bold text-center text-gradient animate-fade-in-up">
-            Bienvenido
-          </h2>
-          <p className="text-xs sm:text-sm text-center text-gray-500 mt-1 animate-fade-in-up animation-delay-100">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
+      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-lg">
+        <div className="mb-6">
+          <BrandingDisplay type="main" className="h-20 mx-auto mb-4" />
+          <h2 className="text-3xl font-bold text-center text-text-carbon">Bienvenido</h2>
+          <p className="text-sm text-center text-gray-500 mt-1">
             Versión: <span className="font-semibold">{APP_VERSION}</span>
           </p>
         </div>
         
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full animate-fade-in-up animation-delay-200">
-          <TabsList className="grid w-full grid-cols-3 bg-gray-100/80 backdrop-blur-sm rounded-xl p-1 h-auto">
-            <TabsTrigger 
-              value="sign_in" 
-              className="rounded-lg py-2.5 text-xs sm:text-sm data-[state=active]:bg-white data-[state=active]:shadow-md transition-all duration-300"
-            >
-              Iniciar Sesión
-            </TabsTrigger>
-            <TabsTrigger 
-              value="sign_up"
-              className="rounded-lg py-2.5 text-xs sm:text-sm data-[state=active]:bg-white data-[state=active]:shadow-md transition-all duration-300"
-            >
-              Registrarse
-            </TabsTrigger>
-            <TabsTrigger 
-              value="reset_password"
-              className="rounded-lg py-2.5 text-xs sm:text-sm data-[state=active]:bg-white data-[state=active]:shadow-md transition-all duration-300"
-            >
-              Recuperar
-            </TabsTrigger>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="sign_in">Iniciar Sesión</TabsTrigger>
+            <TabsTrigger value="sign_up">Registrarse</TabsTrigger>
+            <TabsTrigger value="reset_password">Recuperar</TabsTrigger>
           </TabsList>
           
           {/* Formulario de Inicio de Sesión */}
           <TabsContent value="sign_in">
-            <form onSubmit={handleSignIn} className="space-y-3 sm:space-y-4 mt-4">
+            <form onSubmit={handleSignIn} className="space-y-4 mt-4">
               {registrationSuccess && (
-                <div className="bg-green-50 border border-green-200 rounded-xl p-3 mb-3 animate-fade-in-up">
-                  <p className="text-xs sm:text-sm text-green-800">
+                <div className="bg-green-50 border border-green-200 rounded-md p-3 mb-4">
+                  <p className="text-sm text-green-800">
                     <strong>¡Registro exitoso!</strong> Verifica tu correo electrónico.
                   </p>
                   <Button 
@@ -345,7 +322,7 @@ function Login() {
                     variant="outline" 
                     size="sm" 
                     onClick={handleResendVerification}
-                    className="mt-2 text-xs hover-scale"
+                    className="mt-2 text-xs"
                     disabled={isSubmitting}
                   >
                     Reenviar verificación
@@ -353,8 +330,8 @@ function Login() {
                 </div>
               )}
               
-              <div className="space-y-1.5 sm:space-y-2 animate-fade-in-up animation-delay-100">
-                <Label htmlFor="login-email" className="text-gray-700 font-medium text-sm">Correo electrónico</Label>
+              <div className="space-y-2">
+                <Label htmlFor="login-email">Correo electrónico</Label>
                 <Input 
                   id="login-email" 
                   type="email" 
@@ -363,12 +340,11 @@ function Login() {
                   onChange={(e) => setLoginData({...loginData, email: e.target.value})}
                   required
                   disabled={isSubmitting}
-                  className="rounded-xl border-gray-200 input-premium transition-all duration-300"
                 />
               </div>
               
-              <div className="space-y-1.5 sm:space-y-2 animate-fade-in-up animation-delay-200">
-                <Label htmlFor="login-password" className="text-gray-700 font-medium text-sm">Contraseña</Label>
+              <div className="space-y-2">
+                <Label htmlFor="login-password">Contraseña</Label>
                 <Input 
                   id="login-password" 
                   type="password" 
@@ -377,18 +353,17 @@ function Login() {
                   onChange={(e) => setLoginData({...loginData, password: e.target.value})}
                   required
                   disabled={isSubmitting}
-                  className="rounded-xl border-gray-200 input-premium transition-all duration-300"
                 />
               </div>
               
               <Button 
                 type="submit" 
-                className="w-full bg-gradient-to-r from-primary-blue to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl py-5 sm:py-6 text-base sm:text-lg font-semibold shadow-lg transition-all duration-300 hover-scale btn-shimmer btn-touch animate-fade-in-up animation-delay-300"
+                className="w-full bg-primary-blue hover:bg-blue-700 text-white"
                 disabled={isSubmitting}
               >
                 {isSubmitting ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Iniciando sesión...
                   </>
                 ) : (
@@ -400,9 +375,9 @@ function Login() {
           
           {/* Formulario de Registro */}
           <TabsContent value="sign_up">
-            <form onSubmit={handleSignUp} className="space-y-3 sm:space-y-4 mt-4">
-              <div className="space-y-1.5 sm:space-y-2 animate-fade-in-up">
-                <Label htmlFor="register-email" className="text-gray-700 font-medium text-sm">Correo electrónico *</Label>
+            <form onSubmit={handleSignUp} className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <Label htmlFor="register-email">Correo electrónico *</Label>
                 <Input 
                   id="register-email" 
                   type="email" 
@@ -411,12 +386,11 @@ function Login() {
                   onChange={(e) => setRegisterData({...registerData, email: e.target.value})}
                   required
                   disabled={isSubmitting}
-                  className="rounded-xl border-gray-200 input-premium transition-all duration-300"
                 />
               </div>
               
-              <div className="space-y-1.5 sm:space-y-2 animate-fade-in-up animation-delay-100">
-                <Label htmlFor="register-password" className="text-gray-700 font-medium text-sm">Contraseña *</Label>
+              <div className="space-y-2">
+                <Label htmlFor="register-password">Contraseña *</Label>
                 <Input 
                   id="register-password" 
                   type="password" 
@@ -426,42 +400,37 @@ function Login() {
                   required
                   minLength={6}
                   disabled={isSubmitting}
-                  className="rounded-xl border-gray-200 input-premium transition-all duration-300"
                 />
               </div>
               
-              <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                <div className="space-y-1.5 sm:space-y-2 animate-fade-in-up animation-delay-200">
-                  <Label htmlFor="register-first-name" className="text-gray-700 font-medium text-sm">Nombre *</Label>
-                  <Input 
-                    id="register-first-name" 
-                    type="text" 
-                    placeholder="Tu nombre" 
-                    value={registerData.first_name}
-                    onChange={(e) => setRegisterData({...registerData, first_name: e.target.value})}
-                    required
-                    disabled={isSubmitting}
-                    className="rounded-xl border-gray-200 input-premium transition-all duration-300"
-                  />
-                </div>
-                
-                <div className="space-y-1.5 sm:space-y-2 animate-fade-in-up animation-delay-200">
-                  <Label htmlFor="register-last-name" className="text-gray-700 font-medium text-sm">Apellido *</Label>
-                  <Input 
-                    id="register-last-name" 
-                    type="text" 
-                    placeholder="Tu apellido" 
-                    value={registerData.last_name}
-                    onChange={(e) => setRegisterData({...registerData, last_name: e.target.value})}
-                    required
-                    disabled={isSubmitting}
-                    className="rounded-xl border-gray-200 input-premium transition-all duration-300"
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="register-first-name">Nombre *</Label>
+                <Input 
+                  id="register-first-name" 
+                  type="text" 
+                  placeholder="Tu nombre" 
+                  value={registerData.first_name}
+                  onChange={(e) => setRegisterData({...registerData, first_name: e.target.value})}
+                  required
+                  disabled={isSubmitting}
+                />
               </div>
               
-              <div className="space-y-1.5 sm:space-y-2 animate-fade-in-up animation-delay-300">
-                <Label htmlFor="register-phone" className="text-gray-700 font-medium text-sm">Teléfono *</Label>
+              <div className="space-y-2">
+                <Label htmlFor="register-last-name">Apellido *</Label>
+                <Input 
+                  id="register-last-name" 
+                  type="text" 
+                  placeholder="Tu apellido" 
+                  value={registerData.last_name}
+                  onChange={(e) => setRegisterData({...registerData, last_name: e.target.value})}
+                  required
+                  disabled={isSubmitting}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="register-phone">Teléfono *</Label>
                 <Input 
                   id="register-phone" 
                   type="tel" 
@@ -470,18 +439,17 @@ function Login() {
                   onChange={(e) => setRegisterData({...registerData, phone_number: e.target.value})}
                   required
                   disabled={isSubmitting}
-                  className="rounded-xl border-gray-200 input-premium transition-all duration-300"
                 />
               </div>
               
               <Button 
                 type="submit" 
-                className="w-full bg-gradient-to-r from-primary-blue to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl py-5 sm:py-6 text-base sm:text-lg font-semibold shadow-lg transition-all duration-300 hover-scale btn-shimmer btn-touch animate-fade-in-up animation-delay-400"
+                className="w-full bg-primary-blue hover:bg-blue-700 text-white"
                 disabled={isSubmitting}
               >
                 {isSubmitting ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Registrando...
                   </>
                 ) : (
@@ -493,15 +461,15 @@ function Login() {
           
           {/* Formulario de Recuperación */}
           <TabsContent value="reset_password">
-            <form onSubmit={handleResetPassword} className="space-y-3 sm:space-y-4 mt-4">
-              <div className="bg-blue-50/80 backdrop-blur-sm border border-blue-200 rounded-xl p-3 sm:p-4 mb-3 animate-fade-in-up">
-                <p className="text-xs sm:text-sm text-blue-800">
+            <form onSubmit={handleResetPassword} className="space-y-4 mt-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
+                <p className="text-sm text-blue-800">
                   Ingresa tu correo electrónico y te enviaremos un enlace para restablecer tu contraseña.
                 </p>
               </div>
               
-              <div className="space-y-1.5 sm:space-y-2 animate-fade-in-up animation-delay-100">
-                <Label htmlFor="reset-email" className="text-gray-700 font-medium text-sm">Correo electrónico</Label>
+              <div className="space-y-2">
+                <Label htmlFor="reset-email">Correo electrónico</Label>
                 <Input 
                   id="reset-email" 
                   type="email" 
@@ -510,18 +478,17 @@ function Login() {
                   onChange={(e) => setResetData({...resetData, email: e.target.value})}
                   required
                   disabled={isSubmitting}
-                  className="rounded-xl border-gray-200 input-premium transition-all duration-300"
                 />
               </div>
               
               <Button 
                 type="submit" 
-                className="w-full bg-gradient-to-r from-primary-blue to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl py-5 sm:py-6 text-base sm:text-lg font-semibold shadow-lg transition-all duration-300 hover-scale btn-shimmer btn-touch animate-fade-in-up animation-delay-200"
+                className="w-full bg-primary-blue hover:bg-blue-700 text-white"
                 disabled={isSubmitting}
               >
                 {isSubmitting ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Enviando...
                   </>
                 ) : (
@@ -531,10 +498,10 @@ function Login() {
             </form>
           </TabsContent>
         </Tabs>
-      </ContentCard>
-      
-      {/* Footer y MadeWithDyad se manejan en PageWrapper */}
-    </PageWrapper>
+      </div>
+      <MadeWithDyad />
+      <Footer />
+    </div>
   );
 }
 

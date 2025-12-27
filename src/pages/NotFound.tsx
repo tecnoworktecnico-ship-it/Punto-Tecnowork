@@ -1,12 +1,8 @@
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { useEffect } from "react";
-import PageWrapper from "@/components/PageWrapper";
-import ContentCard from "@/components/ContentCard";
-import { Button } from "@/components/ui/button";
 
 const NotFound = () => {
   const location = useLocation();
-  const navigate = useNavigate();
 
   useEffect(() => {
     console.error(
@@ -16,18 +12,15 @@ const NotFound = () => {
   }, [location.pathname]);
 
   return (
-    <PageWrapper centerContent={true} showFooter={false} showMadeWithDyad={false}>
-      <ContentCard className="text-center p-8">
-        <h1 className="text-6xl font-extrabold text-emphasis-red mb-4 text-gradient">404</h1>
-        <p className="text-2xl text-text-carbon mb-6">Oops! Página no encontrada</p>
-        <Button 
-          onClick={() => navigate('/')}
-          className="bg-primary-blue hover:bg-blue-700 text-white font-bold hover-scale btn-touch"
-        >
-          Volver al Inicio
-        </Button>
-      </ContentCard>
-    </PageWrapper>
+    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="text-center">
+        <h1 className="text-4xl font-bold mb-4">404</h1>
+        <p className="text-xl text-gray-600 mb-4">Oops! Page not found</p>
+        <a href="/" className="text-blue-500 hover:text-blue-700 underline">
+          Return to Home
+        </a>
+      </div>
+    </div>
   );
 };
 

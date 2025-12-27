@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/contexts/SessionContext';
 import { Button } from '@/components/ui/button';
-import { CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { showSuccess, showError } from '@/utils/toast';
 import { useNavigate } from 'react-router-dom';
@@ -30,10 +30,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { getStatusBadge, OrderStatus } from '@/utils/order-status';
-import PageWrapper from '@/components/PageWrapper';
-import AnimatedHeader from '@/components/AnimatedHeader';
-import ContentCard from '@/components/ContentCard';
+import { getStatusBadge, OrderStatus } from '@/utils/order-status'; // Importar OrderStatus
 
 interface OrderFile {
   file_name: string;
@@ -48,7 +45,7 @@ interface OrderWithDetails {
   client_last_name: string | null;
   local_id: string;
   local_name: string;
-  status: OrderStatus;
+  status: OrderStatus; // Usar OrderStatus tipado
   total_price: number;
   points_earned: number;
   created_at: string;
@@ -224,134 +221,133 @@ const AdminOrders = () => {
   }
 
   return (
-    <PageWrapper showFooter={true} showMadeWithDyad={true}>
-      <AnimatedHeader 
-        title="Gestión de Pedidos (Admin)" 
-        showSignOut={true} 
-        showBackButton={true} 
-        backPath="/admin/dashboard"
-      />
-      
-      <main className="p-4">
-        <div className="max-w-7xl mx-auto pt-8 pb-12">
-          <ContentCard>
-            <CardHeader>
-              <div className="flex items-center justify-between mb-4">
-                <h1 className="text-3xl font-bold text-text-carbon">
-                  Gestión de Pedidos (Administrador)
-                </h1>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={fetchOrders}
-                    className="flex items-center gap-2 hover-scale"
-                    disabled={loading}
-                  >
-                    <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                    Actualizar
-                  </Button>
-                  <Select value={filterStatus} onValueChange={setFilterStatus}>
-                    <SelectTrigger className="w-[200px]">
-                      <SelectValue placeholder="Filtrar por estado" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
-                      <SelectItem value="pending">Pendientes</SelectItem>
-                      <SelectItem value="processing">En Proceso</SelectItem>
-                      <SelectItem value="ready">Listos</SelectItem>
-                      <SelectItem value="completed">Completados</SelectItem>
-                      <SelectItem value="cancelled">Cancelados</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+    <div className="min-h-screen p-4 bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
+      <div className="max-w-7xl mx-auto">
+        <Card className="bg-white/80 backdrop-blur-sm rounded-lg shadow-lg">
+          <CardHeader>
+            <div className="flex items-center justify-between mb-4">
+              <Button
+                variant="ghost"
+                onClick={() => navigate('/admin/dashboard')}
+                className="flex items-center gap-2 text-text-carbon hover:text-primary-blue"
+              >
+                <ArrowLeft className="h-5 w-5" />
+                Volver al Dashboard
+              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={fetchOrders}
+                  className="flex items-center gap-2"
+                  disabled={loading}
+                >
+                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                  Actualizar
+                </Button>
+                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Filtrar por estado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="pending">Pendientes</SelectItem>
+                    <SelectItem value="processing">En Proceso</SelectItem>
+                    <SelectItem value="ready">Listos</SelectItem>
+                    <SelectItem value="completed">Completados</SelectItem>
+                    <SelectItem value="cancelled">Cancelados</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            </CardHeader>
-            <CardContent>
-              {filteredOrders.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  {filterStatus === 'all' 
-                    ? 'No hay pedidos registrados.'
-                    : 'No hay pedidos con este estado.'}
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>ID Pedido</TableHead>
-                      <TableHead>Cliente</TableHead>
-                      <TableHead>Local</TableHead>
-                      <TableHead>Archivos</TableHead>
-                      <TableHead>Total</TableHead>
-                      <TableHead>Estado</TableHead>
-                      <TableHead>Fecha</TableHead>
+            </div>
+            <CardTitle className="text-3xl font-bold text-text-carbon">
+              Gestión de Pedidos (Administrador)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {filteredOrders.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                {filterStatus === 'all' 
+                  ? 'No hay pedidos registrados.'
+                  : 'No hay pedidos con este estado.'}
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>ID Pedido</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Local</TableHead>
+                    <TableHead>Archivos</TableHead>
+                    <TableHead>Total</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead>Fecha</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredOrders.map((order) => (
+                    <TableRow key={order.order_id}>
+                      <TableCell className="font-mono text-sm">
+                        {order.order_id.substring(0, 8)}...
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-medium text-text-carbon">
+                            {getClientDisplayName(order)}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {order.client_email}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {order.local_name || 'Local Eliminado'}
+                      </TableCell>
+                      <TableCell>
+                        {renderFilesList(order.files)}
+                      </TableCell>
+                      <TableCell className="font-bold text-success-green">
+                        ${order.total_price.toFixed(2)}
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={order.status}
+                          onValueChange={(value) => handleStatusChange(order.order_id, value as OrderStatus)}
+                          disabled={loading}
+                        >
+                          <SelectTrigger className="w-[140px]">
+                            {getStatusBadge(order.status)}
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pending">Pendiente</SelectItem>
+                            <SelectItem value="processing">En Proceso</SelectItem>
+                            <SelectItem value="ready">Listo</SelectItem>
+                            <SelectItem value="completed">Completado</SelectItem>
+                            <SelectItem value="cancelled">Cancelado</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-medium">
+                            {new Date(order.created_at).toLocaleDateString('es-ES')}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {new Date(order.created_at).toLocaleTimeString('es-ES', { 
+                              hour: '2-digit', 
+                              minute: '2-digit' 
+                            })}
+                          </span>
+                        </div>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredOrders.map((order) => (
-                      <TableRow key={order.order_id}>
-                        <TableCell className="font-mono text-sm">
-                          {order.order_id.substring(0, 8)}...
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col">
-                            <span className="font-medium text-text-carbon">
-                              {getClientDisplayName(order)}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              {order.client_email}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {order.local_name || 'Local Eliminado'}
-                        </TableCell>
-                        <TableCell>
-                          {renderFilesList(order.files)}
-                        </TableCell>
-                        <TableCell className="font-bold text-success-green">
-                          ${order.total_price.toFixed(2)}
-                        </TableCell>
-                        <TableCell>
-                          <Select
-                            value={order.status}
-                            onValueChange={(value) => handleStatusChange(order.order_id, value as OrderStatus)}
-                            disabled={loading}
-                          >
-                            <SelectTrigger className="w-[140px]">
-                              {getStatusBadge(order.status)}
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="pending">Pendiente</SelectItem>
-                              <SelectItem value="processing">En Proceso</SelectItem>
-                              <SelectItem value="ready">Listo</SelectItem>
-                              <SelectItem value="completed">Completado</SelectItem>
-                              <SelectItem value="cancelled">Cancelado</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col">
-                            <span className="font-medium">
-                              {new Date(order.created_at).toLocaleDateString('es-ES')}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              {new Date(order.created_at).toLocaleTimeString('es-ES', { 
-                                hour: '2-digit', 
-                                minute: '2-digit' 
-                              })}
-                            </span>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </ContentCard>
-        </div>
-      </main>
-    </PageWrapper>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   );
 };
 

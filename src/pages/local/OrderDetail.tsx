@@ -10,9 +10,6 @@ import { ArrowLeft, Loader2 } from 'lucide-react';
 import OrderDetailsCard from '@/components/local/OrderDetailsCard';
 import OrderFilesWizard from '@/components/local/OrderFilesWizard';
 import { LocalOrder, OrderStatus } from '@/types/order';
-import PageWrapper from '@/components/PageWrapper';
-import AnimatedHeader from '@/components/AnimatedHeader';
-import ContentCard from '@/components/ContentCard';
 
 const LocalOrderDetail = () => {
   const { profile, loading: sessionLoading } = useSession();
@@ -152,40 +149,36 @@ const LocalOrderDetail = () => {
 
   if (profile?.role !== 'local' || !order) {
     return (
-      <PageWrapper centerContent={true} showFooter={true} showMadeWithDyad={true}>
+      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
         <p className="text-white text-xl mb-4">Pedido no encontrado o acceso denegado.</p>
         <Button onClick={() => navigate('/local/orders')} variant="outline">
           Volver a Pedidos
         </Button>
-      </PageWrapper>
+      </div>
     );
   }
 
   return (
-    <PageWrapper showFooter={true} showMadeWithDyad={true}>
-      <AnimatedHeader 
-        title={`Pedido #${order.id.substring(0, 8)}...`} 
-        showSignOut={true} 
-        showBackButton={true} 
-        backPath="/local/orders"
-      />
-      
-      <main className="p-4">
-        <div className="max-w-6xl mx-auto space-y-6 pt-8 pb-12">
-          <ContentCard delay={100}>
-            <OrderDetailsCard order={order} />
-          </ContentCard>
-          
-          <ContentCard delay={200}>
-            <OrderFilesWizard 
-              order={order} 
-              onStatusUpdate={handleStatusUpdate} 
-              onOrderRefresh={fetchOrder}
-            />
-          </ContentCard>
-        </div>
-      </main>
-    </PageWrapper>
+    <div className="min-h-screen p-4 bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
+      <div className="max-w-6xl mx-auto space-y-6">
+        <Button
+          variant="ghost"
+          onClick={() => navigate('/local/orders')}
+          className="flex items-center gap-2 text-white hover:text-gray-200"
+        >
+          <ArrowLeft className="h-5 w-5" />
+          Volver a la Lista de Pedidos
+        </Button>
+
+        <OrderDetailsCard order={order} />
+        
+        <OrderFilesWizard 
+          order={order} 
+          onStatusUpdate={handleStatusUpdate} 
+          onOrderRefresh={fetchOrder}
+        />
+      </div>
+    </div>
   );
 };
 

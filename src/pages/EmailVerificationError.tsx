@@ -3,12 +3,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
 import { AlertTriangle, RefreshCw, ArrowLeft } from 'lucide-react';
-import PageWrapper from '@/components/PageWrapper';
-import ContentCard from '@/components/ContentCard';
 
 const EmailVerificationError = () => {
   const navigate = useNavigate();
@@ -65,8 +63,8 @@ const EmailVerificationError = () => {
   };
 
   return (
-    <PageWrapper centerContent={true} showFooter={false} showMadeWithDyad={false}>
-      <ContentCard className="w-full max-w-md p-6">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
+      <Card className="w-full max-w-md p-6 bg-white rounded-lg shadow-lg">
         <CardHeader>
           <div className="flex items-center justify-center mb-4 text-emphasis-red">
             <AlertTriangle className="h-12 w-12" />
@@ -100,7 +98,7 @@ const EmailVerificationError = () => {
             <Button
               onClick={handleResendVerification}
               disabled={loading || !email}
-              className="w-full bg-primary-blue hover:bg-blue-700 text-white flex items-center justify-center gap-2 hover-scale btn-touch"
+              className="w-full bg-primary-blue hover:bg-blue-700 text-white flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
@@ -127,8 +125,8 @@ const EmailVerificationError = () => {
             </Button>
           </div>
         </CardContent>
-      </ContentCard>
-    </PageWrapper>
+      </Card>
+    </div>
   );
 };
 

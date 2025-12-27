@@ -2,9 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import PageWrapper from '@/components/PageWrapper';
-import ContentCard from '@/components/ContentCard';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const DebugRecovery = () => {
   const location = useLocation();
@@ -34,9 +32,9 @@ const DebugRecovery = () => {
   }, [location]);
 
   return (
-    <PageWrapper showFooter={true} showMadeWithDyad={true}>
-      <div className="max-w-4xl mx-auto pt-8 pb-12">
-        <ContentCard>
+    <div className="min-h-screen p-4 bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
+      <div className="max-w-4xl mx-auto">
+        <Card className="bg-white rounded-lg shadow-lg">
           <CardHeader>
             <CardTitle className="text-2xl font-bold text-text-carbon">
               Debug: Información de Recuperación
@@ -80,9 +78,9 @@ const DebugRecovery = () => {
               </div>
             </div>
           </CardContent>
-        </ContentCard>
+        </Card>
       </div>
-    </PageWrapper>
+    </div>
   );
 };
 

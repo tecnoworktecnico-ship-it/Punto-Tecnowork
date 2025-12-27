@@ -4,13 +4,13 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/contexts/SessionContext';
 import { Button } from '@/components/ui/button';
-import { CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { showSuccess, showError } from '@/utils/toast';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Edit, Trash2, UserCog, Loader2, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, UserCog } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -35,9 +35,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import PageWrapper from '@/components/PageWrapper';
-import AnimatedHeader from '@/components/AnimatedHeader';
-import ContentCard from '@/components/ContentCard';
 
 interface Local {
   id: string;
@@ -90,12 +87,12 @@ const Locals = () => {
   const fetchData = async () => {
     setLoading(true);
 
-    // Obtener datos de todos los usuarios (para managers)
-    const { data: usersData, error: usersError } = await supabase
-      .rpc('get_all_users_with_emails');
+    // Obtener locales con información del manager
+    const { data: localsData, error: localsError } = await supabase
+      .rpc('get_users_with_emails');
 
-    if (usersError) {
-      console.error('Error fetching users:', usersError);
+    if (localsError) {
+      console.error('Error fetching users:', localsError);
     }
 
     // Obtener locales
@@ -113,7 +110,7 @@ const Locals = () => {
 
     // Combinar datos de locales con información de managers
     const localsWithManagers = localsRawData?.map(local => {
-      const manager = usersData?.find((u: any) => u.id === local.manager_id);
+      const manager = localsData?.find((u: any) => u.id === local.manager_id);
       return {
         ...local,
         manager_email: manager?.email,
@@ -125,9 +122,9 @@ const Locals = () => {
 
     setLocals(localsWithManagers || []);
 
-    // Obtener usuarios con rol 'local'
-    const localUsersList = usersData?.filter((u: any) => u.role === 'local') || [];
-    setLocalUsers(localUsersList);
+    // Obtener usuarios con rol 'local' que no tienen local asignado
+    const usersWithLocal = localsData?.filter((u: any) => u.role === 'local') || [];
+    setLocalUsers(usersWithLocal);
 
     setLoading(false);
   };
@@ -194,37 +191,31 @@ const Locals = () => {
 
     setLoading(true);
 
-    try {
-      // 1. Desasignar el usuario de cualquier otro local (si existe)
-      const { error: unassignError } = await supabase
-        .from('locals')
-        .update({ manager_id: null })
-        .eq('manager_id', selectedUserId)
-        .neq('id', selectedLocalForAssign.id); // No desasignar del local actual si ya está asignado
+    // Primero, desasignar el usuario de cualquier otro local
+    const { error: unassignError } = await supabase
+      .from('locals')
+      .update({ manager_id: null })
+      .eq('manager_id', selectedUserId);
 
-      if (unassignError) {
-        console.error('Error unassigning user:', unassignError);
-      }
+    if (unassignError) {
+      console.error('Error unassigning user:', unassignError);
+    }
 
-      // 2. Asignar el usuario al local seleccionado
-      const { error } = await supabase
-        .from('locals')
-        .update({ manager_id: selectedUserId })
-        .eq('id', selectedLocalForAssign.id);
+    // Asignar el usuario al local seleccionado
+    const { error } = await supabase
+      .from('locals')
+      .update({ manager_id: selectedUserId })
+      .eq('id', selectedLocalForAssign.id);
 
-      if (error) {
-        console.error('Error assigning manager:', error);
-        showError(`Error al asignar manager: ${error.message}`);
-      } else {
-        showSuccess('Manager asignado correctamente al local.');
-        setAssignDialogOpen(false);
-        setSelectedLocalForAssign(null);
-        setSelectedUserId('');
-        fetchData();
-      }
-    } catch (err) {
-      console.error('Unexpected error during assignment:', err);
-      showError('Error inesperado al asignar el manager.');
+    if (error) {
+      console.error('Error assigning manager:', error);
+      showError(`Error al asignar manager: ${error.message}`);
+    } else {
+      showSuccess('Manager asignado correctamente al local.');
+      setAssignDialogOpen(false);
+      setSelectedLocalForAssign(null);
+      setSelectedUserId('');
+      fetchData();
     }
 
     setLoading(false);
@@ -298,12 +289,12 @@ const Locals = () => {
 
   const openAssignDialog = (local: Local) => {
     setSelectedLocalForAssign(local);
-    setSelectedUserId(local.manager_id || 'none'); // Usar 'none' para el estado inicial
+    setSelectedUserId(local.manager_id || '');
     setAssignDialogOpen(true);
   };
 
   const getAvailableUsers = () => {
-    // Usuarios con rol 'local' que no están asignados a NINGÚN otro local
+    // Usuarios que no tienen local asignado o que tienen el local actual
     const assignedManagerIds = locals
       .filter(l => l.manager_id && l.id !== selectedLocalForAssign?.id)
       .map(l => l.manager_id);
@@ -314,7 +305,6 @@ const Locals = () => {
   if (sessionLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
-        <Loader2 className="h-8 w-8 text-white animate-spin mr-2" />
         <p className="text-white text-xl">Cargando locales...</p>
       </div>
     );
@@ -325,291 +315,277 @@ const Locals = () => {
   }
 
   return (
-    <PageWrapper showFooter={true} showMadeWithDyad={true}>
-      <AnimatedHeader 
-        title="Gestión de Locales" 
-        showSignOut={true} 
-        showBackButton={true} 
-        backPath="/admin/dashboard"
-      />
-      
-      <main className="p-4">
-        <div className="max-w-6xl mx-auto pt-8 pb-12">
-          <ContentCard>
-            <CardHeader>
-              <div className="flex items-center justify-between mb-4">
-                <h1 className="text-3xl font-bold text-text-carbon">
-                  Gestión de Locales
-                </h1>
-                <div className="flex gap-2">
+    <div className="min-h-screen p-4 bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
+      <div className="max-w-6xl mx-auto">
+        <Card className="bg-white rounded-lg shadow-lg">
+          <CardHeader>
+            <div className="flex items-center justify-between mb-4">
+              <Button
+                variant="ghost"
+                onClick={() => navigate('/admin/dashboard')}
+                className="flex items-center gap-2 text-text-carbon hover:text-primary-blue"
+              >
+                <ArrowLeft className="h-5 w-5" />
+                Volver al Dashboard
+              </Button>
+              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                <DialogTrigger asChild>
                   <Button
-                    variant="outline"
-                    onClick={fetchData}
-                    className="flex items-center gap-2 hover-scale"
-                    disabled={loading}
+                    onClick={openCreateDialog}
+                    className="bg-primary-blue hover:bg-blue-700 text-white flex items-center gap-2"
                   >
-                    <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                    Actualizar
+                    <Plus className="h-5 w-5" />
+                    Nuevo Local
                   </Button>
-                  <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                    <DialogTrigger asChild>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[500px]">
+                  <DialogHeader>
+                    <DialogTitle>
+                      {editingLocal ? 'Editar Local' : 'Crear Nuevo Local'}
+                    </DialogTitle>
+                    <DialogDescription>
+                      {editingLocal
+                        ? 'Modifica los datos del local.'
+                        : 'Completa los datos para crear un nuevo local.'}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                      <Label htmlFor="name">Nombre del Local *</Label>
+                      <Input
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) =>
+                          setFormData({ ...formData, name: e.target.value })
+                        }
+                        required
+                        placeholder="Ej: Local Centro"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="address">Dirección</Label>
+                      <Input
+                        id="address"
+                        value={formData.address}
+                        onChange={(e) =>
+                          setFormData({ ...formData, address: e.target.value })
+                        }
+                        placeholder="Ej: Calle Principal 123"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="has_photo_print">
+                        ¿Tiene impresión de fotos?
+                      </Label>
+                      <Switch
+                        id="has_photo_print"
+                        checked={formData.has_photo_print}
+                        onCheckedChange={(checked) =>
+                          setFormData({ ...formData, has_photo_print: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="can_edit_prices">
+                        ¿Puede editar precios?
+                      </Label>
+                      <Switch
+                        id="can_edit_prices"
+                        checked={formData.can_edit_prices}
+                        onCheckedChange={(checked) =>
+                          setFormData({ ...formData, can_edit_prices: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex gap-2 justify-end">
                       <Button
-                        onClick={openCreateDialog}
-                        className="bg-primary-blue hover:bg-blue-700 text-white flex items-center gap-2 hover-scale btn-shimmer"
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setDialogOpen(false);
+                          setEditingLocal(null);
+                          resetForm();
+                        }}
                       >
-                        <Plus className="h-5 w-5" />
-                        Nuevo Local
+                        Cancelar
                       </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[500px]">
-                      <DialogHeader>
-                        <DialogTitle>
-                          {editingLocal ? 'Editar Local' : 'Crear Nuevo Local'}
-                        </DialogTitle>
-                        <DialogDescription>
-                          {editingLocal
-                            ? 'Modifica los datos del local.'
-                            : 'Completa los datos para crear un nuevo local.'}
-                        </DialogDescription>
-                      </DialogHeader>
-                      <form onSubmit={handleSubmit} className="space-y-4">
-                        <div>
-                          <Label htmlFor="name">Nombre del Local *</Label>
-                          <Input
-                            id="name"
-                            value={formData.name}
-                            onChange={(e) =>
-                              setFormData({ ...formData, name: e.target.value })
-                            }
-                            required
-                            placeholder="Ej: Local Centro"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="address">Dirección</Label>
-                          <Input
-                            id="address"
-                            value={formData.address}
-                            onChange={(e) =>
-                              setFormData({ ...formData, address: e.target.value })
-                            }
-                            placeholder="Ej: Calle Principal 123"
-                          />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="has_photo_print">
-                            ¿Tiene impresión de fotos?
-                          </Label>
-                          <Switch
-                            id="has_photo_print"
-                            checked={formData.has_photo_print}
-                            onCheckedChange={(checked) =>
-                              setFormData({ ...formData, has_photo_print: checked })
-                            }
-                          />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="can_edit_prices">
-                            ¿Puede editar precios?
-                          </Label>
-                          <Switch
-                            id="can_edit_prices"
-                            checked={formData.can_edit_prices}
-                            onCheckedChange={(checked) =>
-                              setFormData({ ...formData, can_edit_prices: checked })
-                            }
-                          />
-                        </div>
+                      <Button
+                        type="submit"
+                        disabled={loading}
+                        className="bg-primary-blue hover:bg-blue-700 text-white"
+                      >
+                        {loading ? 'Procesando...' : (editingLocal ? 'Actualizar' : 'Crear')}
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
+            <CardTitle className="text-3xl font-bold text-text-carbon">
+              Gestión de Locales
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {locals.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                No hay locales registrados. Crea uno nuevo para comenzar.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Dirección</TableHead>
+                    <TableHead>Manager</TableHead>
+                    <TableHead>Impresión Fotos</TableHead>
+                    <TableHead>Editar Precios</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {locals.map((local) => (
+                    <TableRow key={local.id}>
+                      <TableCell className="font-medium">{local.name}</TableCell>
+                      <TableCell>{local.address || 'N/A'}</TableCell>
+                      <TableCell>
+                        {local.manager_id ? (
+                          <div className="flex flex-col">
+                            <span className="font-medium text-sm">
+                              {local.manager_name || 'Sin nombre'}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {local.manager_email || 'Sin correo'}
+                            </span>
+                          </div>
+                        ) : (
+                          <Badge variant="outline" className="text-gray-500">
+                            Sin asignar
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {local.has_photo_print ? (
+                          <span className="text-success-green">Sí</span>
+                        ) : (
+                          <span className="text-gray-500">No</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {local.can_edit_prices ? (
+                          <span className="text-success-green">Sí</span>
+                        ) : (
+                          <span className="text-gray-500">No</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
                           <Button
-                            type="button"
                             variant="outline"
-                            onClick={() => {
-                              setDialogOpen(false);
-                              setEditingLocal(null);
-                              resetForm();
-                            }}
+                            size="sm"
+                            onClick={() => openAssignDialog(local)}
+                            title="Asignar/Cambiar Manager"
                           >
-                            Cancelar
+                            <UserCog className="h-4 w-4" />
                           </Button>
                           <Button
-                            type="submit"
-                            disabled={loading}
-                            className="bg-primary-blue hover:bg-blue-700 text-white hover-scale"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openEditDialog(local)}
                           >
-                            {loading ? 'Procesando...' : (editingLocal ? 'Actualizar' : 'Crear')}
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDelete(local.id)}
+                            className="text-emphasis-red hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {locals.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  No hay locales registrados. Crea uno nuevo para comenzar.
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Nombre</TableHead>
-                      <TableHead>Dirección</TableHead>
-                      <TableHead>Manager</TableHead>
-                      <TableHead>Impresión Fotos</TableHead>
-                      <TableHead>Editar Precios</TableHead>
-                      <TableHead className="text-right">Acciones</TableHead>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {locals.map((local) => (
-                      <TableRow key={local.id}>
-                        <TableCell className="font-medium">{local.name}</TableCell>
-                        <TableCell>{local.address || 'N/A'}</TableCell>
-                        <TableCell>
-                          {local.manager_id ? (
-                            <div className="flex flex-col">
-                              <span className="font-medium text-sm">
-                                {local.manager_name || 'Sin nombre'}
-                              </span>
-                              <span className="text-xs text-gray-500">
-                                {local.manager_email || 'Sin correo'}
-                              </span>
-                            </div>
-                          ) : (
-                            <Badge variant="outline" className="text-gray-500">
-                              Sin asignar
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {local.has_photo_print ? (
-                            <span className="text-success-green">Sí</span>
-                          ) : (
-                            <span className="text-gray-500">No</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {local.can_edit_prices ? (
-                            <span className="text-success-green">Sí</span>
-                          ) : (
-                            <span className="text-gray-500">No</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex gap-2 justify-end">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => openAssignDialog(local)}
-                              title="Asignar/Cambiar Manager"
-                              className="hover-scale"
-                            >
-                              <UserCog className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => openEditDialog(local)}
-                              className="hover-scale"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDelete(local.id)}
-                              className="text-emphasis-red hover:text-red-700 hover-scale"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </ContentCard>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
 
-          {/* Dialog para asignar manager */}
-          <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
-            <DialogContent className="sm:max-w-[500px]">
-              <DialogHeader>
-                <DialogTitle>Asignar Manager al Local</DialogTitle>
-                <DialogDescription>
-                  Selecciona un usuario con rol "local" para asignar como manager de {selectedLocalForAssign?.name}.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="manager">Usuario Manager</Label>
-                  <Select
-                    value={selectedUserId}
-                    onValueChange={setSelectedUserId}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona un usuario" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Sin asignar</SelectItem>
-                      {getAvailableUsers().map((user) => (
-                        <SelectItem key={user.id} value={user.id}>
-                          {user.first_name || user.last_name
-                            ? `${user.first_name || ''} ${user.last_name || ''}`.trim()
-                            : user.email}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {getAvailableUsers().length === 0 && (
-                    <p className="text-sm text-gray-500 mt-2">
-                      No hay usuarios con rol "local" disponibles. Crea uno desde Gestión de Usuarios.
-                    </p>
-                  )}
-                </div>
-                <div className="flex gap-2 justify-end">
+        {/* Dialog para asignar manager */}
+        <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Asignar Manager al Local</DialogTitle>
+              <DialogDescription>
+                Selecciona un usuario con rol "local" para asignar como manager de {selectedLocalForAssign?.name}.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="manager">Usuario Manager</Label>
+                <Select
+                  value={selectedUserId}
+                  onValueChange={setSelectedUserId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona un usuario" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin asignar</SelectItem>
+                    {getAvailableUsers().map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.first_name || user.last_name
+                          ? `${user.first_name || ''} ${user.last_name || ''}`.trim()
+                          : user.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {getAvailableUsers().length === 0 && (
+                  <p className="text-sm text-gray-500 mt-2">
+                    No hay usuarios con rol "local" disponibles. Crea uno desde Gestión de Usuarios.
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setAssignDialogOpen(false);
+                    setSelectedLocalForAssign(null);
+                    setSelectedUserId('');
+                  }}
+                >
+                  Cancelar
+                </Button>
+                {selectedLocalForAssign?.manager_id && (
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => {
+                      handleUnassignManager(selectedLocalForAssign.id);
                       setAssignDialogOpen(false);
-                      setSelectedLocalForAssign(null);
-                      setSelectedUserId('');
                     }}
+                    className="text-emphasis-red hover:text-red-700"
                   >
-                    Cancelar
+                    Desasignar
                   </Button>
-                  {selectedLocalForAssign?.manager_id && selectedUserId !== 'none' && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        handleUnassignManager(selectedLocalForAssign.id);
-                        setAssignDialogOpen(false);
-                      }}
-                      className="text-emphasis-red hover:text-red-700 hover-scale"
-                    >
-                      Desasignar
-                    </Button>
-                  )}
-                  <Button
-                    onClick={handleAssignManager}
-                    disabled={loading || !selectedUserId || selectedUserId === 'none'}
-                    className="bg-primary-blue hover:bg-blue-700 text-white hover-scale"
-                  >
-                    {loading ? 'Asignando...' : 'Asignar'}
-                  </Button>
-                </div>
+                )}
+                <Button
+                  onClick={handleAssignManager}
+                  disabled={loading || !selectedUserId || selectedUserId === 'none'}
+                  className="bg-primary-blue hover:bg-blue-700 text-white"
+                >
+                  {loading ? 'Asignando...' : 'Asignar'}
+                </Button>
               </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </main>
-    </PageWrapper>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </div>
   );
 };
 

@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useSession } from '@/contexts/SessionContext';
 import { 
   DollarSign, 
@@ -16,10 +16,11 @@ import {
   RefreshCw,
   BarChart,
   Loader2,
-  Gift 
+  Gift // Importar Gift para el nuevo botón
 } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import { useAdminDashboardData } from '@/hooks/useDashboardData';
+import StatCard from '@/components/dashboard/StatCard';
 import {
   Table,
   TableBody,
@@ -28,10 +29,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import PageWrapper from '@/components/PageWrapper';
-import AnimatedHeader from '@/components/AnimatedHeader';
-import ContentCard from '@/components/ContentCard';
-import StatCardAnimated from '@/components/dashboard/StatCardAnimated';
+import Footer from '@/components/Footer';
+import AppHeader from '@/components/AppHeader'; // Importar AppHeader
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -69,211 +68,205 @@ Nota: Esta configuración solo puede cambiarse desde la consola de Supabase y re
   };
 
   return (
-    <PageWrapper showFooter={true} showMadeWithDyad={true}>
-      <AnimatedHeader title="Dashboard de Administración" showSignOut={true} />
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move text-text-on-color">
+      <AppHeader title="Dashboard de Administración" />
       
-      <main className="p-4">
-        <div className="w-full max-w-7xl mx-auto pt-8 pb-12 space-y-8">
-          
-          <ContentCard className="p-8 space-y-6">
-            <div className="flex justify-between items-center mb-6">
-              <h1 className="text-4xl font-bold text-text-carbon">Resumen General</h1>
-              <Button 
-                onClick={refreshData} 
-                disabled={loading}
-                variant="outline"
-                className="flex items-center gap-2 bg-white text-primary-blue border-primary-blue hover:bg-gray-100 hover-scale"
-              >
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                Actualizar Datos
-              </Button>
-            </div>
+      <main className="flex-grow p-4">
+        <div className="w-full max-w-7xl mx-auto p-8 space-y-8 bg-white/80 backdrop-blur-sm rounded-lg shadow-lg">
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-4xl font-bold text-text-carbon">Resumen General</h1>
+            <Button 
+              onClick={refreshData} 
+              disabled={loading}
+              variant="outline"
+              className="flex items-center gap-2 bg-white text-primary-blue border-primary-blue hover:bg-gray-100"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Actualizar Datos
+            </Button>
+          </div>
 
-            {/* Sección de Métricas Clave */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <StatCardAnimated 
-                title="Ingresos Totales (Completados)"
-                value={`$${totalRevenue.toFixed(2)}`}
-                icon={DollarSign}
-                color="text-success-green"
-                description="Pedidos completados históricamente"
-                delay={100}
-              />
-              <StatCardAnimated 
-                title="Total de Pedidos"
-                value={totalOrders}
-                icon={Package}
-                color="text-primary-blue"
-                description="Pedidos totales en el sistema"
-                delay={200}
-              />
-              <StatCardAnimated 
-                title="Clientes Registrados"
-                value={totalClients}
-                icon={User}
-                color="text-secondary-yellow"
-                description="Usuarios con rol 'client'"
-                delay={300}
-              />
-              <StatCardAnimated 
-                title="Locales Activos"
-                value={localPerformance.length}
-                icon={Store}
-                color="text-purple-600"
-                description="Número de locales registrados"
-                delay={400}
-              />
-            </div>
+          {/* Sección de Métricas Clave */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <StatCard 
+              title="Ingresos Totales (Completados)"
+              value={`$${totalRevenue.toFixed(2)}`}
+              icon={DollarSign}
+              color="text-success-green"
+              description="Pedidos completados históricamente"
+            />
+            <StatCard 
+              title="Total de Pedidos"
+              value={totalOrders}
+              icon={Package}
+              color="text-primary-blue"
+              description="Pedidos totales en el sistema"
+            />
+            <StatCard 
+              title="Clientes Registrados"
+              value={totalClients}
+              icon={User}
+              color="text-secondary-yellow"
+              description="Usuarios con rol 'client'"
+            />
+            <StatCard 
+              title="Locales Activos"
+              value={localPerformance.length}
+              icon={Store}
+              color="text-purple-600"
+              description="Número de locales registrados"
+            />
+          </div>
 
-            {/* Sección de Navegación y Configuración */}
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 mt-8">
-              
-              {/* Botón de Reportes */}
-              <ContentCard delay={500} className="bg-primary-blue/10 border-primary-blue shadow-md hover:shadow-lg transition-shadow lg:col-span-2">
-                <CardHeader>
-                  <div className="flex items-center gap-3">
-                    <BarChart className="h-8 w-8 text-primary-blue" />
-                    <CardTitle className="text-primary-blue">ESTADÍSTICAS Y REPORTES</CardTitle>
-                  </div>
-                  <CardDescription>Análisis detallado de rendimiento, tendencias y ranking de clientes.</CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-col space-y-2">
-                  <Button 
-                    className="w-full bg-primary-blue hover:bg-blue-700 text-white hover-scale btn-shimmer" 
-                    onClick={() => navigate('/admin/reports')}
-                  >
-                    Ver Reportes Detallados
-                  </Button>
-                </CardContent>
-              </ContentCard>
+          {/* Sección de Navegación y Configuración */}
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 mt-8">
+            
+            {/* Botón de Reportes */}
+            <Card className="bg-primary-blue/10 border-primary-blue shadow-md hover:shadow-lg transition-shadow lg:col-span-2">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <BarChart className="h-8 w-8 text-primary-blue" />
+                  <CardTitle className="text-primary-blue">ESTADÍSTICAS Y REPORTES</CardTitle>
+                </div>
+                <CardDescription>Análisis detallado de rendimiento, tendencias y ranking de clientes.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col space-y-2">
+                <Button 
+                  className="w-full bg-primary-blue hover:bg-blue-700 text-white" 
+                  onClick={() => navigate('/admin/reports')}
+                >
+                  Ver Reportes Detallados
+                </Button>
+              </CardContent>
+            </Card>
 
-              <ContentCard delay={600} className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <div className="flex items-center gap-3">
-                    <Package className="h-8 w-8 text-primary-blue" />
-                    <CardTitle className="text-primary-blue">Pedidos</CardTitle>
-                  </div>
-                  <CardDescription>Gestiona y supervisa todos los pedidos.</CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-col space-y-2">
-                  <Button 
-                    variant="outline" 
-                    className="w-full justify-start hover-scale" 
-                    onClick={() => navigate('/admin/orders')}
-                  >
-                    Ver Todos los Pedidos
-                  </Button>
-                </CardContent>
-              </ContentCard>
+            <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <Package className="h-8 w-8 text-primary-blue" />
+                  <CardTitle className="text-primary-blue">Pedidos</CardTitle>
+                </div>
+                <CardDescription>Gestiona y supervisa todos los pedidos.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col space-y-2">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start" 
+                  onClick={() => navigate('/admin/orders')}
+                >
+                  Ver Todos los Pedidos
+                </Button>
+              </CardContent>
+            </Card>
 
-              <ContentCard delay={700} className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <div className="flex items-center gap-3">
-                    <Store className="h-8 w-8 text-primary-blue" />
-                    <CardTitle className="text-primary-blue">Locales</CardTitle>
-                  </div>
-                  <CardDescription>Gestiona los locales de impresión.</CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-col space-y-2">
-                  <Button 
-                    variant="outline" 
-                    className="w-full justify-start hover-scale" 
-                    onClick={() => navigate('/admin/locals')}
-                  >
-                    Gestionar Locales
-                  </Button>
-                </CardContent>
-              </ContentCard>
+            <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <Store className="h-8 w-8 text-primary-blue" />
+                  <CardTitle className="text-primary-blue">Locales</CardTitle>
+                </div>
+                <CardDescription>Gestiona los locales de impresión.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col space-y-2">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start" 
+                  onClick={() => navigate('/admin/locals')}
+                >
+                  Gestionar Locales
+                </Button>
+              </CardContent>
+            </Card>
 
-              <ContentCard delay={800} className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <div className="flex items-center gap-3">
-                    <UsersIcon className="h-8 w-8 text-primary-blue" />
-                    <CardTitle className="text-primary-blue">Usuarios</CardTitle>
-                  </div>
-                  <CardDescription>Gestiona usuarios y sus roles.</CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-col space-y-2">
-                  <Button 
-                    variant="outline" 
-                    className="w-full justify-start hover-scale" 
-                    onClick={() => navigate('/admin/users')}
-                  >
-                    Gestionar Usuarios
-                  </Button>
-                </CardContent>
-              </ContentCard>
+            <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <UsersIcon className="h-8 w-8 text-primary-blue" />
+                  <CardTitle className="text-primary-blue">Usuarios</CardTitle>
+                </div>
+                <CardDescription>Gestiona usuarios y sus roles.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col space-y-2">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start" 
+                  onClick={() => navigate('/admin/users')}
+                >
+                  Gestionar Usuarios
+                </Button>
+              </CardContent>
+            </Card>
 
-              <ContentCard delay={900} className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <div className="flex items-center gap-3">
-                    <Settings className="h-8 w-8 text-primary-blue" />
-                    <CardTitle className="text-primary-blue">Configuración</CardTitle>
-                  </div>
-                  <CardDescription>Branding y precios globales.</CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-col space-y-2">
-                  <Button 
-                    variant="outline" 
-                    className="w-full justify-start mb-2 hover-scale" 
-                    onClick={() => navigate('/admin/branding')}
-                  >
-                    Configurar Branding
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    className="w-full justify-start hover-scale" 
-                    onClick={() => navigate('/admin/global-prices')}
-                  >
-                    Gestionar Precios
-                  </Button>
-                </CardContent>
-              </ContentCard>
-              
-              {/* Nueva Tarjeta de Recompensas */}
-              <ContentCard delay={1000} className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <div className="flex items-center gap-3">
-                    <Gift className="h-8 w-8 text-primary-blue" />
-                    <CardTitle className="text-primary-blue">Recompensas</CardTitle>
-                  </div>
-                  <CardDescription>Crea y gestiona los premios canjeables.</CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-col space-y-2">
-                  <Button 
-                    variant="outline" 
-                    className="w-full justify-start hover-scale" 
-                    onClick={() => navigate('/admin/rewards')}
-                  >
-                    Gestionar Premios
-                  </Button>
-                </CardContent>
-              </ContentCard>
+            <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <Settings className="h-8 w-8 text-primary-blue" />
+                  <CardTitle className="text-primary-blue">Configuración</CardTitle>
+                </div>
+                <CardDescription>Branding y precios globales.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col space-y-2">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start mb-2" 
+                  onClick={() => navigate('/admin/branding')}
+                >
+                  Configurar Branding
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start" 
+                  onClick={() => navigate('/admin/global-prices')}
+                >
+                  Gestionar Precios
+                </Button>
+              </CardContent>
+            </Card>
+            
+            {/* Nueva Tarjeta de Recompensas */}
+            <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <Gift className="h-8 w-8 text-primary-blue" />
+                  <CardTitle className="text-primary-blue">Recompensas</CardTitle>
+                </div>
+                <CardDescription>Crea y gestiona los premios canjeables.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col space-y-2">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start" 
+                  onClick={() => navigate('/admin/rewards')}
+                >
+                  Gestionar Premios
+                </Button>
+              </CardContent>
+            </Card>
 
-              <ContentCard delay={1100} className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <div className="flex items-center gap-3">
-                    <Clock className="h-8 w-8 text-primary-blue" />
-                    <CardTitle className="text-primary-blue">Verificación Email</CardTitle>
-                  </div>
-                  <CardDescription>Ajustes de seguridad de autenticación.</CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-col space-y-2">
-                  <Button 
-                    variant="outline" 
-                    className="w-full justify-start hover-scale" 
-                    onClick={showVerificationTimeInstructions}
-                    disabled={isConfiguring}
-                  >
-                    {isConfiguring ? 'Mostrando instrucciones...' : 'Extender tiempo de enlace'}
-                  </Button>
-                </CardContent>
-              </ContentCard>
-            </div>
-          </ContentCard>
+            <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <Clock className="h-8 w-8 text-primary-blue" />
+                  <CardTitle className="text-primary-blue">Verificación Email</CardTitle>
+                </div>
+                <CardDescription>Ajustes de seguridad de autenticación.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col space-y-2">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start" 
+                  onClick={showVerificationTimeInstructions}
+                  disabled={isConfiguring}
+                >
+                  {isConfiguring ? 'Mostrando instrucciones...' : 'Extender tiempo de enlace'}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </main>
-    </PageWrapper>
+      <Footer />
+    </div>
   );
 };
 

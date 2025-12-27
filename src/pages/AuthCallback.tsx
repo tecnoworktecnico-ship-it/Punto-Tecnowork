@@ -4,7 +4,6 @@ import React, { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSession } from '@/contexts/SessionContext';
 import { Loader2 } from 'lucide-react';
-import PageWrapper from '@/components/PageWrapper';
 
 const AuthCallback = () => {
   const navigate = useNavigate();
@@ -54,12 +53,12 @@ const AuthCallback = () => {
   }, [session, loading, profile, navigate, location.hash]);
 
   return (
-    <PageWrapper centerContent={true} showFooter={false} showMadeWithDyad={false}>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
       <div className="flex items-center text-white text-xl">
         <Loader2 className="h-6 w-6 animate-spin mr-3" />
         Procesando autenticación...
       </div>
-    </PageWrapper>
+    </div>
   );
 };
 

@@ -6,13 +6,10 @@ import { useSession } from '@/contexts/SessionContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { showSuccess, showError } from '@/utils/toast';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Trash2, Loader2 } from 'lucide-react';
-import PageWrapper from '@/components/PageWrapper';
-import AnimatedHeader from '@/components/AnimatedHeader';
-import ContentCard from '@/components/ContentCard';
+import { ArrowLeft, Trash2 } from 'lucide-react';
 
 const BrandingSettings = () => {
   const { profile, loading: sessionLoading } = useSession();
@@ -161,7 +158,6 @@ const BrandingSettings = () => {
   if (sessionLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
-        <Loader2 className="h-8 w-8 text-white animate-spin mr-2" />
         <p className="text-white text-xl">Cargando configuración de branding...</p>
       </div>
     );
@@ -172,135 +168,132 @@ const BrandingSettings = () => {
   }
 
   return (
-    <PageWrapper showFooter={true} showMadeWithDyad={true}>
-      <AnimatedHeader 
-        title="Configuración de Branding" 
-        showSignOut={true} 
-        showBackButton={true} 
-        backPath="/admin/dashboard"
-      />
-      
-      <main className="p-4 flex justify-center">
-        <ContentCard className="w-full max-w-2xl p-6 mt-8 mb-12">
-          <CardHeader>
-            <CardTitle className="text-3xl font-bold text-text-carbon text-center">Configuración de Branding</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSave} className="space-y-6">
-              {/* Logo Principal */}
-              <div className="animate-fade-in-up animation-delay-100">
-                <Label htmlFor="mainLogoUrl" className="text-lg font-medium text-text-carbon mb-2 block">URL del Logo Principal</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="mainLogoUrl"
-                    type="url"
-                    value={mainLogoUrl}
-                    onChange={(e) => setMainLogoUrl(e.target.value)}
-                    placeholder="https://ejemplo.com/logo_principal.png"
-                    className="w-full p-3 border border-gray-300 rounded-md focus:ring-primary-blue focus:border-primary-blue"
-                  />
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="icon" 
-                    onClick={() => handleClearLogo('main_logo_url', setMainLogoUrl)}
-                    disabled={!mainLogoUrl || loading}
-                    title="Borrar Logo"
-                    className="flex-shrink-0 text-emphasis-red hover:bg-red-50 hover-scale"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-                {mainLogoUrl && (
-                  <div className="mt-4 p-4 border border-gray-200 rounded-md bg-gray-50">
-                    <p className="text-sm text-gray-600 mb-2 font-medium">Vista previa del Logo Principal:</p>
-                    <div className="flex justify-center">
-                      <img src={mainLogoUrl} alt="Logo Principal" className="h-20 object-contain" />
-                    </div>
-                  </div>
-                )}
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move text-text-on-color">
+      <Card className="w-full max-w-2xl p-6 bg-white rounded-lg shadow-lg">
+        <CardHeader>
+          <div className="flex items-center justify-between mb-4">
+            <Button
+              variant="ghost"
+              onClick={() => navigate('/admin/dashboard')}
+              className="flex items-center gap-2 text-text-carbon hover:text-primary-blue"
+            >
+              <ArrowLeft className="h-5 w-5" />
+              Volver al Dashboard
+            </Button>
+          </div>
+          <CardTitle className="text-3xl font-bold text-text-carbon text-center">Configuración de Branding</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSave} className="space-y-6">
+            {/* Logo Principal */}
+            <div>
+              <Label htmlFor="mainLogoUrl" className="text-lg font-medium text-text-carbon mb-2 block">URL del Logo Principal</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="mainLogoUrl"
+                  type="url"
+                  value={mainLogoUrl}
+                  onChange={(e) => setMainLogoUrl(e.target.value)}
+                  placeholder="https://ejemplo.com/logo_principal.png"
+                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-primary-blue focus:border-primary-blue"
+                />
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="icon" 
+                  onClick={() => handleClearLogo('main_logo_url', setMainLogoUrl)}
+                  disabled={!mainLogoUrl || loading}
+                  title="Borrar Logo"
+                  className="flex-shrink-0 text-emphasis-red hover:bg-red-50"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               </div>
-
-              {/* Logo Powered By #1 */}
-              <div className="animate-fade-in-up animation-delay-200">
-                <Label htmlFor="poweredByLogoUrl" className="text-lg font-medium text-text-carbon mb-2 block">URL del Logo "Powered By" #1</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="poweredByLogoUrl"
-                    type="url"
-                    value={poweredByLogoUrl}
-                    onChange={(e) => setPoweredByLogoUrl(e.target.value)}
-                    placeholder="https://ejemplo.com/powered_by_logo_1.png"
-                    className="w-full p-3 border border-gray-300 rounded-md focus:ring-primary-blue focus:border-primary-blue"
-                  />
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="icon" 
-                    onClick={() => handleClearLogo('powered_by_logo_url', setPoweredByLogoUrl)}
-                    disabled={!poweredByLogoUrl || loading}
-                    title="Borrar Logo"
-                    className="flex-shrink-0 text-emphasis-red hover:bg-red-50 hover-scale"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-                {poweredByLogoUrl && (
-                  <div className="mt-4 p-4 border border-gray-200 rounded-md bg-gray-50">
-                    <p className="text-sm text-gray-600 mb-2 font-medium">Vista previa del Logo "Powered By" #1:</p>
-                    <div className="flex justify-center">
-                      <img src={poweredByLogoUrl} alt="Powered By Logo 1" className="h-12 object-contain" />
-                    </div>
+              {mainLogoUrl && (
+                <div className="mt-4 p-4 border border-gray-200 rounded-md bg-gray-50">
+                  <p className="text-sm text-gray-600 mb-2 font-medium">Vista previa del Logo Principal:</p>
+                  <div className="flex justify-center">
+                    <img src={mainLogoUrl} alt="Logo Principal" className="h-20 object-contain" />
                   </div>
-                )}
-              </div>
-
-              {/* Logo Powered By #2 */}
-              <div className="animate-fade-in-up animation-delay-300">
-                <Label htmlFor="poweredByLogoUrl2" className="text-lg font-medium text-text-carbon mb-2 block">URL del Logo "Powered By" #2</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="poweredByLogoUrl2"
-                    type="url"
-                    value={poweredByLogoUrl2}
-                    onChange={(e) => setPoweredByLogoUrl2(e.target.value)}
-                    placeholder="https://ejemplo.com/powered_by_logo_2.png"
-                    className="w-full p-3 border border-gray-300 rounded-md focus:ring-primary-blue focus:border-primary-blue"
-                  />
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="icon" 
-                    onClick={() => handleClearLogo('powered_by_logo_url_2', setPoweredByLogoUrl2)}
-                    disabled={!poweredByLogoUrl2 || loading}
-                    title="Borrar Logo"
-                    className="flex-shrink-0 text-emphasis-red hover:bg-red-50 hover-scale"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
                 </div>
-                {poweredByLogoUrl2 && (
-                  <div className="mt-4 p-4 border border-gray-200 rounded-md bg-gray-50">
-                    <p className="text-sm text-gray-600 mb-2 font-medium">Vista previa del Logo "Powered By" #2:</p>
-                    <div className="flex justify-center">
-                      <img src={poweredByLogoUrl2} alt="Powered By Logo 2" className="h-12 object-contain" />
-                    </div>
-                  </div>
-                )}
-              </div>
+              )}
+            </div>
 
-              <Button 
-                type="submit" 
-                disabled={loading} 
-                className="w-full bg-primary-blue hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-md hover-scale btn-shimmer animate-fade-in-up animation-delay-400"
-              >
-                {loading ? 'Guardando...' : 'Guardar Configuración'}
-              </Button>
-            </form>
-          </CardContent>
-        </ContentCard>
-      </main>
-    </PageWrapper>
+            {/* Logo Powered By #1 */}
+            <div>
+              <Label htmlFor="poweredByLogoUrl" className="text-lg font-medium text-text-carbon mb-2 block">URL del Logo "Powered By" #1</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="poweredByLogoUrl"
+                  type="url"
+                  value={poweredByLogoUrl}
+                  onChange={(e) => setPoweredByLogoUrl(e.target.value)}
+                  placeholder="https://ejemplo.com/powered_by_logo_1.png"
+                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-primary-blue focus:border-primary-blue"
+                />
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="icon" 
+                  onClick={() => handleClearLogo('powered_by_logo_url', setPoweredByLogoUrl)}
+                  disabled={!poweredByLogoUrl || loading}
+                  title="Borrar Logo"
+                  className="flex-shrink-0 text-emphasis-red hover:bg-red-50"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+              {poweredByLogoUrl && (
+                <div className="mt-4 p-4 border border-gray-200 rounded-md bg-gray-50">
+                  <p className="text-sm text-gray-600 mb-2 font-medium">Vista previa del Logo "Powered By" #1:</p>
+                  <div className="flex justify-center">
+                    <img src={poweredByLogoUrl} alt="Powered By Logo 1" className="h-12 object-contain" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Logo Powered By #2 */}
+            <div>
+              <Label htmlFor="poweredByLogoUrl2" className="text-lg font-medium text-text-carbon mb-2 block">URL del Logo "Powered By" #2</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="poweredByLogoUrl2"
+                  type="url"
+                  value={poweredByLogoUrl2}
+                  onChange={(e) => setPoweredByLogoUrl2(e.target.value)}
+                  placeholder="https://ejemplo.com/powered_by_logo_2.png"
+                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-primary-blue focus:border-primary-blue"
+                />
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="icon" 
+                  onClick={() => handleClearLogo('powered_by_logo_url_2', setPoweredByLogoUrl2)}
+                  disabled={!poweredByLogoUrl2 || loading}
+                  title="Borrar Logo"
+                  className="flex-shrink-0 text-emphasis-red hover:bg-red-50"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+              {poweredByLogoUrl2 && (
+                <div className="mt-4 p-4 border border-gray-200 rounded-md bg-gray-50">
+                  <p className="text-sm text-gray-600 mb-2 font-medium">Vista previa del Logo "Powered By" #2:</p>
+                  <div className="flex justify-center">
+                    <img src={poweredByLogoUrl2} alt="Powered By Logo 2" className="h-12 object-contain" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <Button type="submit" disabled={loading} className="w-full bg-primary-blue hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-md">
+              {loading ? 'Guardando...' : 'Guardar Configuración'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 
