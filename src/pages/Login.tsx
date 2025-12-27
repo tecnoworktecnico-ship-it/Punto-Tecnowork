@@ -47,7 +47,7 @@ function Login() {
   });
 
   // Clases de estilo para inputs en modo oscuro
-  const INPUT_CLASS = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-blue-500 outline-none transition-all";
+  const INPUT_CLASS = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:shadow-lg focus:shadow-blue-500/20 outline-none transition-all";
 
   // Redirigir si ya hay sesión activa (solo una vez)
   useEffect(() => {
@@ -303,10 +303,12 @@ function Login() {
         <div className="absolute bottom-[-10%] left-[20%] w-80 h-80 bg-yellow-500 rounded-full mix-blend-screen filter blur-[100px] opacity-20 animate-blob animation-delay-4000"></div>
       </div>
       
-      <div className="glass-card p-8 rounded-3xl shadow-2xl max-w-md w-full relative z-10 border border-white/10 backdrop-blur-xl">
+      <div className="glass-card p-8 rounded-3xl shadow-2xl max-w-md w-full relative z-10 border border-white/10 backdrop-blur-xl hover:shadow-blue-500/20 hover:border-blue-500/30 transition-all duration-500">
         <div className="mb-6">
           <BrandingDisplay type="main" className="h-20 mx-auto mb-4" />
-          <h2 className="text-3xl font-bold text-center text-white">Bienvenido</h2>
+          <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-yellow-400 animate-gradient text-center">
+            Bienvenido
+          </h2>
           <p className="text-sm text-center text-gray-300 mt-1">
             Versión: <span className="font-semibold text-white">{APP_VERSION}</span>
           </p>
@@ -517,8 +519,17 @@ function Login() {
           </TabsContent>
         </Tabs>
       </div>
+      
+      {/* Footer con estilo Glass Card */}
+      <div className="mt-8 flex flex-col items-center justify-center p-4 rounded-2xl glass-card border border-white/5 bg-white/5 hover:bg-white/10 transition-all">
+        <span className="text-sm text-gray-300 mb-2">Powered by</span>
+        <div className="flex items-center justify-center gap-4">
+          <BrandingDisplay type="poweredBy" className="h-8 object-contain" />
+          <BrandingDisplay type="poweredBy2" className="h-8 object-contain" />
+        </div>
+      </div>
+      
       <MadeWithDyad />
-      <Footer />
     </div>
   );
 }
