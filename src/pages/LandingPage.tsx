@@ -67,7 +67,7 @@ const LandingPage = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move text-text-on-color">
-      <div className="text-center bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
+      <div className="glass-card p-8 rounded-2xl shadow-xl max-w-md w-full relative z-10">
         <div className="mb-6">
           <BrandingDisplay type="main" className="h-20 mx-auto mb-4" />
           <h1 className="text-4xl font-bold text-text-carbon">Bienvenido a Punto Tecnowork</h1>
