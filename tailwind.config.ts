@@ -5,4 +5,10 @@ const config: Config = { content: [ "./src/pages//*.{js,ts,jsx,tsx,mdx}", "./src
     '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
     '100%': { transform: 'translate(0px, 0px) scale(1)' },
   },
-}, animation: { float: 'float 6s ease-in-out infinite', shimmer: 'shimmer 3s linear infinite', blob: 'blob 7s infinite cubic-bezier(0.6, -0.28, 0.735, 0.045)', }, }, }, plugins: [], }; export default config;
+  gradient: { // Definición de la animación de gradiente
+    '0%, 100%': { backgroundPosition: '0% 50%' },
+    '50%': { backgroundPosition: '100% 50%' },
+  },
+}, animation: { float: 'float 6s ease-in-out infinite', shimmer: 'shimmer 3s linear infinite', blob: 'blob 7s infinite cubic-bezier(0.6, -0.28, 0.735, 0.045)',
+  gradient: 'gradient 3s ease infinite', // Uso de la animación de gradiente
+}, }, }, plugins: [], }; export default config;
