@@ -1,0 +1,1 @@
+// This component would wrap its children in a Card structure, applying the 'glass-card-strong' class, 'shadow-premium-sm', and the 'animate-fade-in-up' class with an optional delay prop. It would be a replacement for the standard shadcn Card in main content areas.

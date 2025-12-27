@@ -1,0 +1,1 @@
+// This component would be based on the existing StatCard but would incorporate the 'animate-fade-in-up' class with a delay based on its index, providing a staggered entrance effect.
