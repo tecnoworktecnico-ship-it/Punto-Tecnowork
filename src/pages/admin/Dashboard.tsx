@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -14,27 +12,16 @@ import {
   User,
   RefreshCw,
   BarChart,
-  Gift, 
-  Wrench // Usar Wrench para mantenimiento
+  Gift,
+  Wrench // Icono para mantenimiento
 } from 'lucide-react';
 import { useAdminDashboardData } from '@/hooks/useDashboardData';
 import StatCard from '@/components/dashboard/StatCard';
 import Footer from '@/components/Footer';
-import AppHeader from '@/components/AppHeader'; 
+import AppHeader from '@/components/AppHeader';
+const AdminDashboard = () => { const navigate = useNavigate(); const { profile } = useSession(); const { totalOrders, totalRevenue, totalClients, localPerformance, loading, refreshData } = useAdminDashboardData();
 
-const AdminDashboard = () => {
-  const navigate = useNavigate();
-  const { profile, signOut } = useSession();
-  const { 
-    totalOrders, 
-    totalRevenue, 
-    totalClients, 
-    localPerformance, 
-    loading, 
-    refreshData 
-  } = useAdminDashboardData();
-
-  return (
+return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move text-text-on-color">
       <AppHeader title="Dashboard de Administración" />
       
@@ -52,7 +39,6 @@ const AdminDashboard = () => {
               Actualizar Datos
             </Button>
           </div>
-
           {/* Sección de Métricas Clave */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <StatCard 
@@ -84,9 +70,8 @@ const AdminDashboard = () => {
               description="Número de locales registrados"
             />
           </div>
-
-          {/* Sección de Navegación y Configuración */}
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 mt-8">
+          {/* Sección de Navegación */}
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-8">
             
             {/* Botón de Reportes */}
             <Card className="bg-primary-blue/10 border-primary-blue shadow-md hover:shadow-lg transition-shadow lg:col-span-2">
@@ -95,9 +80,9 @@ const AdminDashboard = () => {
                   <BarChart className="h-8 w-8 text-primary-blue" />
                   <CardTitle className="text-primary-blue">ESTADÍSTICAS Y REPORTES</CardTitle>
                 </div>
-                <CardDescription>Análisis detallado de rendimiento, tendencias y ranking de clientes.</CardDescription>
+                <CardDescription>Análisis detallado de rendimiento y ranking.</CardDescription>
               </CardHeader>
-              <CardContent className="flex flex-col space-y-2">
+              <CardContent>
                 <Button 
                   className="w-full bg-primary-blue hover:bg-blue-700 text-white" 
                   onClick={() => navigate('/admin/reports')}
@@ -106,124 +91,89 @@ const AdminDashboard = () => {
                 </Button>
               </CardContent>
             </Card>
-
             <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <Package className="h-8 w-8 text-primary-blue" />
-                  <CardTitle className="text-primary-blue">Pedidos</CardTitle>
+                  <Package className="h-6 w-6 text-primary-blue" />
+                  <CardTitle className="text-primary-blue text-lg">Pedidos</CardTitle>
                 </div>
-                <CardDescription>Gestiona y supervisa todos los pedidos.</CardDescription>
               </CardHeader>
-              <CardContent className="flex flex-col space-y-2">
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start" 
-                  onClick={() => navigate('/admin/orders')}
-                >
+              <CardContent>
+                <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/admin/orders')}>
                   Ver Todos los Pedidos
                 </Button>
               </CardContent>
             </Card>
-
             <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <Store className="h-8 w-8 text-primary-blue" />
-                  <CardTitle className="text-primary-blue">Locales</CardTitle>
+                  <Store className="h-6 w-6 text-primary-blue" />
+                  <CardTitle className="text-primary-blue text-lg">Locales</CardTitle>
                 </div>
-                <CardDescription>Gestiona los locales de impresión.</CardDescription>
               </CardHeader>
-              <CardContent className="flex flex-col space-y-2">
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start" 
-                  onClick={() => navigate('/admin/locals')}
-                >
+              <CardContent>
+                <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/admin/locals')}>
                   Gestionar Locales
                 </Button>
               </CardContent>
             </Card>
-
             <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <UsersIcon className="h-8 w-8 text-primary-blue" />
-                  <CardTitle className="text-primary-blue">Usuarios</CardTitle>
+                  <UsersIcon className="h-6 w-6 text-primary-blue" />
+                  <CardTitle className="text-primary-blue text-lg">Usuarios</CardTitle>
                 </div>
-                <CardDescription>Gestiona usuarios y sus roles.</CardDescription>
               </CardHeader>
-              <CardContent className="flex flex-col space-y-2">
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start" 
-                  onClick={() => navigate('/admin/users')}
-                >
+              <CardContent>
+                <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/admin/users')}>
                   Gestionar Usuarios
                 </Button>
               </CardContent>
             </Card>
-
             <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <Settings className="h-8 w-8 text-primary-blue" />
-                  <CardTitle className="text-primary-blue">Configuración</CardTitle>
+                  <Settings className="h-6 w-6 text-primary-blue" />
+                  <CardTitle className="text-primary-blue text-lg">Configuración</CardTitle>
                 </div>
-                <CardDescription>Branding y precios globales.</CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col space-y-2">
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start mb-2" 
-                  onClick={() => navigate('/admin/branding')}
-                >
-                  Configurar Branding
+                <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/admin/branding')}>
+                  Branding
                 </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start" 
-                  onClick={() => navigate('/admin/global-prices')}
-                >
-                  Gestionar Precios
+                <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/admin/global-prices')}>
+                  Precios Globales
                 </Button>
               </CardContent>
             </Card>
             
-            {/* Tarjeta de Recompensas */}
             <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <Gift className="h-8 w-8 text-primary-blue" />
-                  <CardTitle className="text-primary-blue">Recompensas</CardTitle>
+                  <Gift className="h-6 w-6 text-primary-blue" />
+                  <CardTitle className="text-primary-blue text-lg">Recompensas</CardTitle>
                 </div>
-                <CardDescription>Crea y gestiona los premios canjeables.</CardDescription>
               </CardHeader>
-              <CardContent className="flex flex-col space-y-2">
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start" 
-                  onClick={() => navigate('/admin/rewards')}
-                >
+              <CardContent>
+                <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/admin/rewards')}>
                   Gestionar Premios
                 </Button>
               </CardContent>
             </Card>
-
-            {/* Nueva Tarjeta de Mantenimiento (Enlace) */}
+            {/* NUEVA TARJETA DE MANTENIMIENTO */}
             <Card 
-              className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow border-l-4 border-l-secondary-yellow cursor-pointer group" 
+              className="bg-white border-l-4 border-l-orange-500 shadow-md hover:shadow-lg transition-shadow cursor-pointer group"
               onClick={() => navigate('/admin/maintenance')}
             >
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <Wrench className="h-8 w-8 text-secondary-yellow group-hover:scale-110 transition-transform" />
-                  <CardTitle className="text-gray-800">Mantenimiento</CardTitle>
+                  <Wrench className="h-6 w-6 text-orange-500 group-hover:rotate-12 transition-transform" />
+                  <CardTitle className="text-gray-800 text-lg">Mantenimiento</CardTitle>
                 </div>
-                <CardDescription>Limpieza, reparación y ajustes técnicos.</CardDescription>
+                <CardDescription>Limpieza y reparación.</CardDescription>
               </CardHeader>
               <CardContent>
-                <Button variant="ghost" className="w-full justify-start pl-0 hover:bg-transparent text-secondary-yellow font-medium">
+                <Button variant="ghost" className="w-full justify-start pl-0 hover:bg-transparent text-orange-600 font-medium">
                   Ir al Panel Técnico →
                 </Button>
               </CardContent>
@@ -233,7 +183,6 @@ const AdminDashboard = () => {
       </main>
       <Footer />
     </div>
-  );
-};
+); };
 
 export default AdminDashboard;
