@@ -20,7 +20,8 @@ import Locals from "@/pages/admin/Locals";
 import Users from "@/pages/admin/Users";
 import AdminReports from "@/pages/admin/AdminReports";
 import Rewards from "@/pages/admin/Rewards";
-import AdminOrders from "@/pages/admin/Orders"; // Importar nueva página
+import AdminOrders from "@/pages/admin/Orders"; 
+import MaintenancePage from "@/pages/admin/Maintenance"; // Importar nueva página
 
 // Local Pages
 import LocalDashboard from "@/pages/local/Dashboard";
@@ -112,6 +113,14 @@ function App() {
             element={
               <AuthGuard allowedRoles={["admin"]}>
                 <AdminOrders />
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/admin/maintenance"
+            element={
+              <AuthGuard allowedRoles={["admin"]}>
+                <MaintenancePage />
               </AuthGuard>
             }
           />
