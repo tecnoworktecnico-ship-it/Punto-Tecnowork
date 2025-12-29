@@ -210,25 +210,21 @@ const AdminDashboard = () => {
               </CardContent>
             </Card>
 
-            {/* Tarjeta de Mantenimiento (Ahora solo un botón de navegación) */}
-            <Card className="bg-white border-l-4 border-l-emphasis-red border-y-gray-200 border-r-gray-200 shadow-sm hover:shadow-md transition-shadow">
-              <CardHeader className="pb-2">
+            {/* Nueva Tarjeta de Mantenimiento (Enlace) */}
+            <Card 
+              className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow border-l-4 border-l-secondary-yellow cursor-pointer group" 
+              onClick={() => navigate('/admin/maintenance')}
+            >
+              <CardHeader>
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-red-50 rounded-lg border border-red-100">
-                    <Wrench className="h-6 w-6 text-emphasis-red" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-gray-800 text-lg">Mantenimiento</CardTitle>
-                    <CardDescription className="text-gray-500">Herramientas críticas del sistema.</CardDescription>
-                  </div>
+                  <Wrench className="h-8 w-8 text-secondary-yellow group-hover:scale-110 transition-transform" />
+                  <CardTitle className="text-gray-800">Mantenimiento</CardTitle>
                 </div>
+                <CardDescription>Limpieza, reparación y ajustes técnicos.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4 pt-4">
-                <Button 
-                  className="w-full bg-emphasis-red hover:bg-red-700 text-white" 
-                  onClick={() => navigate('/admin/maintenance')}
-                >
-                  Ir al Panel de Mantenimiento
+              <CardContent>
+                <Button variant="ghost" className="w-full justify-start pl-0 hover:bg-transparent text-secondary-yellow font-medium">
+                  Ir al Panel Técnico →
                 </Button>
               </CardContent>
             </Card>
