@@ -49,6 +49,7 @@ const ClientRankingTable: React.FC<ClientRankingTableProps> = ({ localId, title,
         }
         setRanking([]);
       } else {
+        // La data ya viene ordenada y limitada a 10 por la función RPC.
         setRanking(data || []);
       }
     } catch (err) {
