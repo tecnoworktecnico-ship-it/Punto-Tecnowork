@@ -8,12 +8,13 @@ import { useNavigate } from 'react-router-dom';
 import ProfileSettings from '@/components/ProfileSettings';
 import PasswordChangeAlert from '@/components/PasswordChangeAlert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Settings, LayoutDashboard, Star, Gift, ShoppingBag, Sparkles } from 'lucide-react';
+import { Settings, LayoutDashboard, Star, Gift, ShoppingBag, Sparkles, DollarSign, Clock, Package } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
 import { Badge } from '@/components/ui/badge';
 import Footer from '@/components/Footer';
-import AppHeader from '@/components/AppHeader'; // Importar AppHeader
+import AppHeader from '@/components/AppHeader';
+import StatCard from '@/components/dashboard/StatCard';
 
 interface FeaturedReward {
   id: string;
@@ -32,6 +33,13 @@ const ClientDashboard = () => {
   const [featuredRewards, setFeaturedRewards] = useState<FeaturedReward[]>([]);
   const [loadingRewards, setLoadingRewards] = useState(true);
   const [totalRewardsCount, setTotalRewardsCount] = useState(0);
+  
+  // NUEVO ESTADO PARA ESTADÍSTICAS DE PEDIDOS
+  const [totalSpent, setTotalSpent] = useState(0);
+  const [pendingOrders, setPendingOrders] = useState(0);
+  const [totalOrders, setTotalOrders] = useState(0);
+  const [loadingStats, setLoadingStats] = useState(true);
+  // FIN NUEVO ESTADO
 
   const fetchUserPoints = useCallback(async () => {
     if (!profile?.id) return;
@@ -82,13 +90,61 @@ const ClientDashboard = () => {
 
     setLoadingRewards(false);
   }, []);
+  
+  // FUNCIÓN PARA OBTENER ESTADÍSTICAS DE PEDIDOS DEL CLIENTE
+  const fetchClientStats = useCallback(async () => {
+    if (!profile?.id) return;
+    setLoadingStats(true);
+
+    try {
+      // 1. Dinero Gastado (Completed Orders Revenue)
+      const { data: revenueData, error: revenueError } = await supabase
+        .from('orders')
+        .select('total_price')
+        .eq('client_id', profile.id)
+        .eq('status', 'completed');
+
+      if (revenueError) throw revenueError;
+      
+      const totalRevenue = revenueData.reduce((sum, order) => sum + order.total_price, 0);
+      setTotalSpent(totalRevenue);
+
+      // 2. Pedidos Pendientes Count
+      const { count: pendingCount, error: pendingError } = await supabase
+        .from('orders')
+        .select('id', { count: 'exact', head: true })
+        .eq('client_id', profile.id)
+        .eq('status', 'pending');
+        
+      if (pendingError) throw pendingError;
+      setPendingOrders(pendingCount || 0);
+
+      // 3. Pedidos Totales (Non-Cancelled)
+      const { count: totalCount, error: totalError } = await supabase
+        .from('orders')
+        .select('id', { count: 'exact', head: true })
+        .eq('client_id', profile.id)
+        .neq('status', 'cancelled');
+        
+      if (totalError) throw totalError;
+      setTotalOrders(totalCount || 0);
+
+    } catch (error) {
+      console.error('Error fetching client stats:', error);
+      showError('Error al cargar las estadísticas de pedidos.');
+    } finally {
+      setLoadingStats(false);
+    }
+  }, [profile?.id]);
+  // FIN FUNCIÓN
 
   useEffect(() => {
     if (!sessionLoading && profile?.role === 'client') {
       fetchUserPoints();
       fetchFeaturedRewards();
+      fetchClientStats(); // Llamar a la nueva función
     }
-  }, [sessionLoading, profile, fetchUserPoints, fetchFeaturedRewards]);
+  }, [sessionLoading, profile, fetchUserPoints, fetchFeaturedRewards, fetchClientStats]);
 
   // Función para forzar la recarga del perfil después de una actualización
   const handleProfileUpdate = () => {
@@ -99,6 +155,7 @@ const ClientDashboard = () => {
   const needsPasswordChange = profile && profile.password_changed === false;
   
   const displayName = profile?.first_name || user?.email;
+  const loadingAll = sessionLoading || loadingPoints || loadingRewards || loadingStats;
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move text-text-on-color">
@@ -139,6 +196,31 @@ const ClientDashboard = () => {
               </Button>
             </CardContent>
           </Card>
+          
+          {/* Sección de Métricas Clave del Cliente */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <StatCard 
+              title="Total Gastado (Completado)"
+              value={loadingStats ? <Loader2 className="h-6 w-6 animate-spin" /> : `$${totalSpent.toFixed(2)}`}
+              icon={DollarSign}
+              color="text-success-green"
+              description="Ingresos de pedidos completados"
+            />
+            <StatCard 
+              title="Pedidos Totales"
+              value={loadingStats ? <Loader2 className="h-6 w-6 animate-spin" /> : totalOrders}
+              icon={Package}
+              color="text-primary-blue"
+              description="Pedidos no cancelados"
+            />
+            <StatCard 
+              title="Pedidos Pendientes"
+              value={loadingStats ? <Loader2 className="h-6 w-6 animate-spin" /> : pendingOrders}
+              icon={Clock}
+              color="text-secondary-yellow"
+              description="Esperando ser procesados"
+            />
+          </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2 md:w-1/3">
