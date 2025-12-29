@@ -77,7 +77,11 @@ const fetchAdminData = async (setLoading: (l: boolean) => void, setData: (d: Das
 
     if (ordersError) throw ordersError;
 
-    const totalOrders = ordersData.length;
+    // Total Pedidos: Contar todos los registros que NO estén 'cancelled'
+    const nonCancelledOrders = ordersData.filter(o => o.status !== 'cancelled');
+    const totalOrders = nonCancelledOrders.length;
+    
+    // Ingresos Totales: Solo pedidos completados
     const totalRevenue = ordersData
       .filter(o => o.status === 'completed')
       .reduce((sum, order) => sum + order.total_price, 0);
@@ -157,7 +161,11 @@ const fetchLocalData = async (localId: string, setLoading: (l: boolean) => void,
 
     if (ordersError) throw ordersError;
 
-    const totalOrders = ordersData.length;
+    // Total Pedidos: Contar todos los registros que NO estén 'cancelled'
+    const nonCancelledOrders = ordersData.filter(o => o.status !== 'cancelled');
+    const totalOrders = nonCancelledOrders.length;
+    
+    // Ingresos Totales: Solo pedidos completados
     const totalRevenue = ordersData
       .filter(o => o.status === 'completed')
       .reduce((sum, order) => sum + order.total_price, 0);
