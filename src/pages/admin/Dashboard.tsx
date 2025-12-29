@@ -16,7 +16,8 @@ import {
   RefreshCw,
   BarChart,
   Loader2,
-  Gift // Importar Gift para el nuevo botón
+  Gift, // Importar Gift para el nuevo botón
+  Tool // Importar Tool para mantenimiento
 } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import { useAdminDashboardData } from '@/hooks/useDashboardData';
@@ -31,6 +32,7 @@ import {
 } from '@/components/ui/table';
 import Footer from '@/components/Footer';
 import AppHeader from '@/components/AppHeader'; // Importar AppHeader
+import PointsRepairButton from '@/components/admin/PointsRepairButton'; // Importar el nuevo componente
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -100,7 +102,7 @@ Nota: Esta configuración solo puede cambiarse desde la consola de Supabase y re
               value={totalOrders}
               icon={Package}
               color="text-primary-blue"
-              description="Pedidos totales en el sistema"
+              description="Pedidos totales en el sistema (no cancelados)"
             />
             <StatCard 
               title="Clientes Registrados"
@@ -223,7 +225,7 @@ Nota: Esta configuración solo puede cambiarse desde la consola de Supabase y re
               </CardContent>
             </Card>
             
-            {/* Nueva Tarjeta de Recompensas */}
+            {/* Tarjeta de Recompensas */}
             <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <div className="flex items-center gap-3">
@@ -243,15 +245,17 @@ Nota: Esta configuración solo puede cambiarse desde la consola de Supabase y re
               </CardContent>
             </Card>
 
-            <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
+            {/* Tarjeta de Mantenimiento */}
+            <Card className="bg-emphasis-red/10 border-emphasis-red shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <Clock className="h-8 w-8 text-primary-blue" />
-                  <CardTitle className="text-primary-blue">Verificación Email</CardTitle>
+                  <Tool className="h-8 w-8 text-emphasis-red" />
+                  <CardTitle className="text-emphasis-red">Mantenimiento</CardTitle>
                 </div>
-                <CardDescription>Ajustes de seguridad de autenticación.</CardDescription>
+                <CardDescription>Herramientas administrativas críticas.</CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col space-y-2">
+                <PointsRepairButton />
                 <Button 
                   variant="outline" 
                   className="w-full justify-start" 
