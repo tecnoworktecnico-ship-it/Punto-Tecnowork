@@ -79,24 +79,23 @@ const PointsRepairButton: React.FC = () => {
   };
 
   return (
-    <Button
+    <button
       onClick={handleRecalculate}
       disabled={loading}
-      variant="destructive"
-      className="w-full bg-emphasis-red hover:bg-red-700 text-white flex items-center gap-2"
+      className="w-full flex items-center justify-center gap-2 px-3 py-3 h-auto min-h-[44px] bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-semibold text-sm transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed shadow-md whitespace-normal leading-tight"
     >
+      {/* shrink-0 evita que el icono se aplaste si el texto ocupa mucho espacio */}
       {loading ? (
-        <>
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Recalculando Puntos...
-        </>
+        <Loader2 className="w-5 h-5 animate-spin shrink-0" />
       ) : (
-        <>
-          <RefreshCw className="h-4 w-4" />
-          Recalcular Puntos de Todos los Usuarios
-        </>
+        <RefreshCw className="w-5 h-5 shrink-0" />
       )}
-    </Button>
+      
+      {/* Texto adaptable */}
+      <span className="text-center">
+        {loading ? 'Sincronizando...' : 'Sincronizar Puntos'}
+      </span>
+    </button>
   );
 };
 
