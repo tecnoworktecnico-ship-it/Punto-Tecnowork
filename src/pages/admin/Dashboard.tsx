@@ -33,6 +33,7 @@ import {
 import Footer from '@/components/Footer';
 import AppHeader from '@/components/AppHeader'; // Importar AppHeader
 import PointsRepairButton from '@/components/admin/PointsRepairButton'; // Importar el nuevo componente
+import StorageCleaner from '@/components/admin/StorageCleaner'; // Importar el nuevo componente
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -262,20 +263,25 @@ Nota: Esta configuración solo puede cambiarse desde la consola de Supabase y re
                 <PointsRepairButton />
                 
                 <div className="h-px bg-gray-100 w-full my-1"></div>
-            <div className="px-1">
-               <Button 
-                 variant="outline" 
-                 className="w-full flex justify-start items-center text-gray-700 hover:text-blue-600 hover:bg-blue-50 border-gray-300 h-auto min-h-[44px] py-2 px-4 whitespace-normal text-left leading-tight" 
-                 onClick={showVerificationTimeInstructions}
-                 disabled={isConfiguring}
-               >
-                 <span className="w-full">
-                   {isConfiguring ? 'Procesando...' : 'Extender tiempo de enlace (30 min)'}
-                 </span>
-               </Button>
-            </div>
-          </CardContent>
-        </Card>
+                
+                <StorageCleaner />
+                
+                <div className="h-px bg-gray-100 w-full my-1"></div>
+                
+                <div className="px-1">
+                  <Button 
+                    variant="outline" 
+                    className="w-full flex justify-start items-center text-gray-700 hover:text-blue-600 hover:bg-blue-50 border-gray-300 h-auto min-h-[44px] py-2 px-4 whitespace-normal text-left leading-tight" 
+                    onClick={showVerificationTimeInstructions}
+                    disabled={isConfiguring}
+                  >
+                    <span className="w-full">
+                      {isConfiguring ? 'Procesando...' : 'Extender tiempo de enlace (30 min)'}
+                    </span>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </main>
