@@ -245,27 +245,35 @@ Nota: Esta configuración solo puede cambiarse desde la consola de Supabase y re
               </CardContent>
             </Card>
 
-            {/* Tarjeta de Mantenimiento */}
-            <Card className="bg-emphasis-red/10 border-emphasis-red shadow-md hover:shadow-lg transition-shadow">
-              <CardHeader>
+            {/* Tarjeta de Mantenimiento Mejorada */}
+            <Card className="bg-white border-l-4 border-l-emphasis-red border-y-gray-200 border-r-gray-200 shadow-sm hover:shadow-md transition-shadow">
+              <CardHeader className="pb-2">
                 <div className="flex items-center gap-3">
-                  <Wrench className="h-8 w-8 text-emphasis-red" />
-                  <CardTitle className="text-emphasis-red">Mantenimiento</CardTitle>
+                  <div className="p-2 bg-red-50 rounded-lg border border-red-100">
+                    <Wrench className="h-6 w-6 text-emphasis-red" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-gray-800 text-lg">Panel de Mantenimiento</CardTitle>
+                    <CardDescription className="text-gray-500">Herramientas críticas del sistema.</CardDescription>
+                  </div>
                 </div>
-                <CardDescription>Herramientas administrativas críticas.</CardDescription>
               </CardHeader>
-              <CardContent className="flex flex-col space-y-2">
+              <CardContent className="space-y-4 pt-4">
                 <PointsRepairButton />
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start" 
-                  onClick={showVerificationTimeInstructions}
-                  disabled={isConfiguring}
-                >
-                  {isConfiguring ? 'Mostrando instrucciones...' : 'Extender tiempo de enlace'}
-                </Button>
-              </CardContent>
-            </Card>
+                
+                <div className="h-px bg-gray-100 w-full my-1"></div>
+            <div className="px-1">
+               <Button 
+                 variant="outline" 
+                 className="w-full justify-start text-gray-700 hover:text-blue-600 hover:bg-blue-50 border-gray-300 h-auto py-2" 
+                 onClick={showVerificationTimeInstructions}
+                 disabled={isConfiguring}
+               >
+                 {isConfiguring ? 'Procesando...' : 'Extender tiempo de enlace'}
+               </Button>
+            </div>
+          </CardContent>
+        </Card>
           </div>
         </div>
       </main>
