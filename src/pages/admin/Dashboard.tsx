@@ -17,7 +17,7 @@ import {
   BarChart,
   Loader2,
   Gift, // Importar Gift para el nuevo botón
-  Tool // Importar Tool para mantenimiento
+  Wrench // Usar Wrench para mantenimiento
 } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import { useAdminDashboardData } from '@/hooks/useDashboardData';
@@ -249,7 +249,7 @@ Nota: Esta configuración solo puede cambiarse desde la consola de Supabase y re
             <Card className="bg-emphasis-red/10 border-emphasis-red shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <Tool className="h-8 w-8 text-emphasis-red" />
+                  <Wrench className="h-8 w-8 text-emphasis-red" />
                   <CardTitle className="text-emphasis-red">Mantenimiento</CardTitle>
                 </div>
                 <CardDescription>Herramientas administrativas críticas.</CardDescription>
