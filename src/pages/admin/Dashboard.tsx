@@ -265,12 +265,12 @@ Nota: Esta configuración solo puede cambiarse desde la consola de Supabase y re
             <div className="px-1">
                <Button 
                  variant="outline" 
-                 className="w-full justify-start text-gray-700 hover:text-blue-600 hover:bg-blue-50 border-gray-300 h-auto min-h-[44px] py-3 whitespace-normal text-left leading-tight" 
+                 className="w-full flex justify-start items-center text-gray-700 hover:text-blue-600 hover:bg-blue-50 border-gray-300 h-auto min-h-[44px] py-2 px-4 whitespace-normal text-left leading-tight" 
                  onClick={showVerificationTimeInstructions}
                  disabled={isConfiguring}
                >
-                 <span>
-                   {isConfiguring ? 'Procesando...' : 'Extender tiempo de enlace'}
+                 <span className="w-full">
+                   {isConfiguring ? 'Procesando...' : 'Extender tiempo de enlace (30 min)'}
                  </span>
                </Button>
             </div>
