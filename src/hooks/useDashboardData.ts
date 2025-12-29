@@ -71,9 +71,10 @@ const fetchAdminData = async (setLoading: (l: boolean) => void, setData: (d: Das
     if (clientsError) throw clientsError;
 
     // 2. Estadísticas de Pedidos (Total, Ingresos, Estado)
+    // MODIFICADO: Incluir join con locals(name) y local_id para calcular localPerformance
     const { data: ordersData, error: ordersError } = await supabase
       .from('orders')
-      .select('id, status, total_price, created_at');
+      .select('id, status, total_price, created_at, local_id, locals(name)');
 
     if (ordersError) throw ordersError;
 
@@ -113,24 +114,37 @@ const fetchAdminData = async (setLoading: (l: boolean) => void, setData: (d: Das
       count,
     })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    // 4. Rendimiento por Local (Ingresos y Pedidos Completados)
-    const { data: localData, error: localError } = await supabase
-      .from('locals')
-      .select('id, name');
+    // 4. Rendimiento por Local (Ingresos y Pedidos Completados) - Lógica corregida
+    const localStatsMap = new Map<string, { total_revenue: number, completed_orders: number, local_name: string }>();
 
-    if (localError) throw localError;
-
-    const localPerformance: LocalStat[] = localData.map(local => {
-      const localOrders = ordersData.filter(o => o.local_id === local.id);
-      const completedOrders = localOrders.filter(o => o.status === 'completed');
-      const totalRevenue = completedOrders.reduce((sum, order) => sum + order.total_price, 0);
-
-      return {
-        local_name: local.name,
-        total_revenue: totalRevenue,
-        completed_orders: completedOrders.length,
-      };
+    ordersData.forEach(order => {
+        if (order.local_id) {
+            // Acceso seguro al nombre del local (Join de Supabase)
+            const localName = (order.locals as { name: string } | null)?.name || 'Local Desconocido';
+            
+            if (!localStatsMap.has(localName)) {
+                localStatsMap.set(localName, { local_name: localName, total_revenue: 0, completed_orders: 0 });
+            }
+            
+            const stats = localStatsMap.get(localName)!;
+            
+            // Contar solo pedidos completados para revenue y completed_orders
+            if (order.status === 'completed') {
+                stats.total_revenue += order.total_price;
+                stats.completed_orders += 1;
+            }
+        }
     });
+
+    const localPerformance: LocalStat[] = Array.from(localStatsMap.values()).map(stats => ({
+        local_name: stats.local_name,
+        total_revenue: stats.total_revenue,
+        completed_orders: stats.completed_orders,
+    }));
+    
+    // Ordenar por ingresos totales
+    localPerformance.sort((a, b) => b.total_revenue - a.total_revenue);
+
 
     setData({
       totalOrders,
