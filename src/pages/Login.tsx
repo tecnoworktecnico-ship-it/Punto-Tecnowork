@@ -46,9 +46,6 @@ function Login() {
     email: '',
   });
 
-  // Clases de estilo para inputs en modo oscuro
-  const INPUT_CLASS = "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:shadow-lg focus:shadow-blue-500/20 outline-none transition-all";
-
   // Redirigir si ya hay sesión activa (solo una vez)
   useEffect(() => {
     // No redirigir si estamos solicitando reset de contraseña
@@ -295,38 +292,29 @@ function Login() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4 relative overflow-hidden bg-black">
-      {/* Fondo Animado (Luces) */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden -z-10">
-        <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-blue-600 rounded-full mix-blend-screen filter blur-[100px] opacity-30 animate-blob"></div>
-        <div className="absolute top-[20%] right-[-10%] w-96 h-96 bg-red-600 rounded-full mix-blend-screen filter blur-[100px] opacity-20 animate-blob animation-delay-2000"></div>
-        <div className="absolute bottom-[-10%] left-[20%] w-80 h-80 bg-yellow-500 rounded-full mix-blend-screen filter blur-[100px] opacity-20 animate-blob animation-delay-4000"></div>
-      </div>
-      
-      <div className="glass-card p-8 rounded-3xl shadow-2xl max-w-md w-full relative z-10 border border-white/10 backdrop-blur-xl hover:shadow-blue-500/20 hover:border-blue-500/30 transition-all duration-500">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
+      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-lg">
         <div className="mb-6">
           <BrandingDisplay type="main" className="h-20 mx-auto mb-4" />
-          <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-yellow-400 animate-gradient text-center">
-            Bienvenido
-          </h2>
-          <p className="text-sm text-center text-gray-300 mt-1">
-            Versión: <span className="font-semibold text-white">{APP_VERSION}</span>
+          <h2 className="text-3xl font-bold text-center text-text-carbon">Bienvenido</h2>
+          <p className="text-sm text-center text-gray-500 mt-1">
+            Versión: <span className="font-semibold">{APP_VERSION}</span>
           </p>
         </div>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 bg-white/10 border border-white/10">
-            <TabsTrigger value="sign_in" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white">Iniciar Sesión</TabsTrigger>
-            <TabsTrigger value="sign_up" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white">Registrarse</TabsTrigger>
-            <TabsTrigger value="reset_password" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white">Recuperar</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="sign_in">Iniciar Sesión</TabsTrigger>
+            <TabsTrigger value="sign_up">Registrarse</TabsTrigger>
+            <TabsTrigger value="reset_password">Recuperar</TabsTrigger>
           </TabsList>
           
           {/* Formulario de Inicio de Sesión */}
           <TabsContent value="sign_in">
             <form onSubmit={handleSignIn} className="space-y-4 mt-4">
               {registrationSuccess && (
-                <div className="bg-green-900/30 border border-green-400/50 rounded-md p-3 mb-4">
-                  <p className="text-sm text-green-400">
+                <div className="bg-green-50 border border-green-200 rounded-md p-3 mb-4">
+                  <p className="text-sm text-green-800">
                     <strong>¡Registro exitoso!</strong> Verifica tu correo electrónico.
                   </p>
                   <Button 
@@ -334,7 +322,7 @@ function Login() {
                     variant="outline" 
                     size="sm" 
                     onClick={handleResendVerification}
-                    className="mt-2 text-xs bg-white/10 text-white hover:bg-white/20 border-green-400/50"
+                    className="mt-2 text-xs"
                     disabled={isSubmitting}
                   >
                     Reenviar verificación
@@ -343,7 +331,7 @@ function Login() {
               )}
               
               <div className="space-y-2">
-                <Label htmlFor="login-email" className="text-white">Correo electrónico</Label>
+                <Label htmlFor="login-email">Correo electrónico</Label>
                 <Input 
                   id="login-email" 
                   type="email" 
@@ -352,12 +340,11 @@ function Login() {
                   onChange={(e) => setLoginData({...loginData, email: e.target.value})}
                   required
                   disabled={isSubmitting}
-                  className={INPUT_CLASS}
                 />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="login-password" className="text-white">Contraseña</Label>
+                <Label htmlFor="login-password">Contraseña</Label>
                 <Input 
                   id="login-password" 
                   type="password" 
@@ -366,7 +353,6 @@ function Login() {
                   onChange={(e) => setLoginData({...loginData, password: e.target.value})}
                   required
                   disabled={isSubmitting}
-                  className={INPUT_CLASS}
                 />
               </div>
               
@@ -391,7 +377,7 @@ function Login() {
           <TabsContent value="sign_up">
             <form onSubmit={handleSignUp} className="space-y-4 mt-4">
               <div className="space-y-2">
-                <Label htmlFor="register-email" className="text-white">Correo electrónico *</Label>
+                <Label htmlFor="register-email">Correo electrónico *</Label>
                 <Input 
                   id="register-email" 
                   type="email" 
@@ -400,12 +386,11 @@ function Login() {
                   onChange={(e) => setRegisterData({...registerData, email: e.target.value})}
                   required
                   disabled={isSubmitting}
-                  className={INPUT_CLASS}
                 />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="register-password" className="text-white">Contraseña *</Label>
+                <Label htmlFor="register-password">Contraseña *</Label>
                 <Input 
                   id="register-password" 
                   type="password" 
@@ -415,12 +400,11 @@ function Login() {
                   required
                   minLength={6}
                   disabled={isSubmitting}
-                  className={INPUT_CLASS}
                 />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="register-first-name" className="text-white">Nombre *</Label>
+                <Label htmlFor="register-first-name">Nombre *</Label>
                 <Input 
                   id="register-first-name" 
                   type="text" 
@@ -429,12 +413,11 @@ function Login() {
                   onChange={(e) => setRegisterData({...registerData, first_name: e.target.value})}
                   required
                   disabled={isSubmitting}
-                  className={INPUT_CLASS}
                 />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="register-last-name" className="text-white">Apellido *</Label>
+                <Label htmlFor="register-last-name">Apellido *</Label>
                 <Input 
                   id="register-last-name" 
                   type="text" 
@@ -443,12 +426,11 @@ function Login() {
                   onChange={(e) => setRegisterData({...registerData, last_name: e.target.value})}
                   required
                   disabled={isSubmitting}
-                  className={INPUT_CLASS}
                 />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="register-phone" className="text-white">Teléfono *</Label>
+                <Label htmlFor="register-phone">Teléfono *</Label>
                 <Input 
                   id="register-phone" 
                   type="tel" 
@@ -457,7 +439,6 @@ function Login() {
                   onChange={(e) => setRegisterData({...registerData, phone_number: e.target.value})}
                   required
                   disabled={isSubmitting}
-                  className={INPUT_CLASS}
                 />
               </div>
               
@@ -481,14 +462,14 @@ function Login() {
           {/* Formulario de Recuperación */}
           <TabsContent value="reset_password">
             <form onSubmit={handleResetPassword} className="space-y-4 mt-4">
-              <div className="bg-blue-900/30 border border-blue-400/50 rounded-md p-3 mb-4">
-                <p className="text-sm text-blue-400">
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
+                <p className="text-sm text-blue-800">
                   Ingresa tu correo electrónico y te enviaremos un enlace para restablecer tu contraseña.
                 </p>
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="reset-email" className="text-white">Correo electrónico</Label>
+                <Label htmlFor="reset-email">Correo electrónico</Label>
                 <Input 
                   id="reset-email" 
                   type="email" 
@@ -497,7 +478,6 @@ function Login() {
                   onChange={(e) => setResetData({...resetData, email: e.target.value})}
                   required
                   disabled={isSubmitting}
-                  className={INPUT_CLASS}
                 />
               </div>
               
@@ -519,17 +499,8 @@ function Login() {
           </TabsContent>
         </Tabs>
       </div>
-      
-      {/* Footer con estilo Glass Card */}
-      <div className="mt-8 flex flex-col items-center justify-center p-4 rounded-2xl glass-card border border-white/5 bg-white/5 hover:bg-white/10 transition-all">
-        <span className="text-sm text-gray-300 mb-2">Powered by</span>
-        <div className="flex items-center justify-center gap-4">
-          <BrandingDisplay type="poweredBy" className="h-8 object-contain" />
-          <BrandingDisplay type="poweredBy2" className="h-8 object-contain" />
-        </div>
-      </div>
-      
       <MadeWithDyad />
+      <Footer />
     </div>
   );
 }
