@@ -265,11 +265,13 @@ Nota: Esta configuración solo puede cambiarse desde la consola de Supabase y re
             <div className="px-1">
                <Button 
                  variant="outline" 
-                 className="w-full justify-start text-gray-700 hover:text-blue-600 hover:bg-blue-50 border-gray-300 h-auto py-2" 
+                 className="w-full justify-start text-gray-700 hover:text-blue-600 hover:bg-blue-50 border-gray-300 h-auto min-h-[44px] py-3 whitespace-normal text-left leading-tight" 
                  onClick={showVerificationTimeInstructions}
                  disabled={isConfiguring}
                >
-                 {isConfiguring ? 'Procesando...' : 'Extender tiempo de enlace'}
+                 <span>
+                   {isConfiguring ? 'Procesando...' : 'Extender tiempo de enlace'}
+                 </span>
                </Button>
             </div>
           </CardContent>
