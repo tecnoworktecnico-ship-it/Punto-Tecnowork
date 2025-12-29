@@ -246,26 +246,6 @@ const NewOrder = () => {
         filesUploaded++;
       }
 
-      setUploadProgress('Actualizando puntos...');
-
-      // Actualizar puntos del usuario
-      const { data: userPoints } = await supabase
-        .from('user_points')
-        .select('points')
-        .eq('user_id', profile?.id)
-        .single();
-
-      if (userPoints) {
-        await supabase
-          .from('user_points')
-          .update({ points: userPoints.points + points })
-          .eq('user_id', profile?.id);
-      } else {
-        await supabase
-          .from('user_points')
-          .insert({ user_id: profile?.id, points });
-      }
-
       // Registrar en auditoría
       await supabase.from('order_audit').insert({
         order_id: order.id,
@@ -275,9 +255,9 @@ const NewOrder = () => {
       });
 
       if (filesWithErrors > 0) {
-        showSuccess(`Pedido creado con ${filesWithErrors} archivo(s) que no se pudieron subir. ¡Has ganado ${points} puntos!`);
+        showSuccess(`Pedido creado con ${filesWithErrors} archivo(s) que no se pudieron subir. Los puntos se sumarán al completar el pedido.`);
       } else {
-        showSuccess(`¡Pedido creado correctamente! Has ganado ${points} puntos.`);
+        showSuccess(`¡Pedido creado correctamente! Los puntos se sumarán al completar el pedido.`);
       }
       
       navigate('/client/orders');
@@ -553,7 +533,7 @@ const NewOrder = () => {
                     <div className="flex justify-between text-sm text-gray-600">
                       <span>Puntos a ganar:</span>
                       <span className="text-secondary-yellow font-bold text-lg">
-                        +{calculatePoints(calculateTotal())} puntos
+                        +{calculatePoints(calculateTotal())} puntos (Se sumarán al completar el pedido)
                       </span>
                     </div>
                   </div>
