@@ -27,6 +27,7 @@ import {
 interface OrderFile {
   file_name: string;
   copies: number;
+  file_path: string; // Añadido para verificar si fue eliminado
 }
 
 interface Order {
@@ -85,10 +86,10 @@ const ClientOrders = () => {
             .eq('id', order.local_id)
             .single();
 
-          // Obtener archivos del pedido
+          // Obtener archivos del pedido (incluyendo file_path)
           const { data: filesData } = await supabase
             .from('order_files')
-            .select('file_name, copies')
+            .select('file_name, copies, file_path')
             .eq('order_id', order.id);
 
           return {
@@ -120,36 +121,62 @@ const ClientOrders = () => {
     const config = statusConfig[status] || { label: status, variant: 'outline' };
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
+  
+  const isFileDeleted = (filePath: string) => filePath.includes('DELETED');
 
   const renderFilesList = (files: OrderFile[]) => {
     if (files.length === 0) return 'Sin archivos';
     
+    const deletedFiles = files.filter(f => isFileDeleted(f.file_path));
+    const activeFiles = files.filter(f => !isFileDeleted(f.file_path));
+    
     if (files.length === 1) {
+      const file = files[0];
+      if (isFileDeleted(file.file_path)) {
+        return (
+          <div className="flex flex-col">
+            <span className="font-medium text-gray-500">Archivo Eliminado</span>
+            <Badge variant="secondary" className="text-xs mt-1 bg-gray-100 text-gray-500">
+              No disponible
+            </Badge>
+          </div>
+        );
+      }
+      
       return (
         <div className="flex flex-col">
-          <span className="font-medium truncate max-w-[200px]">{files[0].file_name}</span>
-          <span className="text-xs text-gray-500">{files[0].copies} copia{files[0].copies > 1 ? 's' : ''}</span>
+          <span className="font-medium truncate max-w-[200px]">{file.file_name}</span>
+          <span className="text-xs text-gray-500">{file.copies} copia{file.copies > 1 ? 's' : ''}</span>
         </div>
       );
     }
 
-    const filesList = files.map(f => `${f.file_name} (${f.copies}x)`).join('\n');
+    // Multiple files case (using Tooltip)
     
     return (
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
             <div className="flex flex-col cursor-help">
-              <span className="font-medium">{files.length} archivos</span>
+              <span className="font-medium flex items-center gap-1">
+                <FileText className="h-4 w-4 text-primary-blue" />
+                {activeFiles.length} activos / {files.length} total
+              </span>
               <span className="text-xs text-gray-500">Ver detalles</span>
             </div>
           </TooltipTrigger>
           <TooltipContent className="max-w-xs">
             <div className="space-y-1">
               {files.map((file, idx) => (
-                <div key={idx} className="text-sm">
-                  <span className="font-medium">{file.file_name}</span>
-                  <span className="text-gray-400 ml-2">({file.copies}x)</span>
+                <div key={idx} className="text-sm flex justify-between items-center">
+                  <span className={`font-medium truncate max-w-[150px] ${isFileDeleted(file.file_path) ? 'text-emphasis-red line-through' : 'text-text-carbon'}`}>
+                    {file.file_name}
+                  </span>
+                  {isFileDeleted(file.file_path) ? (
+                    <Badge variant="destructive" className="text-xs ml-2">Eliminado</Badge>
+                  ) : (
+                    <span className="text-gray-400 ml-2">({file.copies}x)</span>
+                  )}
                 </div>
               ))}
             </div>
