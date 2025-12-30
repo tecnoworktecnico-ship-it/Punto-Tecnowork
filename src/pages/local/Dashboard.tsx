@@ -53,18 +53,19 @@ interface Order {
 }
 
 const LocalDashboard = () => {
-  const { profile, loading: sessionLoading } = useSession();
+  // OBTENEMOS profileLoaded DEL CONTEXTO
+  const { profile, loading: sessionLoading, profileLoaded } = useSession();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [updating, setUpdating] = useState<string | null>(null);
 
-  // EFECTO SIMPLIFICADO Y CORRECTO
   useEffect(() => {
-    if (sessionLoading) return; // Esperar a que cargue la sesión
+    // NUEVA VALIDACIÓN ROBUSTA:
+    // No hacemos nada hasta que la sesión termine de cargar Y el perfil esté 100% listo.
+    if (sessionLoading || !profileLoaded) return;
 
     if (profile?.local_id) {
-      // Si tiene local, cargar pedidos
       fetchOrders(profile.local_id);
       
       const channel = supabase
@@ -87,10 +88,11 @@ const LocalDashboard = () => {
         supabase.removeChannel(channel);
       };
     } else {
-      // Si ya cargó la sesión pero no hay local_id, terminar carga
+      // Si el perfil ya cargó (profileLoaded = true) y NO hay local_id,
+      // entonces sí podemos decir que no tiene local y quitamos el spinner.
       setLoading(false);
     }
-  }, [profile, sessionLoading]);
+  }, [profile, sessionLoading, profileLoaded]);
 
   const fetchOrders = async (localId: string) => {
     try {
@@ -202,7 +204,12 @@ const LocalDashboard = () => {
     }
   };
 
-  if (sessionLoading || (loading && profile?.local_id)) {
+  // PANTALLA DE CARGA ROBUSTA
+  // Solo mostramos loading si:
+  // 1. SessionContext sigue cargando
+  // 2. O el perfil aún no está 100% listo (profileLoaded false)
+  // 3. O estamos cargando los pedidos del local
+  if (sessionLoading || !profileLoaded || (loading && profile?.local_id)) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <Loader2 className="w-8 h-8 animate-spin text-primary-blue" />
@@ -211,7 +218,8 @@ const LocalDashboard = () => {
     );
   }
 
-  // Pantalla correcta de "Sin Local"
+  // PANTALLA DE ERROR "SOLO SI DE VERDAD FALLÓ"
+  // Solo entramos aquí si profileLoaded es TRUE y local_id sigue siendo NULL
   if (!profile?.local_id) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] text-center p-4 animate-in fade-in">
