@@ -87,8 +87,11 @@ const LocalDashboard = () => {
       return () => {
         supabase.removeChannel(channel);
       };
+    } else if (profile && !profile.local_id) {
+      // CORRECCIÓN: Si el usuario cargó pero no tiene local, dejamos de cargar
+      setLoading(false);
     }
-  }, [profile?.local_id]);
+  }, [profile?.local_id, profile]);
 
   const fetchOrders = async () => {
     try {
@@ -208,6 +211,23 @@ const LocalDashboard = () => {
     );
   }
 
+  // CORRECCIÓN: Pantalla de "No Local Asignado"
+  if (!profile?.local_id) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] text-center p-4 animate-in fade-in">
+        <div className="bg-yellow-50 p-4 rounded-full mb-4">
+          <AlertCircle className="w-12 h-12 text-yellow-500" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-800 mb-2">Local No Asignado</h2>
+        <p className="text-gray-500 max-w-md">
+          Tu cuenta tiene rol de "Local" pero no ha sido vinculada a ninguna sucursal física.
+          <br /><br />
+          Por favor, contacta al administrador del sistema para que te asigne un local.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-in fade-in">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -285,7 +305,7 @@ const LocalDashboard = () => {
                       <TableCell>
                         <div className="space-y-1">
                           {order.order_files.map((file, idx) => {
-                            // --- DETECCIÓN DE ARCHIVO BORRADO ---
+                            // LOGICA DE ARCHIVO BORRADO (APLICADA TAMBIÉN AQUÍ)
                             const isDeleted = file.file_path && file.file_path.includes('DELETED');
                             
                             return (
