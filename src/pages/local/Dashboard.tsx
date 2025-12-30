@@ -1,290 +1,354 @@
-"use client";
-
 import React, { useEffect, useState } from 'react';
 import { useSession } from '@/contexts/SessionContext';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { showError } from '@/utils/toast';
-import { DollarSign, Settings, LayoutDashboard, RefreshCw, Package, Clock, BarChart, Trophy, Gift, Edit } from 'lucide-react';
-import ProfileSettings from '@/components/ProfileSettings';
-import PasswordChangeAlert from '@/components/PasswordChangeAlert';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useLocalDashboardData } from '@/hooks/useDashboardData';
-import { useManagerLocalPrices } from '@/hooks/useLocalPrices';
-import StatCard from '@/components/dashboard/StatCard';
-import ClientRankingTable from '@/components/dashboard/ClientRankingTable';
-import PriceList from '@/components/PriceList';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from '@/components/ui/badge';
-import Footer from '@/components/Footer';
-import AppHeader from '@/components/AppHeader'; // Importar AppHeader
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { showError, showSuccess } from '@/utils/toast';
+import { 
+  Printer, 
+  Search, 
+  MapPin, 
+  Clock, 
+  FileText, 
+  CheckCircle2, 
+  XCircle, 
+  AlertCircle, 
+  Loader2, 
+  Download,
+  Eye,
+  RefreshCw
+} from 'lucide-react';
+
+interface OrderFile {
+  id: string;
+  file_name: string;
+  file_path: string;
+  copies: number;
+}
+
+interface Order {
+  id: string;
+  created_at: string;
+  status: string;
+  total_price: number;
+  client: {
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
+  order_files: OrderFile[];
+}
 
 const LocalDashboard = () => {
-  const { user, profile, signOut } = useSession();
-  const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [activeRewardsCount, setActiveRewardsCount] = useState<number>(0);
-  const [loadingRewards, setLoadingRewards] = useState(true);
-
-  // Usar el hook para obtener precios del local del manager
-  const { 
-    prices, 
-    localInfo, 
-    loading: loadingPrices, 
-    refreshPrices,
-    localId 
-  } = useManagerLocalPrices(profile?.id || null);
-
-  const { 
-    totalOrders, 
-    totalRevenue, 
-    orderStatusStats, 
-    loading: loadingStats, 
-    refreshData 
-  } = useLocalDashboardData(localId);
+  const { profile } = useSession();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [updating, setUpdating] = useState<string | null>(null);
 
   useEffect(() => {
-    if (profile?.role === 'local') {
-      fetchActiveRewards();
+    if (profile?.local_id) {
+      fetchOrders();
+      
+      // Suscripción en tiempo real para nuevos pedidos
+      const channel = supabase
+        .channel('local-orders')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'orders',
+            filter: `local_id=eq.${profile.local_id}`
+          },
+          () => {
+            fetchOrders();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
-  }, [profile]);
+  }, [profile?.local_id]);
 
-  const fetchActiveRewards = async () => {
-    setLoadingRewards(true);
+  const fetchOrders = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          id,
+          created_at,
+          status,
+          total_price,
+          profiles:client_id (
+            first_name,
+            last_name,
+            email
+          ),
+          order_files (
+            id,
+            file_name,
+            file_path,
+            copies
+          )
+        `)
+        .eq('local_id', profile?.local_id)
+        .order('created_at', { ascending: false });
 
-    const { count, error } = await supabase
-      .from('rewards')
-      .select('*', { count: 'exact', head: true })
-      .eq('is_active', true);
+      if (error) throw error;
 
-    if (error) {
-      console.error('Error fetching active rewards:', error);
-    } else {
-      setActiveRewardsCount(count || 0);
+      const formattedOrders = data.map((order: any) => ({
+        id: order.id,
+        created_at: order.created_at,
+        status: order.status,
+        total_price: order.total_price,
+        client: order.profiles || { first_name: 'Usuario', last_name: 'Eliminado', email: '' },
+        order_files: order.order_files || []
+      }));
+
+      setOrders(formattedOrders);
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      showError('Error al cargar pedidos');
+    } finally {
+      setLoading(false);
     }
-
-    setLoadingRewards(false);
   };
 
-  // Función para forzar la recarga del perfil después de una actualización
-  const handleProfileUpdate = () => {
-    // Confiar en SessionContext para recargar el perfil
+  const handleStatusChange = async (orderId: string, newStatus: string) => {
+    setUpdating(orderId);
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: newStatus })
+        .eq('id', orderId);
+
+      if (error) throw error;
+      showSuccess(`Estado actualizado a: ${newStatus}`);
+      
+      setOrders(orders.map(o => 
+        o.id === orderId ? { ...o, status: newStatus } : o
+      ));
+    } catch (error) {
+      console.error('Error updating status:', error);
+      showError('Error al actualizar estado');
+    } finally {
+      setUpdating(null);
+    }
   };
 
-  // Condición estricta: solo si password_changed es false (creado por admin)
-  const needsPasswordChange = profile && profile.password_changed === false;
-  const pendingOrders = orderStatusStats.find(s => s.name === 'PENDING')?.value || 0;
+  const handleDownload = async (filePath: string, fileName: string) => {
+    try {
+      if (filePath.includes('DELETED')) {
+        showError('Este archivo ha sido eliminado del servidor.');
+        return;
+      }
 
-  if (loadingPrices && !localInfo) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
-        <p className="text-white text-xl">Cargando...</p>
-      </div>
-    );
-  }
+      const { data, error } = await supabase.storage
+        .from('order-files')
+        .download(filePath);
 
-  // Si no tiene local asignado
-  if (!localInfo && !loadingPrices) {
+      if (error) throw error;
+
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error downloading:', error);
+      showError('Error al descargar el archivo');
+    }
+  };
+
+  const filteredOrders = orders.filter(order => 
+    order.client.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    order.client.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    order.id.slice(0, 8).includes(searchTerm)
+  );
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'printing': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'completed': return 'bg-green-100 text-green-800 border-green-200';
+      case 'cancelled': return 'bg-red-100 text-red-800 border-red-200';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
-        <AppHeader title="Dashboard de Local" showSignOut={true} />
-        <Card className="w-full max-w-md p-6 bg-white/80 backdrop-blur-sm rounded-lg shadow-lg text-center mt-8">
-          <CardHeader>
-            <CardTitle className="text-2xl font-bold text-text-carbon">Local No Asignado</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-gray-600 mb-4">
-              Tu cuenta de manager no está asignada a ningún local. Por favor, contacta al administrador para que te asigne un local.
-            </p>
-            <Button onClick={signOut} className="bg-emphasis-red hover:bg-red-700 text-white">
-              Cerrar Sesión
-            </Button>
-          </CardContent>
-        </Card>
-        <Footer />
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-primary-blue" />
+        <span className="ml-2 text-gray-500">Cargando panel del local...</span>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move text-text-on-color">
-      <AppHeader title={`Dashboard - ${localInfo?.name || 'Local'}`} />
-      
-      <main className="flex-grow p-4">
-        <div className="w-full max-w-6xl mx-auto p-8 space-y-6 bg-white/80 backdrop-blur-sm rounded-lg shadow-lg">
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-4xl font-bold text-text-carbon">Gestión de {localInfo?.name || 'Local'}</h1>
-            <Button 
-              onClick={() => {
-                refreshData();
-                refreshPrices();
-                fetchActiveRewards();
-              }} 
-              disabled={loadingStats || loadingRewards || loadingPrices}
-              variant="outline"
-              className="flex items-center gap-2 bg-white text-primary-blue border-primary-blue hover:bg-gray-100"
-            >
-              <RefreshCw className={`h-4 w-4 ${(loadingStats || loadingRewards || loadingPrices) ? 'animate-spin' : ''}`} />
-              Actualizar Datos
-            </Button>
-          </div>
-          <p className="text-xl text-gray-600 mb-6">
-            Bienvenido, {profile?.first_name || user?.email}! Aquí puedes gestionar tus pedidos y configuraciones.
-          </p>
-
-          {needsPasswordChange && (
-            <PasswordChangeAlert onNavigateToSettings={() => setActiveTab('settings')} />
-          )}
-
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 md:w-1/3">
-              <TabsTrigger value="dashboard" className="flex items-center gap-2">
-                <LayoutDashboard className="h-4 w-4" /> Dashboard
-              </TabsTrigger>
-              <TabsTrigger value="settings" className="flex items-center gap-2">
-                <Settings className="h-4 w-4" /> Configuración
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="dashboard" className="mt-6 space-y-6">
-              {/* Estadísticas rápidas */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <StatCard 
-                  title="Ingresos (Completados)"
-                  value={`$${totalRevenue.toFixed(2)}`}
-                  icon={DollarSign}
-                  color="text-success-green"
-                  description="Pedidos completados históricamente"
-                />
-                <StatCard 
-                  title="Total de Pedidos"
-                  value={totalOrders}
-                  icon={Package}
-                  color="text-primary-blue"
-                  description="Pedidos totales de este local"
-                />
-                <StatCard 
-                  title="Pedidos Pendientes"
-                  value={pendingOrders}
-                  icon={Clock}
-                  color="text-secondary-yellow"
-                  description="Pedidos esperando ser procesados"
-                />
-                <StatCard 
-                  title="Premios Activos"
-                  value={activeRewardsCount}
-                  icon={Gift}
-                  color="text-purple-600"
-                  description="Recompensas disponibles para canje"
-                />
-              </div>
-
-              {/* Lista de Precios Activos */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <PriceList 
-                  prices={prices}
-                  loading={loadingPrices}
-                  title={`Precios Activos - ${localInfo?.name}`}
-                  description={
-                    localInfo?.can_edit_prices 
-                      ? "Precios personalizados de tu local (los marcados como 'Global' usan el precio base)"
-                      : "Precios estándar"
-                  }
-                  showCustomBadge={localInfo?.can_edit_prices || false}
-                />
-
-                {/* Acciones Rápidas */}
-                <div className="space-y-4">
-                  <Card className="bg-primary-blue/10 border-primary-blue shadow-md">
-                    <CardHeader>
-                      <CardTitle className="text-primary-blue flex items-center gap-2">
-                        <Package className="h-5 w-5" /> Gestión de Pedidos
-                      </CardTitle>
-                      <CardDescription>Revisa y actualiza el estado de los pedidos de tu local.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex flex-col space-y-2">
-                      <Button 
-                        className="w-full bg-primary-blue hover:bg-blue-700 text-white" 
-                        onClick={() => navigate('/local/orders')}
-                      >
-                        Ver Todos los Pedidos
-                      </Button>
-                    </CardContent>
-                  </Card>
-
-                  {localInfo?.can_edit_prices && (
-                    <Card className="bg-success-green/10 border-success-green shadow-md">
-                      <CardHeader>
-                        <CardTitle className="text-success-green flex items-center gap-2">
-                          <Edit className="h-5 w-5" /> Editar Precios
-                        </CardTitle>
-                        <CardDescription>Personaliza los precios de los servicios en tu local.</CardDescription>
-                      </CardHeader>
-                      <CardContent className="flex flex-col space-y-2">
-                        <Button 
-                          className="w-full bg-success-green hover:bg-green-700 text-white" 
-                          onClick={() => navigate('/local/prices')}
-                        >
-                          Gestionar Precios Locales
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  <Card className="bg-secondary-yellow/10 border-secondary-yellow shadow-md">
-                    <CardHeader>
-                      <CardTitle className="text-secondary-yellow flex items-center gap-2">
-                        <Trophy className="h-5 w-5" /> Ranking de Clientes
-                      </CardTitle>
-                      <CardDescription>Consulta el ranking de clientes con más puntos en tu local.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex flex-col space-y-2">
-                      <Button 
-                        variant="outline" 
-                        className="w-full text-secondary-yellow border-secondary-yellow hover:bg-secondary-yellow/20" 
-                        onClick={() => navigate('/local/reports')}
-                      >
-                        Ver Ranking y Reportes
-                      </Button>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="bg-purple-100 border-purple-600 shadow-md">
-                    <CardHeader>
-                      <CardTitle className="text-purple-600 flex items-center gap-2">
-                        <Gift className="h-5 w-5" /> Catálogo de Premios
-                      </CardTitle>
-                      <CardDescription>Consulta los premios disponibles para tus clientes.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex flex-col space-y-2">
-                      <Button 
-                        variant="outline" 
-                        className="w-full text-purple-600 border-purple-600 hover:bg-purple-100" 
-                        onClick={() => navigate('/local/rewards')}
-                      >
-                        Ver Catálogo ({activeRewardsCount})
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-              
-              {/* Ranking de Clientes */}
-              <ClientRankingTable 
-                localId={localId || undefined}
-                title={`Top 10 Clientes de ${localInfo?.name || 'Tu Local'}`}
-                description="Clientes con más puntos que han realizado pedidos aquí."
-              />
-            </TabsContent>
-
-            <TabsContent value="settings" className="mt-6">
-              <ProfileSettings onProfileUpdate={handleProfileUpdate} />
-            </TabsContent>
-          </Tabs>
+    <div className="space-y-6 animate-in fade-in">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+            <Printer className="w-6 h-6 text-primary-blue" />
+            Panel de Impresión
+          </h1>
+          <p className="text-gray-500">Gestiona los pedidos entrantes de tu local.</p>
         </div>
-      </main>
-      <Footer />
+        <div className="flex gap-2 w-full md:w-auto">
+          <div className="relative w-full md:w-64">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+            <Input
+              placeholder="Buscar cliente o ID..."
+              className="pl-9"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <Button variant="outline" size="icon" onClick={fetchOrders} title="Recargar">
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Cola de Pedidos</CardTitle>
+          <CardDescription>
+            Mostrando {filteredOrders.length} pedidos recientes.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ID / Fecha</TableHead>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>Archivos</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead>Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredOrders.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                      No hay pedidos que coincidan con la búsqueda.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredOrders.map((order) => (
+                    <TableRow key={order.id}>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-mono text-xs font-bold text-gray-600">
+                            #{order.id.slice(0, 8)}
+                          </span>
+                          <span className="text-xs text-gray-400 flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {new Date(order.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-medium text-sm">
+                            {order.client.first_name} {order.client.last_name}
+                          </span>
+                          <span className="text-xs text-gray-400">{order.client.email}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          {order.order_files.map((file, idx) => {
+                            // --- DETECCIÓN DE ARCHIVO BORRADO ---
+                            const isDeleted = file.file_path && file.file_path.includes('DELETED');
+                            
+                            return (
+                              <div key={idx} className="flex items-center justify-between text-xs bg-gray-50 p-1.5 rounded border border-gray-100 max-w-[250px]">
+                                <div className="flex items-center gap-1 overflow-hidden">
+                                  <FileText className="w-3 h-3 text-blue-500 shrink-0" />
+                                  <span className="truncate" title={file.file_name}>{file.file_name}</span>
+                                  <span className="font-bold text-gray-600 ml-1">x{file.copies}</span>
+                                </div>
+                                
+                                {isDeleted ? (
+                                  <Badge variant="destructive" className="text-[10px] h-5 px-1 bg-red-100 text-red-700 hover:bg-red-100 border-none shadow-none">
+                                    Expirado
+                                  </Badge>
+                                ) : (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-gray-400 hover:text-blue-600"
+                                    onClick={() => handleDownload(file.file_path, file.file_name)}
+                                    title="Descargar para imprimir"
+                                  >
+                                    <Download className="w-3 h-3" />
+                                  </Button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={`${getStatusColor(order.status)} border shadow-sm`}>
+                          {order.status === 'pending' && 'Pendiente'}
+                          {order.status === 'printing' && 'Imprimiendo'}
+                          {order.status === 'completed' && 'Completado'}
+                          {order.status === 'cancelled' && 'Cancelado'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          defaultValue={order.status}
+                          onValueChange={(value) => handleStatusChange(order.id, value)}
+                          disabled={updating === order.id}
+                        >
+                          <SelectTrigger className="w-[130px] h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pending">Pendiente</SelectItem>
+                            <SelectItem value="printing">Imprimiendo</SelectItem>
+                            <SelectItem value="completed">Completado</SelectItem>
+                            <SelectItem value="cancelled">Cancelado</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
