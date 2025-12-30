@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { showError } from '@/utils/toast';
 import { useNavigate } from 'react-router-dom';
-// CORRECCIÓN AQUÍ: Se agregó Loader2 y RefreshCw a los imports
+// IMPORTANTE: Aquí se agregan Loader2 y RefreshCw para evitar el error de pantalla blanca
 import { ArrowLeft, FileText, Download, AlertCircle, Calendar, Loader2, RefreshCw } from 'lucide-react';
 import {
   Table,
@@ -60,6 +60,7 @@ const ClientOrders = () => {
   const fetchOrders = async () => {
     setLoading(true);
     try {
+      // Usamos selects anidados para traer el nombre del local directamente
       const { data, error } = await supabase
         .from('orders')
         .select(`
@@ -82,6 +83,7 @@ const ClientOrders = () => {
 
       if (error) throw error;
 
+      // Mapeo seguro de datos
       const formattedOrders: Order[] = (data || []).map((order: any) => ({
         id: order.id,
         created_at: order.created_at,
@@ -103,6 +105,7 @@ const ClientOrders = () => {
 
   const handleDownload = async (filePath: string, fileName: string) => {
     try {
+      // BLINDAJE: Si el archivo tiene la marca DELETED, detenemos la descarga
       if (filePath.includes('DELETED')) {
         showError('Este archivo ha expirado o fue eliminado.');
         return;
@@ -134,7 +137,7 @@ const ClientOrders = () => {
     return (
       <div className="space-y-1">
         {files.map((file) => {
-          // LÓGICA DE PROTECCIÓN: Si el path tiene DELETED, mostramos aviso
+          // Detectar si el archivo fue borrado por el Admin
           const isDeleted = file.file_path && file.file_path.includes('DELETED');
 
           return (
@@ -156,7 +159,7 @@ const ClientOrders = () => {
                       </Badge>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Este archivo ya no está disponible.</p>
+                      <p>Este archivo fue eliminado por privacidad o antigüedad.</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -181,7 +184,6 @@ const ClientOrders = () => {
   if (sessionLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
-        {/* Aquí se usa Loader2, que antes daba error por falta de import */}
         <Loader2 className="h-8 w-8 text-white animate-spin mr-2" />
         <p className="text-white text-xl">Cargando tus pedidos...</p>
       </div>
