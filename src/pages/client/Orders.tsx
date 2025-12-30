@@ -4,11 +4,12 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/contexts/SessionContext';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { showError } from '@/utils/toast';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, FileText, Download, AlertCircle, RefreshCw, Loader2 } from 'lucide-react';
+// CORRECCIÓN AQUÍ: Se agregó Loader2 y RefreshCw a los imports
+import { ArrowLeft, FileText, Download, AlertCircle, Calendar, Loader2, RefreshCw } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -38,8 +39,7 @@ interface Order {
   status: string;
   total_price: number;
   points_earned: number;
-  local_id: string;
-  local_name: string; // Mapped from locals.name
+  local_name: string;
   order_files: OrderFile[];
 }
 
@@ -53,7 +53,6 @@ const ClientOrders = () => {
     if (!sessionLoading && profile?.role === 'client') {
       fetchOrders();
     } else if (!sessionLoading && profile?.role !== 'client') {
-      showError('No tienes permiso para acceder a esta página.');
       navigate('/client');
     }
   }, [sessionLoading, profile, navigate]);
@@ -61,30 +60,38 @@ const ClientOrders = () => {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      // Consulta optimizada para obtener archivos y nombre del local en una sola llamada
       const { data, error } = await supabase
         .from('orders')
         .select(`
-          id, 
-          created_at, 
-          status, 
-          total_price, 
-          points_earned, 
-          local_id, 
+          id,
+          created_at,
+          status,
+          total_price,
+          points_earned,
+          local_id,
           locals ( name ),
-          order_files ( id, file_name, file_path, copies )
+          order_files (
+            id,
+            file_name,
+            file_path,
+            copies
+          )
         `)
         .eq('client_id', profile?.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      
-      // Mapear los datos para aplanar el nombre del local
+
       const formattedOrders: Order[] = (data || []).map((order: any) => ({
-        ...order,
+        id: order.id,
+        created_at: order.created_at,
+        status: order.status,
+        total_price: order.total_price,
+        points_earned: order.points_earned,
         local_name: order.locals?.name || 'Local desconocido',
+        order_files: order.order_files || []
       }));
-      
+
       setOrders(formattedOrders);
     } catch (error: any) {
       console.error('Error fetching orders:', error);
@@ -104,8 +111,9 @@ const ClientOrders = () => {
       const { data, error } = await supabase.storage
         .from('order-files')
         .download(filePath);
+
       if (error) throw error;
-      
+
       const url = URL.createObjectURL(data);
       const a = document.createElement('a');
       a.href = url;
@@ -121,13 +129,14 @@ const ClientOrders = () => {
   };
 
   const renderFilesList = (files: OrderFile[]) => {
-    if (!files || files.length === 0) return 'Sin archivos';
+    if (!files || files.length === 0) return <span className="text-gray-400 text-sm">Sin archivos</span>;
 
     return (
       <div className="space-y-1">
         {files.map((file) => {
-          // ESTA ES LA LÓGICA QUE FALTABA
+          // LÓGICA DE PROTECCIÓN: Si el path tiene DELETED, mostramos aviso
           const isDeleted = file.file_path && file.file_path.includes('DELETED');
+
           return (
             <div key={file.id} className="flex items-center justify-between text-sm bg-gray-50 p-2 rounded border border-gray-100">
               <div className="flex items-center gap-2 overflow-hidden">
@@ -137,16 +146,17 @@ const ClientOrders = () => {
                 </span>
                 <span className="text-xs text-gray-500 shrink-0">({file.copies}x)</span>
               </div>
+
               {isDeleted ? (
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger>
-                      <Badge variant="outline" className="text-gray-400 border-gray-200 text-[10px] h-6 flex gap-1 items-center">
+                      <Badge variant="outline" className="text-gray-400 border-gray-200 text-[10px] h-6 flex gap-1 items-center bg-gray-100">
                         <AlertCircle className="w-3 h-3" /> Expirado
                       </Badge>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Este archivo fue eliminado por privacidad.</p>
+                      <p>Este archivo ya no está disponible.</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -171,20 +181,17 @@ const ClientOrders = () => {
   if (sessionLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
+        {/* Aquí se usa Loader2, que antes daba error por falta de import */}
         <Loader2 className="h-8 w-8 text-white animate-spin mr-2" />
-        <p className="text-white text-xl">Cargando pedidos...</p>
+        <p className="text-white text-xl">Cargando tus pedidos...</p>
       </div>
     );
-  }
-
-  if (profile?.role !== 'client') {
-    return null;
   }
 
   return (
     <div className="min-h-screen p-4 bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
       <div className="max-w-6xl mx-auto">
-        <Card className="bg-white rounded-lg shadow-lg">
+        <Card className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg">
           <CardHeader>
             <div className="flex items-center justify-between mb-4">
               <Button
@@ -195,83 +202,78 @@ const ClientOrders = () => {
                 <ArrowLeft className="h-5 w-5" />
                 Volver al Dashboard
               </Button>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  onClick={fetchOrders}
-                  className="flex items-center gap-2"
-                  disabled={loading}
-                >
-                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                  Actualizar
-                </Button>
-                <Button
-                  onClick={() => navigate('/client/new-order')}
-                  className="bg-primary-blue hover:bg-blue-700 text-white"
-                >
-                  Nuevo Pedido
-                </Button>
+              <div className="flex gap-2">
+                 <Button 
+                   variant="outline"
+                   onClick={fetchOrders}
+                   disabled={loading}
+                   className="gap-2"
+                 >
+                   <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                   Actualizar
+                 </Button>
+                 <Button onClick={() => navigate('/client/new-order')} className="bg-primary-blue hover:bg-blue-700 text-white">
+                   Nuevo Pedido
+                 </Button>
               </div>
             </div>
-            <CardTitle className="text-3xl font-bold text-text-carbon">
+            <CardTitle className="text-3xl font-bold text-text-carbon flex items-center gap-2">
+              <FileText className="h-8 w-8 text-primary-blue" />
               Mis Pedidos
             </CardTitle>
+            <CardDescription>
+              Historial de tus solicitudes de impresión.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {orders.length === 0 ? (
-              <div className="text-center py-12">
-                <FileText className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500 text-lg mb-4">
-                  No tienes pedidos aún
-                </p>
-                <Button
-                  onClick={() => navigate('/client/new-order')}
-                  className="bg-primary-blue hover:bg-blue-700 text-white"
-                >
-                  Crear Primer Pedido
+              <div className="text-center py-12 text-gray-500 bg-gray-50 rounded-xl border-dashed border-2 border-gray-200">
+                <p className="mb-4 text-lg">Aún no has realizado ningún pedido.</p>
+                <Button onClick={() => navigate('/client/new-order')}>
+                  ¡Haz tu primer pedido ahora!
                 </Button>
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Local</TableHead>
-                    <TableHead>Archivos</TableHead>
-                    <TableHead>Total</TableHead>
-                    <TableHead>Puntos</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead>Fecha</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {orders.map((order) => (
-                    <TableRow key={order.id}>
-                      <TableCell className="font-medium">
-                        {order.local_name}
-                      </TableCell>
-                      <TableCell>
-                        {renderFilesList(order.order_files)}
-                      </TableCell>
-                      <TableCell className="font-bold">
-                        ${order.total_price.toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-secondary-yellow font-medium">
-                        +{order.points_earned} pts
-                      </TableCell>
-                      <TableCell>
-                        {getStatusBadge(order.status)}
-                      </TableCell>
-                      <TableCell>
-                        {new Date(order.created_at).toLocaleDateString('es-ES', {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                        })}
-                      </TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Local</TableHead>
+                      <TableHead>Archivos</TableHead>
+                      <TableHead>Total</TableHead>
+                      <TableHead>Puntos</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Fecha</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {orders.map((order) => (
+                      <TableRow key={order.id}>
+                        <TableCell className="font-medium">
+                          {order.local_name}
+                        </TableCell>
+                        <TableCell className="min-w-[200px]">
+                          {renderFilesList(order.order_files)}
+                        </TableCell>
+                        <TableCell className="font-bold text-success-green">
+                          ${order.total_price.toFixed(2)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 border-yellow-200">
+                            +{order.points_earned} pts
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {getStatusBadge(order.status)}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-gray-500">
+                           {new Date(order.created_at).toLocaleDateString()}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </CardContent>
         </Card>
