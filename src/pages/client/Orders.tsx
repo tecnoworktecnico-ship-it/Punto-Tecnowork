@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { showError } from '@/utils/toast';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, FileText, RefreshCw } from 'lucide-react';
+import { ArrowLeft, FileText, Download, AlertCircle, RefreshCw, Loader2 } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -17,6 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { getStatusBadge } from '@/utils/order-status';
 import {
   Tooltip,
   TooltipContent,
@@ -25,20 +26,21 @@ import {
 } from "@/components/ui/tooltip";
 
 interface OrderFile {
+  id: string;
   file_name: string;
+  file_path: string;
   copies: number;
-  file_path: string; // Añadido para verificar si fue eliminado
 }
 
 interface Order {
   id: string;
-  local_id: string;
+  created_at: string;
   status: string;
   total_price: number;
   points_earned: number;
-  created_at: string;
-  local_name: string;
-  files: OrderFile[];
+  local_id: string;
+  local_name: string; // Mapped from locals.name
+  order_files: OrderFile[];
 }
 
 const ClientOrders = () => {
@@ -48,147 +50,128 @@ const ClientOrders = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!sessionLoading && profile?.role !== 'client') {
-      showError('No tienes permiso para acceder a esta página.');
-      navigate('/client');
-    }
-
     if (!sessionLoading && profile?.role === 'client') {
       fetchOrders();
+    } else if (!sessionLoading && profile?.role !== 'client') {
+      showError('No tienes permiso para acceder a esta página.');
+      navigate('/client');
     }
   }, [sessionLoading, profile, navigate]);
 
   const fetchOrders = async () => {
     setLoading(true);
-
     try {
-      // Obtener pedidos
-      const { data: ordersData, error: ordersError } = await supabase
+      // Consulta optimizada para obtener archivos y nombre del local en una sola llamada
+      const { data, error } = await supabase
         .from('orders')
-        .select('id, local_id, status, total_price, points_earned, created_at')
+        .select(`
+          id, 
+          created_at, 
+          status, 
+          total_price, 
+          points_earned, 
+          local_id, 
+          locals ( name ),
+          order_files ( id, file_name, file_path, copies )
+        `)
         .eq('client_id', profile?.id)
         .order('created_at', { ascending: false });
 
-      if (ordersError) {
-        console.error('Error fetching orders:', ordersError);
-        showError('Error al cargar los pedidos.');
-        setLoading(false);
-        return;
-      }
-
-      // Para cada pedido, obtener el nombre del local y los archivos
-      const ordersWithDetails = await Promise.all(
-        (ordersData || []).map(async (order) => {
-          // Obtener nombre del local
-          const { data: localData } = await supabase
-            .from('locals')
-            .select('name')
-            .eq('id', order.local_id)
-            .single();
-
-          // Obtener archivos del pedido (incluyendo file_path)
-          const { data: filesData } = await supabase
-            .from('order_files')
-            .select('file_name, copies, file_path')
-            .eq('order_id', order.id);
-
-          return {
-            ...order,
-            local_name: localData?.name || 'Local desconocido',
-            files: filesData || [],
-          };
-        })
-      );
-
-      setOrders(ordersWithDetails);
-    } catch (error) {
-      console.error('Unexpected error:', error);
-      showError('Error inesperado al cargar pedidos.');
+      if (error) throw error;
+      
+      // Mapear los datos para aplanar el nombre del local
+      const formattedOrders: Order[] = (data || []).map((order: any) => ({
+        ...order,
+        local_name: order.locals?.name || 'Local desconocido',
+      }));
+      
+      setOrders(formattedOrders);
+    } catch (error: any) {
+      console.error('Error fetching orders:', error);
+      showError('Error al cargar tus pedidos.');
     } finally {
       setLoading(false);
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-      pending: { label: 'Pendiente', variant: 'secondary' },
-      in_progress: { label: 'En Proceso', variant: 'default' },
-      ready: { label: 'Listo para Recoger', variant: 'outline' },
-      completed: { label: 'Completado', variant: 'default' },
-      cancelled: { label: 'Cancelado', variant: 'destructive' },
-    };
+  const handleDownload = async (filePath: string, fileName: string) => {
+    try {
+      if (filePath.includes('DELETED')) {
+        showError('Este archivo ha expirado o fue eliminado.');
+        return;
+      }
 
-    const config = statusConfig[status] || { label: status, variant: 'outline' };
-    return <Badge variant={config.variant}>{config.label}</Badge>;
+      const { data, error } = await supabase.storage
+        .from('order-files')
+        .download(filePath);
+      if (error) throw error;
+      
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      showError('No se pudo descargar el archivo.');
+    }
   };
-  
-  const isFileDeleted = (filePath: string) => filePath.includes('DELETED');
 
   const renderFilesList = (files: OrderFile[]) => {
-    if (files.length === 0) return 'Sin archivos';
-    
-    const deletedFiles = files.filter(f => isFileDeleted(f.file_path));
-    const activeFiles = files.filter(f => !isFileDeleted(f.file_path));
-    
-    if (files.length === 1) {
-      const file = files[0];
-      if (isFileDeleted(file.file_path)) {
-        return (
-          <div className="flex flex-col">
-            <span className="font-medium text-gray-500">Archivo Eliminado</span>
-            <Badge variant="secondary" className="text-xs mt-1 bg-gray-100 text-gray-500">
-              No disponible
-            </Badge>
-          </div>
-        );
-      }
-      
-      return (
-        <div className="flex flex-col">
-          <span className="font-medium truncate max-w-[200px]">{file.file_name}</span>
-          <span className="text-xs text-gray-500">{file.copies} copia{file.copies > 1 ? 's' : ''}</span>
-        </div>
-      );
-    }
+    if (!files || files.length === 0) return 'Sin archivos';
 
-    // Multiple files case (using Tooltip)
-    
     return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className="flex flex-col cursor-help">
-              <span className="font-medium flex items-center gap-1">
-                <FileText className="h-4 w-4 text-primary-blue" />
-                {activeFiles.length} activos / {files.length} total
-              </span>
-              <span className="text-xs text-gray-500">Ver detalles</span>
+      <div className="space-y-1">
+        {files.map((file) => {
+          // ESTA ES LA LÓGICA QUE FALTABA
+          const isDeleted = file.file_path && file.file_path.includes('DELETED');
+          return (
+            <div key={file.id} className="flex items-center justify-between text-sm bg-gray-50 p-2 rounded border border-gray-100">
+              <div className="flex items-center gap-2 overflow-hidden">
+                <FileText className="h-4 w-4 text-primary-blue shrink-0" />
+                <span className="truncate max-w-[150px] md:max-w-[200px]" title={file.file_name}>
+                  {file.file_name}
+                </span>
+                <span className="text-xs text-gray-500 shrink-0">({file.copies}x)</span>
+              </div>
+              {isDeleted ? (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Badge variant="outline" className="text-gray-400 border-gray-200 text-[10px] h-6 flex gap-1 items-center">
+                        <AlertCircle className="w-3 h-3" /> Expirado
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Este archivo fue eliminado por privacidad.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-gray-500 hover:text-primary-blue"
+                  onClick={() => handleDownload(file.file_path, file.file_name)}
+                  title="Descargar"
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+              )}
             </div>
-          </TooltipTrigger>
-          <TooltipContent className="max-w-xs">
-            <div className="space-y-1">
-              {files.map((file, idx) => (
-                <div key={idx} className="text-sm flex justify-between items-center">
-                  <span className={`font-medium truncate max-w-[150px] ${isFileDeleted(file.file_path) ? 'text-emphasis-red line-through' : 'text-text-carbon'}`}>
-                    {file.file_name}
-                  </span>
-                  {isFileDeleted(file.file_path) ? (
-                    <Badge variant="destructive" className="text-xs ml-2">Eliminado</Badge>
-                  ) : (
-                    <span className="text-gray-400 ml-2">({file.copies}x)</span>
-                  )}
-                </div>
-              ))}
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+          );
+        })}
+      </div>
     );
   };
 
   if (sessionLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
+        <Loader2 className="h-8 w-8 text-white animate-spin mr-2" />
         <p className="text-white text-xl">Cargando pedidos...</p>
       </div>
     );
@@ -267,7 +250,7 @@ const ClientOrders = () => {
                         {order.local_name}
                       </TableCell>
                       <TableCell>
-                        {renderFilesList(order.files)}
+                        {renderFilesList(order.order_files)}
                       </TableCell>
                       <TableCell className="font-bold">
                         ${order.total_price.toFixed(2)}
