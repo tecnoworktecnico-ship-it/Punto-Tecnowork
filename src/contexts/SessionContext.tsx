@@ -2,7 +2,6 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session } from '@supabase/supabase-js';
 
-// CORRECCIÓN: Se agrega local_id a la interfaz
 interface Profile {
   id: string;
   first_name: string | null;
@@ -12,7 +11,7 @@ interface Profile {
   password_changed: boolean | null;
   phone_number: string | null;
   points: number | null;
-  local_id: string | null; // <--- ¡AQUÍ ESTABA LA CLAVE!
+  local_id: string | null; // Fix: Agregado para que funcione en dashboards locales
 }
 
 interface SessionContextType {
@@ -31,7 +30,8 @@ const SessionContext = createContext<SessionContextType>({
 
 export const useSession = () => useContext(SessionContext);
 
-export const SessionProvider = ({ children }: { children: React.ReactNode }) => {
+// CORRECCIÓN: Renombrado de vuelta a SessionContextProvider para compatibilidad
+export const SessionContextProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,10 +65,9 @@ export const SessionProvider = ({ children }: { children: React.ReactNode }) => 
 
   const fetchProfile = async (userId: string) => {
     try {
-      // CORRECCIÓN: Aseguramos que traiga todos los campos, incluido local_id
       const { data, error } = await supabase
         .from('profiles')
-        .select('*') 
+        .select('*')
         .eq('id', userId)
         .single();
 
