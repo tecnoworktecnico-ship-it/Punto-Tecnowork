@@ -24,6 +24,7 @@ interface FileRecord {
   orders?: {
     status: string;
     created_at: string;
+    // Intentaremos mapear el cliente, pero si falla no romperemos la UI
     profiles?: {
       first_name: string;
       last_name: string;
@@ -70,23 +71,67 @@ export default function StorageCleaner() {
   const handleListRecentFiles = async () => {
     setLoading('search');
     try {
+      // INTENTO 1: Consulta segura.
+      // Si la relación orders->profiles falla, al menos traemos los archivos y el estado del pedido.
+      // Hemos simplificado la query para evitar el error PGRST200
+      
       const { data, error } = await supabase
         .from('order_files')
         .select(`
-          id, file_name, file_path, order_id, created_at, 
-          orders ( status, created_at, profiles ( first_name, last_name ) )
+          id, 
+          file_name, 
+          file_path, 
+          order_id, 
+          created_at, 
+          orders (
+            status,
+            created_at,
+            client_id
+          )
         `)
         .order('created_at', { ascending: false })
         .limit(50);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching files:', error);
+        throw error;
+      }
+
+      // PASO ADICIONAL: Enriquecer con nombres de clientes manualmente
+      // Esto evita el error de "foreign key relationship" si Supabase no la detecta automáticamente en el join profundo
+      const activeFiles = (data || []).filter((f: any) => !f.file_path.includes('DELETED'));
+      
+      // Recolectar IDs de clientes únicos
+      const clientIds = [...new Set(activeFiles.map((f: any) => f.orders?.client_id).filter(Boolean))];
+      
+      let profilesMap: Record<string, any> = {};
+      
+      if (clientIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name')
+          .in('id', clientIds);
+          
+        if (profiles) {
+          profiles.forEach(p => {
+            profilesMap[p.id] = p;
+          });
+        }
+      }
+
+      // Combinar datos
+      const enrichedFiles = activeFiles.map((f: any) => ({
+        ...f,
+        orders: {
+          ...f.orders,
+          profiles: f.orders?.client_id ? profilesMap[f.orders.client_id] : null
+        }
+      }));
 
       // @ts-ignore
-      const activeFiles = (data || []).filter((f: any) => !f.file_path.includes('DELETED'));
-      // @ts-ignore
-      setFiles(activeFiles);
+      setFiles(enrichedFiles);
       
-      if (activeFiles.length === 0) setResult({ type: 'error', text: 'No se encontraron archivos activos.' });
+      if (enrichedFiles.length === 0) setResult({ type: 'error', text: 'No se encontraron archivos activos.' });
       else setResult(null);
 
     } catch (err: any) {
@@ -131,13 +176,12 @@ export default function StorageCleaner() {
   });
 
   return (
-    <Card className="shadow-md">
-      <CardHeader>
+    <Card className="shadow-md bg-white">
+      <CardHeader className="pb-3 border-b border-gray-100">
         <div className="flex items-center gap-3">
-          <HardDrive className="w-6 h-6 text-orange-600" />
-          <CardTitle className="text-lg font-bold text-gray-800">Gestor de Archivos</CardTitle>
+          <div className="p-2 bg-orange-100 rounded-lg text-orange-600"><HardDrive className="w-6 h-6" /></div>
+          <div><CardTitle className="text-lg font-bold text-gray-800">Gestor de Archivos</CardTitle><CardDescription>Limpieza y mantenimiento.</CardDescription></div>
         </div>
-        <CardDescription>Mantenimiento de almacenamiento y limpieza.</CardDescription>
       </CardHeader>
       
       <CardContent className="space-y-6 pt-6">
@@ -184,7 +228,7 @@ export default function StorageCleaner() {
                      filteredFiles.map(f => (
                       <TableRow key={f.id} className="hover:bg-gray-50">
                         <TableCell className="py-2"><div className="flex flex-col"><span className="font-medium text-xs flex gap-1 text-gray-700"><FileText className="w-3 h-3 text-blue-500"/>{f.file_name}</span><span className="text-[10px] text-gray-400 ml-4">{new Date(f.created_at || '').toLocaleDateString()}</span></div></TableCell>
-                        <TableCell className="py-2"><div className="flex flex-col"><span className="text-xs font-semibold text-gray-600 flex gap-1"><User className="w-3 h-3"/>{f.orders?.profiles ? `${f.orders.profiles.first_name} ${f.orders.profiles.last_name}` : 'Desconocido'}</span><Badge variant="outline" className="text-[10px] w-fit">{f.orders?.status}</Badge></div></TableCell>
+                        <TableCell className="py-2"><div className="flex flex-col"><span className="text-xs font-semibold text-gray-600 flex gap-1"><User className="w-3 h-3"/>{f.orders?.profiles ? `${f.orders.profiles.first_name} ${f.orders.profiles.last_name}` : 'Desc.'}</span><Badge variant="outline" className="text-[10px] w-fit">{f.orders?.status}</Badge></div></TableCell>
                         <TableCell className="text-right py-2"><Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-gray-400 hover:text-red-600" onClick={() => handleDeleteSingle(f)} disabled={!!loading}>{loading === f.id ? <Loader2 className="w-3 h-3 animate-spin"/> : <Trash2 className="w-4 h-4"/>}</Button></TableCell>
                       </TableRow>
                     ))}
