@@ -24,7 +24,6 @@ interface FileRecord {
   orders?: {
     status: string;
     created_at: string;
-    // Intentaremos mapear el cliente, pero si falla no romperemos la UI
     profiles?: {
       first_name: string;
       last_name: string;
@@ -71,10 +70,6 @@ export default function StorageCleaner() {
   const handleListRecentFiles = async () => {
     setLoading('search');
     try {
-      // INTENTO 1: Consulta segura.
-      // Si la relación orders->profiles falla, al menos traemos los archivos y el estado del pedido.
-      // Hemos simplificado la query para evitar el error PGRST200
-      
       const { data, error } = await supabase
         .from('order_files')
         .select(`
@@ -92,18 +87,12 @@ export default function StorageCleaner() {
         .order('created_at', { ascending: false })
         .limit(50);
 
-      if (error) {
-        console.error('Error fetching files:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      // PASO ADICIONAL: Enriquecer con nombres de clientes manualmente
-      // Esto evita el error de "foreign key relationship" si Supabase no la detecta automáticamente en el join profundo
+      // Enriquecimiento manual para evitar errores de relación
       const activeFiles = (data || []).filter((f: any) => !f.file_path.includes('DELETED'));
       
-      // Recolectar IDs de clientes únicos
       const clientIds = [...new Set(activeFiles.map((f: any) => f.orders?.client_id).filter(Boolean))];
-      
       let profilesMap: Record<string, any> = {};
       
       if (clientIds.length > 0) {
@@ -113,13 +102,10 @@ export default function StorageCleaner() {
           .in('id', clientIds);
           
         if (profiles) {
-          profiles.forEach(p => {
-            profilesMap[p.id] = p;
-          });
+          profiles.forEach(p => profilesMap[p.id] = p);
         }
       }
 
-      // Combinar datos
       const enrichedFiles = activeFiles.map((f: any) => ({
         ...f,
         orders: {
@@ -146,20 +132,34 @@ export default function StorageCleaner() {
     const p = file.orders?.profiles;
     const clientName = p ? `${p.first_name} ${p.last_name}` : 'Desconocido';
     
-    if (!confirm(`¿ELIMINAR "${file.file_name}" de ${clientName}?`)) return;
+    if (!confirm(`¿ELIMINAR DEFINITIVAMENTE "${file.file_name}" de ${clientName}?`)) return;
     
     setLoading(file.id);
     try {
-      await supabase.storage.from('order-files').remove([file.file_path]);
-      const { error } = await supabase
+      // 1. Intentar eliminar del Storage físico
+      const { error: storageError } = await supabase.storage.from('order-files').remove([file.file_path]);
+      if (storageError) console.warn('Storage warning:', storageError);
+
+      // 2. Actualizar BD con VERIFICACIÓN (.select)
+      const { data, error } = await supabase
         .from('order_files')
         .update({ file_path: `DELETED_MANUAL_${new Date().toISOString()}` })
-        .eq('id', file.id);
+        .eq('id', file.id)
+        .select(); // <--- IMPORTANTE: Pedimos que nos devuelva el dato modificado
 
       if (error) throw error;
-      showSuccess('Archivo eliminado.');
+
+      // 3. Verificación de Seguridad RLS
+      if (!data || data.length === 0) {
+        throw new Error('PERMISO DENEGADO: La base de datos rechazó la eliminación. Verifica las políticas RLS de Supabase para Admins.');
+      }
+
+      showSuccess('Archivo eliminado correctamente.');
+      // Solo actualizamos la lista si la BD confirmó el cambio
       setFiles(prev => prev.filter(f => f.id !== file.id));
+
     } catch (err: any) {
+      console.error(err);
       showError(err.message);
     } finally {
       setLoading(null);
@@ -228,7 +228,7 @@ export default function StorageCleaner() {
                      filteredFiles.map(f => (
                       <TableRow key={f.id} className="hover:bg-gray-50">
                         <TableCell className="py-2"><div className="flex flex-col"><span className="font-medium text-xs flex gap-1 text-gray-700"><FileText className="w-3 h-3 text-blue-500"/>{f.file_name}</span><span className="text-[10px] text-gray-400 ml-4">{new Date(f.created_at || '').toLocaleDateString()}</span></div></TableCell>
-                        <TableCell className="py-2"><div className="flex flex-col"><span className="text-xs font-semibold text-gray-600 flex gap-1"><User className="w-3 h-3"/>{f.orders?.profiles ? `${f.orders.profiles.first_name} ${f.orders.profiles.last_name}` : 'Desc.'}</span><Badge variant="outline" className="text-[10px] w-fit">{f.orders?.status}</Badge></div></TableCell>
+                        <TableCell className="py-2"><div className="flex flex-col"><span className="text-xs font-semibold text-gray-600 flex gap-1"><User className="w-3 h-3"/>{f.orders?.profiles ? `${f.orders.profiles.first_name} ${f.orders.profiles.last_name}` : 'Desconocido'}</span><Badge variant="outline" className="text-[10px] w-fit">{f.orders?.status}</Badge></div></TableCell>
                         <TableCell className="text-right py-2"><Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-gray-400 hover:text-red-600" onClick={() => handleDeleteSingle(f)} disabled={!!loading}>{loading === f.id ? <Loader2 className="w-3 h-3 animate-spin"/> : <Trash2 className="w-4 h-4"/>}</Button></TableCell>
                       </TableRow>
                     ))}
@@ -236,7 +236,7 @@ export default function StorageCleaner() {
                 </Table>
               </div>
               <p className="text-[10px] text-gray-400 text-center italic">
-                * Eliminar un archivo aquí impedirá su descarga por parte del cliente y del administrador.
+                * Nota: Si recibes "Permiso Denegado", contacta al desarrollador para ajustar las reglas RLS.
               </p>
             </div>
           )}
