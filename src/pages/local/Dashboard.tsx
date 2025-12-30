@@ -53,47 +53,78 @@ interface Order {
 }
 
 const LocalDashboard = () => {
-  // OBTENEMOS profileLoaded DEL CONTEXTO
-  const { profile, loading: sessionLoading, profileLoaded } = useSession();
+  const { profile, loading: sessionLoading } = useSession();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [updating, setUpdating] = useState<string | null>(null);
+  
+  // ESTADO PARA EL LOCAL CORRECTO
+  const [activeLocal, setActiveLocal] = useState<{id: string, name: string} | null>(null);
+  const [localCheckComplete, setLocalCheckComplete] = useState(false);
 
+  // 1. RECUPERAR EL LOCAL BASADO EN EL MANAGER_ID (Lógica V16)
   useEffect(() => {
-    // NUEVA VALIDACIÓN ROBUSTA:
-    // No hacemos nada hasta que la sesión termine de cargar Y el perfil esté 100% listo.
-    if (sessionLoading || !profileLoaded) return;
+    const fetchLocalByManager = async () => {
+      if (sessionLoading) return; // Esperar sesión
+      if (!profile) {
+        setLocalCheckComplete(true);
+        return;
+      }
 
-    if (profile?.local_id) {
-      fetchOrders(profile.local_id);
-      
-      const channel = supabase
-        .channel('local-orders')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'orders',
-            filter: `local_id=eq.${profile.local_id}`
-          },
-          () => {
-            if (profile.local_id) fetchOrders(profile.local_id);
-          }
-        )
-        .subscribe();
+      try {
+        console.log("Buscando local donde manager_id =", profile.id);
+        
+        // AQUÍ ESTÁ LA CLAVE: Buscamos en 'locals' donde el manager sea el usuario actual
+        const { data, error } = await supabase
+          .from('locals')
+          .select('id, name')
+          .eq('manager_id', profile.id)
+          .maybeSingle();
 
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    } else {
-      // Si el perfil ya cargó (profileLoaded = true) y NO hay local_id,
-      // entonces sí podemos decir que no tiene local y quitamos el spinner.
-      setLoading(false);
-    }
-  }, [profile, sessionLoading, profileLoaded]);
+        if (error) throw error;
 
+        if (data) {
+          console.log("Local encontrado:", data);
+          setActiveLocal(data);
+          // Una vez tenemos el ID, cargamos los pedidos
+          fetchOrders(data.id);
+          setupSubscription(data.id);
+        } else {
+          console.warn("No se encontró ningún local gestionado por este usuario.");
+        }
+      } catch (err) {
+        console.error("Error buscando local del manager:", err);
+      } finally {
+        setLocalCheckComplete(true);
+      }
+    };
+
+    fetchLocalByManager();
+  }, [profile, sessionLoading]);
+
+  // 2. CONFIGURAR SUSCRIPCIÓN
+  const setupSubscription = (localId: string) => {
+    const channel = supabase
+      .channel('local-orders')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+          filter: `local_id=eq.${localId}`
+        },
+        () => fetchOrders(localId)
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  };
+
+  // 3. CARGAR PEDIDOS
   const fetchOrders = async (localId: string) => {
     try {
       setLoading(true);
@@ -204,23 +235,28 @@ const LocalDashboard = () => {
     }
   };
 
-  // PANTALLA DE CARGA ROBUSTA
-  // Solo mostramos loading si:
-  // 1. SessionContext sigue cargando
-  // 2. O el perfil aún no está 100% listo (profileLoaded false)
-  // 3. O estamos cargando los pedidos del local
-  if (sessionLoading || !profileLoaded || (loading && profile?.local_id)) {
+  // 1. CARGA INICIAL DE SESIÓN
+  if (sessionLoading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <Loader2 className="w-8 h-8 animate-spin text-primary-blue" />
-        <span className="ml-2 text-gray-500">Cargando panel del local...</span>
+        <span className="ml-2 text-gray-500">Autenticando...</span>
       </div>
     );
   }
 
-  // PANTALLA DE ERROR "SOLO SI DE VERDAD FALLÓ"
-  // Solo entramos aquí si profileLoaded es TRUE y local_id sigue siendo NULL
-  if (!profile?.local_id) {
+  // 2. BUSCANDO LOCAL DEL MANAGER
+  if (!localCheckComplete) {
+     return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+        <span className="ml-2 text-gray-500">Buscando tu sucursal...</span>
+      </div>
+    );
+  }
+
+  // 3. NO SE ENCONTRÓ LOCAL (Error Real)
+  if (!activeLocal) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] text-center p-4 animate-in fade-in">
         <div className="bg-yellow-50 p-4 rounded-full mb-4">
@@ -228,12 +264,12 @@ const LocalDashboard = () => {
         </div>
         <h2 className="text-xl font-bold text-gray-800 mb-2">Local No Asignado</h2>
         <p className="text-gray-500 max-w-md">
-          Tu cuenta tiene rol de "Local" pero no ha sido vinculada a ninguna sucursal física.
+          Tu usuario no figura como gerente de ninguna sucursal en la base de datos (tabla <code>locals</code>).
           <br /><br />
-          Por favor, contacta al administrador del sistema para que te asigne un local.
+          Contacta al administrador para que asigne tu ID de usuario como <code>manager_id</code> en el local correspondiente.
         </p>
         <Button variant="outline" className="mt-4" onClick={() => window.location.reload()}>
-          Recargar Página
+          Recargar
         </Button>
       </div>
     );
@@ -245,9 +281,9 @@ const LocalDashboard = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
             <Printer className="w-6 h-6 text-primary-blue" />
-            Panel de Impresión
+            Panel: {activeLocal.name}
           </h1>
-          <p className="text-gray-500">Gestiona los pedidos entrantes de tu local.</p>
+          <p className="text-gray-500">Gestionando pedidos de {activeLocal.name}</p>
         </div>
         <div className="flex gap-2 w-full md:w-auto">
           <div className="relative w-full md:w-64">
@@ -259,7 +295,7 @@ const LocalDashboard = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button variant="outline" size="icon" onClick={() => profile?.local_id && fetchOrders(profile.local_id)} title="Recargar">
+          <Button variant="outline" size="icon" onClick={() => fetchOrders(activeLocal.id)} title="Recargar">
             <RefreshCw className="h-4 w-4" />
           </Button>
         </div>
