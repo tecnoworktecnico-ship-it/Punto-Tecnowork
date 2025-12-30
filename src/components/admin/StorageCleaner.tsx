@@ -113,7 +113,7 @@ return (
     </CardHeader>
     <CardContent className="space-y-6 pt-6">
       {/* Masiva */}
-      <div className="p-4 bg-red-50 rounded-lg border border-red-100 flex justify-between items-center gap-4">
+      <div className="p-4 bg-red-50 rounded-lg border border-red-100 flex flex-col md:flex-row justify-between items-center gap-4">
         <div className="flex flex-col">
           <span className="text-sm font-bold text-red-800 flex items-center gap-2"><Trash2 className="w-4 h-4" /> Limpieza Masiva</span>
           <span className="text-xs text-red-600">Elimina archivos de pedidos CANCELADOS.</span>
