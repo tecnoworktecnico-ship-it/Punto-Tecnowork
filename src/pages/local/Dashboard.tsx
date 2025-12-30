@@ -62,39 +62,74 @@ const LocalDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [updating, setUpdating] = useState<string | null>(null);
+  
+  // Estado local para asegurar el ID del local, independiente de la sesión
+  const [activeLocalId, setActiveLocalId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (profile?.local_id) {
-      fetchOrders();
-      
-      // Suscripción en tiempo real para nuevos pedidos
-      const channel = supabase
-        .channel('local-orders')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'orders',
-            filter: `local_id=eq.${profile.local_id}`
-          },
-          () => {
-            fetchOrders();
-          }
-        )
-        .subscribe();
+    if (profile) {
+      verifyAndFetch();
+    }
+  }, [profile]);
 
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    } else if (profile && !profile.local_id) {
-      // CORRECCIÓN: Si el usuario cargó pero no tiene local, dejamos de cargar
+  // Función de Doble Verificación
+  const verifyAndFetch = async () => {
+    try {
+      let targetLocalId = profile?.local_id;
+
+      // Si la sesión no tiene el ID, lo buscamos manualmente en la BD (Doble Check)
+      if (!targetLocalId) {
+        console.log("Local ID no encontrado en sesión, verificando en DB...");
+        const { data: userProfile, error } = await supabase
+          .from('profiles')
+          .select('local_id')
+          .eq('id', profile!.id)
+          .single();
+        
+        if (!error && userProfile?.local_id) {
+          targetLocalId = userProfile.local_id;
+          console.log("Local ID recuperado de DB:", targetLocalId);
+        }
+      }
+
+      if (targetLocalId) {
+        setActiveLocalId(targetLocalId);
+        await fetchOrders(targetLocalId);
+        setupSubscription(targetLocalId);
+      } else {
+        // Solo si después de buscar en DB sigue siendo null, entonces paramos
+        console.warn("Usuario sin local asignado confirmado.");
+        setLoading(false);
+      }
+    } catch (e) {
+      console.error("Error verificando local:", e);
       setLoading(false);
     }
-  }, [profile?.local_id, profile]);
+  };
 
-  const fetchOrders = async () => {
+  const setupSubscription = (localId: string) => {
+    const channel = supabase
+      .channel('local-orders')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+          filter: `local_id=eq.${localId}`
+        },
+        () => fetchOrders(localId)
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  };
+
+  const fetchOrders = async (localId: string) => {
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('orders')
         .select(`
@@ -114,7 +149,7 @@ const LocalDashboard = () => {
             copies
           )
         `)
-        .eq('local_id', profile?.local_id)
+        .eq('local_id', localId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -211,8 +246,8 @@ const LocalDashboard = () => {
     );
   }
 
-  // CORRECCIÓN: Pantalla de "No Local Asignado"
-  if (!profile?.local_id) {
+  // Solo mostramos el error si YA TERMINÓ de cargar Y confirmamos que NO hay ID
+  if (!loading && !activeLocalId) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] text-center p-4 animate-in fade-in">
         <div className="bg-yellow-50 p-4 rounded-full mb-4">
@@ -220,10 +255,13 @@ const LocalDashboard = () => {
         </div>
         <h2 className="text-xl font-bold text-gray-800 mb-2">Local No Asignado</h2>
         <p className="text-gray-500 max-w-md">
-          Tu cuenta tiene rol de "Local" pero no ha sido vinculada a ninguna sucursal física.
+          El sistema verificó tu cuenta y no encontró una sucursal vinculada.
           <br /><br />
-          Por favor, contacta al administrador del sistema para que te asigne un local.
+          Si crees que esto es un error, por favor recarga la página o contacta al administrador.
         </p>
+        <Button variant="outline" className="mt-4" onClick={() => window.location.reload()}>
+          Recargar Página
+        </Button>
       </div>
     );
   }
@@ -248,7 +286,7 @@ const LocalDashboard = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button variant="outline" size="icon" onClick={fetchOrders} title="Recargar">
+          <Button variant="outline" size="icon" onClick={() => activeLocalId && fetchOrders(activeLocalId)} title="Recargar">
             <RefreshCw className="h-4 w-4" />
           </Button>
         </div>
@@ -305,7 +343,7 @@ const LocalDashboard = () => {
                       <TableCell>
                         <div className="space-y-1">
                           {order.order_files.map((file, idx) => {
-                            // LOGICA DE ARCHIVO BORRADO (APLICADA TAMBIÉN AQUÍ)
+                            // DETECCIÓN DE ARCHIVO BORRADO
                             const isDeleted = file.file_path && file.file_path.includes('DELETED');
                             
                             return (
