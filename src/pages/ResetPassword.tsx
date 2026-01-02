@@ -7,12 +7,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { showError, showSuccess } from '@/utils/toast';
-import { Loader2, KeyRound, Mail, ArrowLeft, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { Loader2, KeyRound, Mail, ArrowLeft, CheckCircle2 } from 'lucide-react';
 
 const ResetPassword = () => {
   const navigate = useNavigate();
-  // 1. OBTENEMOS LA SESIÓN DEL CONTEXTO
-  // Si el link del correo funcionó, 'session' ya tendrá datos válidos.
+  // Recuperamos la sesión del contexto (Lógica V5: si hay sesión, es porque el token funcionó)
   const { session } = useSession(); 
   
   const [loading, setLoading] = useState(false);
@@ -20,23 +19,20 @@ const ResetPassword = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   
-  // 'request' = Pedir correo | 'update' = Poner nueva clave
-  const [mode, setMode] = useState<'request' | 'update'>('request');
+  // Estados: 'request' (pedir mail) o 'update' (cambiar clave)
+  const [view, setView] = useState<'request' | 'update'>('request');
 
-  // --- LÓGICA DE HOMEBANKING ---
   useEffect(() => {
-    // A. Si el contexto dice que hay sesión, es porque el link de recuperación nos logueó.
-    // Pasamos directo a cambiar la clave.
+    // LÓGICA V5 RESTAURADA:
+    // 1. Si Supabase nos logueó automáticamente con el link, mostramos el formulario de cambio.
     if (session) {
-      console.log("Lógica Homebanking: Sesión activa detectada. Permitir cambio de clave.");
-      setMode('update');
+      setView('update');
     }
 
-    // B. Escuchar evento explícito de recuperación (Red de seguridad)
+    // 2. Escuchar el evento específico por si acaso (doble seguridad)
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event) => {
       if (event === 'PASSWORD_RECOVERY') {
-        console.log("Evento Supabase: PASSWORD_RECOVERY detectado.");
-        setMode('update');
+        setView('update');
       }
     });
 
@@ -45,13 +41,13 @@ const ResetPassword = () => {
     };
   }, [session]);
 
-  // FUNCIÓN 1: El usuario olvidó la clave y pide el link
+  // --- Lógica de Envío de Correo ---
   const handleRequestReset = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      // Redirigir a ESTA misma página para que la lógica de arriba capture el retorno
+      // URL de redirección explícita
       const redirectUrl = `${window.location.origin}/reset-password`;
       
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -60,21 +56,21 @@ const ResetPassword = () => {
 
       if (error) throw error;
 
-      showSuccess('Correo enviado. Revisa tu bandeja de entrada (y spam).');
+      showSuccess('Enlace enviado. Revisa tu correo.');
+      // No limpiamos el email para que el usuario vea que escribió bien
     } catch (error: any) {
-      console.error('Error solicitando reset:', error);
-      showError(error.message || 'Error al solicitar recuperación');
+      showError(error.message || 'Error al solicitar');
     } finally {
       setLoading(false);
     }
   };
 
-  // FUNCIÓN 2: El usuario ya entró con el link y está poniendo la nueva clave
+  // --- Lógica de Cambio de Clave ---
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (newPassword.length < 6) {
-      showError('La contraseña debe tener al menos 6 caracteres');
+      showError('Mínimo 6 caracteres');
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -85,80 +81,49 @@ const ResetPassword = () => {
     setLoading(true);
 
     try {
-      // Usamos updateUser porque YA estamos logueados (gracias al link)
       const { error } = await supabase.auth.updateUser({
         password: newPassword
       });
 
       if (error) throw error;
 
-      showSuccess('¡Contraseña blindada correctamente!');
+      showSuccess('¡Contraseña actualizada!');
       
-      // Salir para obligar a entrar con la nueva clave (buena práctica de seguridad)
+      // Logout forzado para que entre con la nueva clave (Seguridad)
       await supabase.auth.signOut();
-      
-      setTimeout(() => {
-        navigate('/login');
-      }, 1500);
+      navigate('/login');
 
     } catch (error: any) {
-      console.error('Error actualizando password:', error);
-      showError(error.message || 'No se pudo actualizar la contraseña');
+      showError(error.message || 'Error al actualizar');
     } finally {
       setLoading(false);
     }
   };
 
-  // --- VISTA A: FORMULARIO DE NUEVA CONTRASEÑA (Modo Homebanking Activo) ---
-  if (mode === 'update') {
+  // --- VISTA: CAMBIAR CONTRASEÑA ---
+  if (view === 'update') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-        <Card className="w-full max-w-md shadow-2xl border-t-4 border-green-500 animate-in fade-in zoom-in duration-300">
-          <CardHeader className="text-center pb-2">
-            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4 shadow-inner">
-              <ShieldCheck className="w-8 h-8 text-green-600" />
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4 animate-in fade-in">
+        <Card className="w-full max-w-md shadow-lg border-t-4 border-green-500">
+          <CardHeader className="text-center">
+            <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
+              <CheckCircle2 className="w-6 h-6 text-green-600" />
             </div>
-            <CardTitle className="text-xl font-bold text-gray-800">Seguridad de la Cuenta</CardTitle>
-            <CardDescription>
-              Hemos verificado tu identidad. <br/>
-              Establece tu nueva contraseña de acceso.
-            </CardDescription>
+            <CardTitle>Nueva Contraseña</CardTitle>
+            <CardDescription>Ingresa tu nueva clave de acceso.</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleUpdatePassword} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="new-password">Nueva Contraseña</Label>
-                <div className="relative">
-                  <KeyRound className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="new-password"
-                    type="password"
-                    placeholder="Mínimo 6 caracteres"
-                    className="pl-10 h-11"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    required
-                  />
-                </div>
+                <Label>Nueva Contraseña</Label>
+                <Input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required placeholder="******" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="confirm-password">Confirmar Contraseña</Label>
-                <div className="relative">
-                  <KeyRound className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="confirm-password"
-                    type="password"
-                    placeholder="Repite la contraseña"
-                    className="pl-10 h-11"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
-                  />
-                </div>
+                <Label>Confirmar Contraseña</Label>
+                <Input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required placeholder="******" />
               </div>
-              <Button type="submit" className="w-full h-11 bg-green-600 hover:bg-green-700 font-semibold text-lg shadow-md" disabled={loading}>
-                {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
-                Confirmar Cambio
+              <Button type="submit" className="w-full bg-green-600 hover:bg-green-700" disabled={loading}>
+                {loading ? <Loader2 className="animate-spin mr-2 h-4 w-4"/> : null} Actualizar
               </Button>
             </form>
           </CardContent>
@@ -167,44 +132,33 @@ const ResetPassword = () => {
     );
   }
 
-  // --- VISTA B: SOLICITAR ENLACE (Paso 1) ---
+  // --- VISTA: SOLICITAR ENLACE ---
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-      <Card className="w-full max-w-md shadow-xl animate-in fade-in duration-500">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4 animate-in fade-in">
+      <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="text-center">
           <div className="mx-auto w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
             <KeyRound className="w-6 h-6 text-primary-blue" />
           </div>
-          <CardTitle className="text-xl">Recuperar Acceso</CardTitle>
-          <CardDescription>
-            Ingresa tu correo y te enviaremos una llave de acceso temporal.
-          </CardDescription>
+          <CardTitle>Recuperar Contraseña</CardTitle>
+          <CardDescription>Te enviaremos un enlace mágico.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleRequestReset} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Correo Electrónico</Label>
+              <Label>Correo Electrónico</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="tu@email.com"
-                  className="pl-10 h-11"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
+                <Input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="email@ejemplo.com" className="pl-10" />
               </div>
             </div>
-            <Button type="submit" className="w-full h-11 bg-primary-blue hover:bg-blue-700 text-base" disabled={loading}>
-              {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-              Enviar Enlace Mágico
+            <Button type="submit" className="w-full bg-primary-blue hover:bg-blue-700" disabled={loading}>
+              {loading ? <Loader2 className="animate-spin mr-2 h-4 w-4"/> : null} Enviar Enlace
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="flex justify-center border-t pt-6">
-          <Button variant="ghost" onClick={() => navigate('/login')} className="text-gray-500 hover:text-primary-blue gap-2">
+        <CardFooter className="flex justify-center pt-2">
+          <Button variant="link" onClick={() => navigate('/login')} className="text-gray-500 gap-2">
             <ArrowLeft className="w-4 h-4" /> Volver al Login
           </Button>
         </CardFooter>
