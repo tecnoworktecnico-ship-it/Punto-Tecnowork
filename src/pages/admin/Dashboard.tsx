@@ -10,17 +10,27 @@ import {
   Settings, 
   Users as UsersIcon, 
   Store,
+  Clock,
   Package,
   User,
   RefreshCw,
   BarChart,
-  Gift, 
-  Wrench // Usar Wrench para mantenimiento
+  Loader2,
+  Gift // Importar Gift para el nuevo botón
 } from 'lucide-react';
+import { showError, showSuccess } from '@/utils/toast';
 import { useAdminDashboardData } from '@/hooks/useDashboardData';
 import StatCard from '@/components/dashboard/StatCard';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import Footer from '@/components/Footer';
-import AppHeader from '@/components/AppHeader'; 
+import AppHeader from '@/components/AppHeader'; // Importar AppHeader
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -33,6 +43,29 @@ const AdminDashboard = () => {
     loading, 
     refreshData 
   } = useAdminDashboardData();
+  const [isConfiguring, setIsConfiguring] = useState(false);
+
+  // Función para mostrar instrucciones sobre cómo extender el tiempo de verificación
+  const showVerificationTimeInstructions = () => {
+    setIsConfiguring(true);
+    
+    setTimeout(() => {
+      setIsConfiguring(false);
+      showSuccess('Instrucciones mostradas. Recuerda que necesitas acceso a la consola de Supabase.');
+    } , 1500);
+    
+    // Mostrar instrucciones detalladas
+    alert(`Para extender el tiempo de verificación de correo a 30 minutos:
+
+1. Accede a la consola de Supabase (https://app.supabase.com)
+2. Selecciona tu proyecto
+3. Ve a Authentication > Settings > Email
+4. Busca "Email Link Expiration"
+5. Cambia el valor a 1800 (segundos = 30 minutos)
+6. Guarda los cambios
+
+Nota: Esta configuración solo puede cambiarse desde la consola de Supabase y requiere permisos de administrador.`);
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move text-text-on-color">
@@ -67,7 +100,7 @@ const AdminDashboard = () => {
               value={totalOrders}
               icon={Package}
               color="text-primary-blue"
-              description="Pedidos totales en el sistema (no cancelados)"
+              description="Pedidos totales en el sistema"
             />
             <StatCard 
               title="Clientes Registrados"
@@ -190,7 +223,7 @@ const AdminDashboard = () => {
               </CardContent>
             </Card>
             
-            {/* Tarjeta de Recompensas */}
+            {/* Nueva Tarjeta de Recompensas */}
             <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <div className="flex items-center gap-3">
@@ -210,21 +243,22 @@ const AdminDashboard = () => {
               </CardContent>
             </Card>
 
-            {/* Nueva Tarjeta de Mantenimiento (Enlace) */}
-            <Card 
-              className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow border-l-4 border-l-secondary-yellow cursor-pointer group" 
-              onClick={() => navigate('/admin/maintenance')}
-            >
+            <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <Wrench className="h-8 w-8 text-secondary-yellow group-hover:scale-110 transition-transform" />
-                  <CardTitle className="text-gray-800">Mantenimiento</CardTitle>
+                  <Clock className="h-8 w-8 text-primary-blue" />
+                  <CardTitle className="text-primary-blue">Verificación Email</CardTitle>
                 </div>
-                <CardDescription>Limpieza, reparación y ajustes técnicos.</CardDescription>
+                <CardDescription>Ajustes de seguridad de autenticación.</CardDescription>
               </CardHeader>
-              <CardContent>
-                <Button variant="ghost" className="w-full justify-start pl-0 hover:bg-transparent text-secondary-yellow font-medium">
-                  Ir al Panel Técnico →
+              <CardContent className="flex flex-col space-y-2">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start" 
+                  onClick={showVerificationTimeInstructions}
+                  disabled={isConfiguring}
+                >
+                  {isConfiguring ? 'Mostrando instrucciones...' : 'Extender tiempo de enlace'}
                 </Button>
               </CardContent>
             </Card>

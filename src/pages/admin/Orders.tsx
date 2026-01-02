@@ -116,22 +116,10 @@ const AdminOrders = () => {
   };
 
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
-    // Encontrar el pedido actual para obtener client_id y points_earned
-    const currentOrder = orders.find(o => o.order_id === orderId);
-    if (!currentOrder) {
-      showError('Pedido no encontrado.');
-      return;
-    }
-    
-    // Prevenir la doble suma de puntos si ya estaba completado
-    const wasCompleted = currentOrder.status === 'completed';
-    const isCompleting = newStatus === 'completed';
-
     setLoading(true);
 
     try {
-      // 1. Actualizar el estado del pedido
-      const { error: updateError } = await supabase
+      const { error } = await supabase
         .from('orders')
         .update({ 
           status: newStatus,
@@ -139,70 +127,27 @@ const AdminOrders = () => {
         })
         .eq('id', orderId);
 
-      if (updateError) {
-        console.error('Error updating order status:', updateError);
-        showError(`Error al actualizar el estado del pedido: ${updateError.message}`);
-        setLoading(false);
-        return;
+      if (error) {
+        console.error('Error updating order status:', error);
+        showError(`Error al actualizar el estado del pedido: ${error.message}`); // Mostrar error específico
+      } else {
+        showSuccess('Estado del pedido actualizado correctamente.');
+        
+        // Registrar en auditoría
+        await supabase.from('order_audit').insert({
+          order_id: orderId,
+          user_id: profile?.id,
+          action: 'status_change_admin',
+          details: { new_status: newStatus }
+        });
+
+        fetchOrders();
       }
-      
-      let pointsMessage = '';
-
-      // 2. Lógica de Puntos: Sumar solo si pasa a 'completed' y no estaba completado antes
-      if (isCompleting && !wasCompleted) {
-        const points = currentOrder.points_earned;
-        const clientId = currentOrder.client_id;
-        
-        // Obtener puntos actuales del usuario
-        const { data: userPointsData, error: pointsFetchError } = await supabase
-          .from('user_points')
-          .select('points')
-          .eq('user_id', clientId)
-          .single();
-          
-        if (pointsFetchError && pointsFetchError.code !== 'PGRST116') {
-          console.error('Error fetching user points for update:', pointsFetchError);
-          // No lanzar error, solo registrar y continuar
-        }
-        
-        const currentPoints = userPointsData?.points || 0;
-        const newPoints = currentPoints + points;
-        
-        // Actualizar o insertar puntos
-        const { error: pointsUpdateError } = await supabase
-          .from('user_points')
-          .upsert(
-            { user_id: clientId, points: newPoints, updated_at: new Date().toISOString() },
-            { onConflict: 'user_id' }
-          );
-
-        if (pointsUpdateError) {
-          console.error('Error updating user points:', pointsUpdateError);
-          pointsMessage = ` (Advertencia: Error al sumar ${points} puntos)`;
-        } else {
-          pointsMessage = ` (Se sumaron ${points} puntos al cliente)`;
-        }
-      }
-      
-      // 3. Registrar en auditoría
-      await supabase.from('order_audit').insert({
-        order_id: orderId,
-        user_id: profile?.id,
-        action: 'status_change_admin',
-        details: { new_status: newStatus }
-      });
-
-      showSuccess(`Estado del pedido actualizado a ${newStatus.replace('_', ' ')}.${pointsMessage}`);
-      
-      // 4. Recargar datos
-      fetchOrders();
-      
     } catch (error) {
       console.error('Unexpected error:', error);
       showError('Error inesperado al actualizar el estado.');
     } finally {
-      // El loading se maneja dentro de fetchOrders, pero lo aseguramos aquí si hay un error temprano
-      if (loading) setLoading(false);
+      setLoading(false);
     }
   };
 
