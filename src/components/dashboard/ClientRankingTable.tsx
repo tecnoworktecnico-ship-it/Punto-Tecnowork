@@ -15,7 +15,7 @@ interface RankingEntry {
   last_name: string | null;
   email: string;
   points: number;
-  rank: number;
+  rank: number; // Rank provided by the RPC function
 }
 
 interface ClientRankingTableProps {
@@ -34,16 +34,22 @@ const ClientRankingTable: React.FC<ClientRankingTableProps> = ({ localId, title,
     setError(null);
     
     try {
+      // Utilizamos la función RPC 'get_client_points_ranking' que ya está optimizada
+      // en la base de datos para ordenar por puntos (DESC) y limitar a 10.
       const { data, error } = await supabase.rpc('get_client_points_ranking', {
         target_local_id: localId || null
       });
 
       if (error) {
         console.error('Ranking fetch error:', error);
-        setError(error.message || 'Error al cargar el ranking');
+        if (error.message.includes('No tienes permisos')) {
+             setError('No tienes permisos para acceder a este ranking.');
+        } else {
+             setError(error.message || 'Error al cargar el ranking');
+        }
         setRanking([]);
       } else {
-        console.log('Ranking data:', data);
+        // La data ya viene ordenada y limitada a 10 por la función RPC.
         setRanking(data || []);
       }
     } catch (err) {
@@ -118,7 +124,7 @@ const ClientRankingTable: React.FC<ClientRankingTableProps> = ({ localId, title,
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[80px]">Rank</TableHead>
+                <TableHead className="w-[80px]">Posición</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead className="text-right">Puntos</TableHead>
               </TableRow>

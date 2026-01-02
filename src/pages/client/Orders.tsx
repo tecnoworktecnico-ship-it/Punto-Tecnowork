@@ -4,11 +4,12 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/contexts/SessionContext';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { showError } from '@/utils/toast';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, FileText, RefreshCw } from 'lucide-react';
+// IMPORTANTE: Aquí se agregan Loader2 y RefreshCw para evitar el error de pantalla blanca
+import { ArrowLeft, FileText, Download, AlertCircle, Calendar, Loader2, RefreshCw } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -17,6 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { getStatusBadge } from '@/utils/order-status';
 import {
   Tooltip,
   TooltipContent,
@@ -25,19 +27,20 @@ import {
 } from "@/components/ui/tooltip";
 
 interface OrderFile {
+  id: string;
   file_name: string;
+  file_path: string;
   copies: number;
 }
 
 interface Order {
   id: string;
-  local_id: string;
+  created_at: string;
   status: string;
   total_price: number;
   points_earned: number;
-  created_at: string;
   local_name: string;
-  files: OrderFile[];
+  order_files: OrderFile[];
 }
 
 const ClientOrders = () => {
@@ -47,134 +50,150 @@ const ClientOrders = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!sessionLoading && profile?.role !== 'client') {
-      showError('No tienes permiso para acceder a esta página.');
-      navigate('/client');
-    }
-
     if (!sessionLoading && profile?.role === 'client') {
       fetchOrders();
+    } else if (!sessionLoading && profile?.role !== 'client') {
+      navigate('/client');
     }
   }, [sessionLoading, profile, navigate]);
 
   const fetchOrders = async () => {
     setLoading(true);
-
     try {
-      // Obtener pedidos
-      const { data: ordersData, error: ordersError } = await supabase
+      // Usamos selects anidados para traer el nombre del local directamente
+      const { data, error } = await supabase
         .from('orders')
-        .select('id, local_id, status, total_price, points_earned, created_at')
+        .select(`
+          id,
+          created_at,
+          status,
+          total_price,
+          points_earned,
+          local_id,
+          locals ( name ),
+          order_files (
+            id,
+            file_name,
+            file_path,
+            copies
+          )
+        `)
         .eq('client_id', profile?.id)
         .order('created_at', { ascending: false });
 
-      if (ordersError) {
-        console.error('Error fetching orders:', ordersError);
-        showError('Error al cargar los pedidos.');
-        setLoading(false);
-        return;
-      }
+      if (error) throw error;
 
-      // Para cada pedido, obtener el nombre del local y los archivos
-      const ordersWithDetails = await Promise.all(
-        (ordersData || []).map(async (order) => {
-          // Obtener nombre del local
-          const { data: localData } = await supabase
-            .from('locals')
-            .select('name')
-            .eq('id', order.local_id)
-            .single();
+      // Mapeo seguro de datos
+      const formattedOrders: Order[] = (data || []).map((order: any) => ({
+        id: order.id,
+        created_at: order.created_at,
+        status: order.status,
+        total_price: order.total_price,
+        points_earned: order.points_earned,
+        local_name: order.locals?.name || 'Local desconocido',
+        order_files: order.order_files || []
+      }));
 
-          // Obtener archivos del pedido
-          const { data: filesData } = await supabase
-            .from('order_files')
-            .select('file_name, copies')
-            .eq('order_id', order.id);
-
-          return {
-            ...order,
-            local_name: localData?.name || 'Local desconocido',
-            files: filesData || [],
-          };
-        })
-      );
-
-      setOrders(ordersWithDetails);
-    } catch (error) {
-      console.error('Unexpected error:', error);
-      showError('Error inesperado al cargar pedidos.');
+      setOrders(formattedOrders);
+    } catch (error: any) {
+      console.error('Error fetching orders:', error);
+      showError('Error al cargar tus pedidos.');
     } finally {
       setLoading(false);
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-      pending: { label: 'Pendiente', variant: 'secondary' },
-      in_progress: { label: 'En Proceso', variant: 'default' },
-      ready: { label: 'Listo para Recoger', variant: 'outline' },
-      completed: { label: 'Completado', variant: 'default' },
-      cancelled: { label: 'Cancelado', variant: 'destructive' },
-    };
+  const handleDownload = async (filePath: string, fileName: string) => {
+    try {
+      // BLINDAJE: Si el archivo tiene la marca DELETED, detenemos la descarga
+      if (filePath.includes('DELETED')) {
+        showError('Este archivo ha expirado o fue eliminado.');
+        return;
+      }
 
-    const config = statusConfig[status] || { label: status, variant: 'outline' };
-    return <Badge variant={config.variant}>{config.label}</Badge>;
+      const { data, error } = await supabase.storage
+        .from('order-files')
+        .download(filePath);
+
+      if (error) throw error;
+
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      showError('No se pudo descargar el archivo.');
+    }
   };
 
   const renderFilesList = (files: OrderFile[]) => {
-    if (files.length === 0) return 'Sin archivos';
-    
-    if (files.length === 1) {
-      return (
-        <div className="flex flex-col">
-          <span className="font-medium truncate max-w-[200px]">{files[0].file_name}</span>
-          <span className="text-xs text-gray-500">{files[0].copies} copia{files[0].copies > 1 ? 's' : ''}</span>
-        </div>
-      );
-    }
+    if (!files || files.length === 0) return <span className="text-gray-400 text-sm">Sin archivos</span>;
 
-    const filesList = files.map(f => `${f.file_name} (${f.copies}x)`).join('\n');
-    
     return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className="flex flex-col cursor-help">
-              <span className="font-medium">{files.length} archivos</span>
-              <span className="text-xs text-gray-500">Ver detalles</span>
+      <div className="space-y-1">
+        {files.map((file) => {
+          // Detectar si el archivo fue borrado por el Admin
+          const isDeleted = file.file_path && file.file_path.includes('DELETED');
+
+          return (
+            <div key={file.id} className="flex items-center justify-between text-sm bg-gray-50 p-2 rounded border border-gray-100">
+              <div className="flex items-center gap-2 overflow-hidden">
+                <FileText className="h-4 w-4 text-primary-blue shrink-0" />
+                <span className="truncate max-w-[150px] md:max-w-[200px]" title={file.file_name}>
+                  {file.file_name}
+                </span>
+                <span className="text-xs text-gray-500 shrink-0">({file.copies}x)</span>
+              </div>
+
+              {isDeleted ? (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Badge variant="outline" className="text-gray-400 border-gray-200 text-[10px] h-6 flex gap-1 items-center bg-gray-100">
+                        <AlertCircle className="w-3 h-3" /> Expirado
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Este archivo fue eliminado por privacidad o antigüedad.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-gray-500 hover:text-primary-blue"
+                  onClick={() => handleDownload(file.file_path, file.file_name)}
+                  title="Descargar"
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+              )}
             </div>
-          </TooltipTrigger>
-          <TooltipContent className="max-w-xs">
-            <div className="space-y-1">
-              {files.map((file, idx) => (
-                <div key={idx} className="text-sm">
-                  <span className="font-medium">{file.file_name}</span>
-                  <span className="text-gray-400 ml-2">({file.copies}x)</span>
-                </div>
-              ))}
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+          );
+        })}
+      </div>
     );
   };
 
   if (sessionLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
-        <p className="text-white text-xl">Cargando pedidos...</p>
+        <Loader2 className="h-8 w-8 text-white animate-spin mr-2" />
+        <p className="text-white text-xl">Cargando tus pedidos...</p>
       </div>
     );
-  }
-
-  if (profile?.role !== 'client') {
-    return null;
   }
 
   return (
     <div className="min-h-screen p-4 bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
       <div className="max-w-6xl mx-auto">
-        <Card className="bg-white rounded-lg shadow-lg">
+        <Card className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg">
           <CardHeader>
             <div className="flex items-center justify-between mb-4">
               <Button
@@ -185,83 +204,78 @@ const ClientOrders = () => {
                 <ArrowLeft className="h-5 w-5" />
                 Volver al Dashboard
               </Button>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  onClick={fetchOrders}
-                  className="flex items-center gap-2"
-                  disabled={loading}
-                >
-                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                  Actualizar
-                </Button>
-                <Button
-                  onClick={() => navigate('/client/new-order')}
-                  className="bg-primary-blue hover:bg-blue-700 text-white"
-                >
-                  Nuevo Pedido
-                </Button>
+              <div className="flex gap-2">
+                 <Button 
+                   variant="outline"
+                   onClick={fetchOrders}
+                   disabled={loading}
+                   className="gap-2"
+                 >
+                   <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                   Actualizar
+                 </Button>
+                 <Button onClick={() => navigate('/client/new-order')} className="bg-primary-blue hover:bg-blue-700 text-white">
+                   Nuevo Pedido
+                 </Button>
               </div>
             </div>
-            <CardTitle className="text-3xl font-bold text-text-carbon">
+            <CardTitle className="text-3xl font-bold text-text-carbon flex items-center gap-2">
+              <FileText className="h-8 w-8 text-primary-blue" />
               Mis Pedidos
             </CardTitle>
+            <CardDescription>
+              Historial de tus solicitudes de impresión.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {orders.length === 0 ? (
-              <div className="text-center py-12">
-                <FileText className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500 text-lg mb-4">
-                  No tienes pedidos aún
-                </p>
-                <Button
-                  onClick={() => navigate('/client/new-order')}
-                  className="bg-primary-blue hover:bg-blue-700 text-white"
-                >
-                  Crear Primer Pedido
+              <div className="text-center py-12 text-gray-500 bg-gray-50 rounded-xl border-dashed border-2 border-gray-200">
+                <p className="mb-4 text-lg">Aún no has realizado ningún pedido.</p>
+                <Button onClick={() => navigate('/client/new-order')}>
+                  ¡Haz tu primer pedido ahora!
                 </Button>
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Local</TableHead>
-                    <TableHead>Archivos</TableHead>
-                    <TableHead>Total</TableHead>
-                    <TableHead>Puntos</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead>Fecha</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {orders.map((order) => (
-                    <TableRow key={order.id}>
-                      <TableCell className="font-medium">
-                        {order.local_name}
-                      </TableCell>
-                      <TableCell>
-                        {renderFilesList(order.files)}
-                      </TableCell>
-                      <TableCell className="font-bold">
-                        ${order.total_price.toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-secondary-yellow font-medium">
-                        +{order.points_earned} pts
-                      </TableCell>
-                      <TableCell>
-                        {getStatusBadge(order.status)}
-                      </TableCell>
-                      <TableCell>
-                        {new Date(order.created_at).toLocaleDateString('es-ES', {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                        })}
-                      </TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Local</TableHead>
+                      <TableHead>Archivos</TableHead>
+                      <TableHead>Total</TableHead>
+                      <TableHead>Puntos</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Fecha</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {orders.map((order) => (
+                      <TableRow key={order.id}>
+                        <TableCell className="font-medium">
+                          {order.local_name}
+                        </TableCell>
+                        <TableCell className="min-w-[200px]">
+                          {renderFilesList(order.order_files)}
+                        </TableCell>
+                        <TableCell className="font-bold text-success-green">
+                          ${order.total_price.toFixed(2)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 border-yellow-200">
+                            +{order.points_earned} pts
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {getStatusBadge(order.status)}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-gray-500">
+                           {new Date(order.created_at).toLocaleDateString()}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </CardContent>
         </Card>

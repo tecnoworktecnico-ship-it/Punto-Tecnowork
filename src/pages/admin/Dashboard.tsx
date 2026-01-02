@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -10,64 +8,20 @@ import {
   Settings, 
   Users as UsersIcon, 
   Store,
-  Clock,
   Package,
   User,
   RefreshCw,
   BarChart,
-  Loader2,
-  Gift // Importar Gift para el nuevo botón
+  Gift,
+  Wrench // Icono para mantenimiento
 } from 'lucide-react';
-import { showError, showSuccess } from '@/utils/toast';
 import { useAdminDashboardData } from '@/hooks/useDashboardData';
 import StatCard from '@/components/dashboard/StatCard';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import Footer from '@/components/Footer';
-import AppHeader from '@/components/AppHeader'; // Importar AppHeader
+import AppHeader from '@/components/AppHeader';
+const AdminDashboard = () => { const navigate = useNavigate(); const { profile } = useSession(); const { totalOrders, totalRevenue, totalClients, localPerformance, loading, refreshData } = useAdminDashboardData();
 
-const AdminDashboard = () => {
-  const navigate = useNavigate();
-  const { profile, signOut } = useSession();
-  const { 
-    totalOrders, 
-    totalRevenue, 
-    totalClients, 
-    localPerformance, 
-    loading, 
-    refreshData 
-  } = useAdminDashboardData();
-  const [isConfiguring, setIsConfiguring] = useState(false);
-
-  // Función para mostrar instrucciones sobre cómo extender el tiempo de verificación
-  const showVerificationTimeInstructions = () => {
-    setIsConfiguring(true);
-    
-    setTimeout(() => {
-      setIsConfiguring(false);
-      showSuccess('Instrucciones mostradas. Recuerda que necesitas acceso a la consola de Supabase.');
-    } , 1500);
-    
-    // Mostrar instrucciones detalladas
-    alert(`Para extender el tiempo de verificación de correo a 30 minutos:
-
-1. Accede a la consola de Supabase (https://app.supabase.com)
-2. Selecciona tu proyecto
-3. Ve a Authentication > Settings > Email
-4. Busca "Email Link Expiration"
-5. Cambia el valor a 1800 (segundos = 30 minutos)
-6. Guarda los cambios
-
-Nota: Esta configuración solo puede cambiarse desde la consola de Supabase y requiere permisos de administrador.`);
-  };
-
-  return (
+return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move text-text-on-color">
       <AppHeader title="Dashboard de Administración" />
       
@@ -85,7 +39,6 @@ Nota: Esta configuración solo puede cambiarse desde la consola de Supabase y re
               Actualizar Datos
             </Button>
           </div>
-
           {/* Sección de Métricas Clave */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <StatCard 
@@ -100,7 +53,7 @@ Nota: Esta configuración solo puede cambiarse desde la consola de Supabase y re
               value={totalOrders}
               icon={Package}
               color="text-primary-blue"
-              description="Pedidos totales en el sistema"
+              description="Pedidos totales en el sistema (no cancelados)"
             />
             <StatCard 
               title="Clientes Registrados"
@@ -117,9 +70,8 @@ Nota: Esta configuración solo puede cambiarse desde la consola de Supabase y re
               description="Número de locales registrados"
             />
           </div>
-
-          {/* Sección de Navegación y Configuración */}
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 mt-8">
+          {/* Sección de Navegación */}
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-8">
             
             {/* Botón de Reportes */}
             <Card className="bg-primary-blue/10 border-primary-blue shadow-md hover:shadow-lg transition-shadow lg:col-span-2">
@@ -128,9 +80,9 @@ Nota: Esta configuración solo puede cambiarse desde la consola de Supabase y re
                   <BarChart className="h-8 w-8 text-primary-blue" />
                   <CardTitle className="text-primary-blue">ESTADÍSTICAS Y REPORTES</CardTitle>
                 </div>
-                <CardDescription>Análisis detallado de rendimiento, tendencias y ranking de clientes.</CardDescription>
+                <CardDescription>Análisis detallado de rendimiento y ranking.</CardDescription>
               </CardHeader>
-              <CardContent className="flex flex-col space-y-2">
+              <CardContent>
                 <Button 
                   className="w-full bg-primary-blue hover:bg-blue-700 text-white" 
                   onClick={() => navigate('/admin/reports')}
@@ -139,126 +91,90 @@ Nota: Esta configuración solo puede cambiarse desde la consola de Supabase y re
                 </Button>
               </CardContent>
             </Card>
-
             <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <Package className="h-8 w-8 text-primary-blue" />
-                  <CardTitle className="text-primary-blue">Pedidos</CardTitle>
+                  <Package className="h-6 w-6 text-primary-blue" />
+                  <CardTitle className="text-primary-blue text-lg">Pedidos</CardTitle>
                 </div>
-                <CardDescription>Gestiona y supervisa todos los pedidos.</CardDescription>
               </CardHeader>
-              <CardContent className="flex flex-col space-y-2">
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start" 
-                  onClick={() => navigate('/admin/orders')}
-                >
+              <CardContent>
+                <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/admin/orders')}>
                   Ver Todos los Pedidos
                 </Button>
               </CardContent>
             </Card>
-
             <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <Store className="h-8 w-8 text-primary-blue" />
-                  <CardTitle className="text-primary-blue">Locales</CardTitle>
+                  <Store className="h-6 w-6 text-primary-blue" />
+                  <CardTitle className="text-primary-blue text-lg">Locales</CardTitle>
                 </div>
-                <CardDescription>Gestiona los locales de impresión.</CardDescription>
               </CardHeader>
-              <CardContent className="flex flex-col space-y-2">
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start" 
-                  onClick={() => navigate('/admin/locals')}
-                >
+              <CardContent>
+                <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/admin/locals')}>
                   Gestionar Locales
                 </Button>
               </CardContent>
             </Card>
-
             <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <UsersIcon className="h-8 w-8 text-primary-blue" />
-                  <CardTitle className="text-primary-blue">Usuarios</CardTitle>
+                  <UsersIcon className="h-6 w-6 text-primary-blue" />
+                  <CardTitle className="text-primary-blue text-lg">Usuarios</CardTitle>
                 </div>
-                <CardDescription>Gestiona usuarios y sus roles.</CardDescription>
               </CardHeader>
-              <CardContent className="flex flex-col space-y-2">
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start" 
-                  onClick={() => navigate('/admin/users')}
-                >
+              <CardContent>
+                <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/admin/users')}>
                   Gestionar Usuarios
                 </Button>
               </CardContent>
             </Card>
-
             <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <Settings className="h-8 w-8 text-primary-blue" />
-                  <CardTitle className="text-primary-blue">Configuración</CardTitle>
+                  <Settings className="h-6 w-6 text-primary-blue" />
+                  <CardTitle className="text-primary-blue text-lg">Configuración</CardTitle>
                 </div>
-                <CardDescription>Branding y precios globales.</CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col space-y-2">
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start mb-2" 
-                  onClick={() => navigate('/admin/branding')}
-                >
-                  Configurar Branding
+                <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/admin/branding')}>
+                  Branding
                 </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start" 
-                  onClick={() => navigate('/admin/global-prices')}
-                >
-                  Gestionar Precios
+                <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/admin/global-prices')}>
+                  Precios Globales
                 </Button>
               </CardContent>
             </Card>
             
-            {/* Nueva Tarjeta de Recompensas */}
             <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <Gift className="h-8 w-8 text-primary-blue" />
-                  <CardTitle className="text-primary-blue">Recompensas</CardTitle>
+                  <Gift className="h-6 w-6 text-primary-blue" />
+                  <CardTitle className="text-primary-blue text-lg">Recompensas</CardTitle>
                 </div>
-                <CardDescription>Crea y gestiona los premios canjeables.</CardDescription>
               </CardHeader>
-              <CardContent className="flex flex-col space-y-2">
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start" 
-                  onClick={() => navigate('/admin/rewards')}
-                >
+              <CardContent>
+                <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/admin/rewards')}>
                   Gestionar Premios
                 </Button>
               </CardContent>
             </Card>
-
-            <Card className="bg-gray-50 shadow-md hover:shadow-lg transition-shadow">
+            {/* NUEVA TARJETA DE MANTENIMIENTO */}
+            <Card 
+              className="bg-white border-l-4 border-l-orange-500 shadow-md hover:shadow-lg transition-shadow cursor-pointer group"
+              onClick={() => navigate('/admin/maintenance')}
+            >
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <Clock className="h-8 w-8 text-primary-blue" />
-                  <CardTitle className="text-primary-blue">Verificación Email</CardTitle>
+                  <Wrench className="h-6 w-6 text-orange-500 group-hover:rotate-12 transition-transform" />
+                  <CardTitle className="text-gray-800 text-lg">Mantenimiento</CardTitle>
                 </div>
-                <CardDescription>Ajustes de seguridad de autenticación.</CardDescription>
+                <CardDescription>Limpieza y reparación.</CardDescription>
               </CardHeader>
-              <CardContent className="flex flex-col space-y-2">
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start" 
-                  onClick={showVerificationTimeInstructions}
-                  disabled={isConfiguring}
-                >
-                  {isConfiguring ? 'Mostrando instrucciones...' : 'Extender tiempo de enlace'}
+              <CardContent>
+                <Button variant="ghost" className="w-full justify-start pl-0 hover:bg-transparent text-orange-600 font-medium">
+                  Ir al Panel Técnico →
                 </Button>
               </CardContent>
             </Card>
@@ -267,7 +183,6 @@ Nota: Esta configuración solo puede cambiarse desde la consola de Supabase y re
       </main>
       <Footer />
     </div>
-  );
-};
+); };
 
 export default AdminDashboard;
