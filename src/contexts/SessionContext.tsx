@@ -24,7 +24,7 @@ interface SessionContextType {
   user: User | null;
   profile: Profile | null;
   loading: boolean;
-  profileLoaded: boolean; // <--- NUEVA BANDERA DE SEGURIDAD
+  profileLoaded: boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   setIsRequestingPasswordReset: (value: boolean) => void;
@@ -48,7 +48,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [profileLoaded, setProfileLoaded] = useState(false); // <--- INICIALMENTE FALSE
+  const [profileLoaded, setProfileLoaded] = useState(false);
   
   const navigate = useNavigate();
   const location = useLocation();
@@ -63,8 +63,6 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
 
   const fetchProfile = async (userId: string) => {
     try {
-      console.log(`SessionContext - Fetching profile for user: ${userId}`);
-      
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -77,9 +75,8 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       }
       
       if (data) {
-        console.log('SessionContext - Profile fetched successfully:', data);
         setProfile(data as Profile);
-        setProfileLoaded(true); // <--- CONFIRMAMOS QUE YA TENEMOS EL DATO
+        setProfileLoaded(true);
         return data as Profile;
       }
       return null;
@@ -96,9 +93,12 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
   };
 
   const handleNavigation = (currentProfile: Profile, currentPath: string) => {
-    if (isRequestingReset.current) return;
+    // BLINDAJE: Si estamos en reset-password, NUNCA redirigir a dashboard
     if (currentPath === '/reset-password' || currentPath === '/update-password') return;
-
+    
+    if (isRequestingReset.current) return;
+    
+    // Si ya estamos donde debemos estar, no hacer nada
     if (currentProfile.role === 'admin' && currentPath.startsWith('/admin')) return;
     if (currentProfile.role === 'local' && currentPath.startsWith('/local')) return;
     if (currentProfile.role === 'client' && currentPath.startsWith('/client')) return;
@@ -133,14 +133,14 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
             setUser(initialSession.user);
             const userProfile = await fetchProfile(initialSession.user.id);
             
+            // Solo redirigir si NO estamos en recuperación
             if (userProfile && (location.pathname === '/login' || location.pathname === '/')) {
                handleNavigation(userProfile, location.pathname);
             }
           } else {
-            setLoading(false); // Si no hay sesión, terminamos carga
+            setLoading(false);
           }
-          // Nota: Si hay sesión, fetchProfile se encarga de setProfileLoaded
-          if (!initialSession) setProfileLoaded(true); // Si no hay user, profileLoaded es true (porque "no hay perfil" es un estado válido)
+          if (!initialSession) setProfileLoaded(true);
         }
       } catch (err) {
         console.error('SessionContext - Initialization error:', err);
@@ -154,8 +154,14 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       if (!mounted) return;
       if (isSigningOut.current) return;
 
+      console.log("Auth Event:", event);
+
+      // --- CORRECCIÓN CLAVE AQUÍ ---
+      // Si Supabase nos dice que es una recuperación, FORZAMOS ir a /reset-password
+      // y detenemos todo lo demás.
       if (event === 'PASSWORD_RECOVERY') {
         setLoading(false);
+        navigate('/reset-password'); // <--- EL SALVAVIDAS
         return;
       }
 
@@ -165,14 +171,18 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       if (currentSession) {
         if (!profile || profile.id !== currentSession.user.id) {
            const newProfile = await fetchProfile(currentSession.user.id);
-           if (newProfile && (location.pathname === '/login' || location.pathname === '/')) {
-             handleNavigation(newProfile, location.pathname);
+           
+           // Validamos de nuevo: Si estamos en /reset-password, NO redirigir al dashboard
+           if (newProfile && location.pathname !== '/reset-password') {
+             if (location.pathname === '/login' || location.pathname === '/') {
+               handleNavigation(newProfile, location.pathname);
+             }
            }
         }
         setLoading(false);
       } else if (event === 'SIGNED_OUT') {
         setProfile(null);
-        setProfileLoaded(false); // Reset al salir
+        setProfileLoaded(false);
         setUser(null);
         if (!PUBLIC_PATHS.includes(location.pathname)) {
             navigate('/login', { replace: true });
@@ -196,7 +206,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       setSession(null);
       setUser(null);
       setProfile(null);
-      setProfileLoaded(false); // Reset flag
+      setProfileLoaded(false);
       
       await supabase.auth.signOut();
       
