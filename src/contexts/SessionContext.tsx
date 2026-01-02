@@ -162,12 +162,23 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
 
       console.log("Auth Event:", event);
 
-      // SI SUPABASE DICE QUE ES RECUPERACIÓN, FORZAMOS LA RUTA Y PARAMOS TODO
+      // --- CORRECCIÓN CRÍTICA APLICADA AQUÍ ---
       if (event === 'PASSWORD_RECOVERY') {
+        console.log('PASSWORD_RECOVERY - Setting session for password reset');
+        
+        // 1. Guardamos la sesión (Esto faltaba antes)
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+        
         setLoading(false);
-        navigate('/reset-password'); 
+        
+        // 2. Solo navegamos si no estamos ya ahí
+        if (location.pathname !== '/reset-password') {
+          navigate('/reset-password'); 
+        }
         return;
       }
+      // ----------------------------------------
 
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
