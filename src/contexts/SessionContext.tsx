@@ -92,23 +92,18 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     }
   };
 
-  // --- LÓGICA DE NAVEGACIÓN BLINDADA ---
   const handleNavigation = (currentProfile: Profile, currentPath: string) => {
-    // 1. FRENO DE MANO: Si estamos recuperando contraseña, NO MOVERSE.
     if (currentPath === '/reset-password' || currentPath === '/update-password') {
       console.log("SessionContext: Usuario en recuperación. Redirección cancelada.");
       return;
     }
     
-    // 2. Si el usuario pidió reset manualmente, tampoco moverlo.
     if (isRequestingReset.current) return;
     
-    // 3. Si ya está en su dashboard correspondiente, no hacer nada.
     if (currentProfile.role === 'admin' && currentPath.startsWith('/admin')) return;
     if (currentProfile.role === 'local' && currentPath.startsWith('/local')) return;
     if (currentProfile.role === 'client' && currentPath.startsWith('/client')) return;
 
-    // 4. Ejecutar redirección según rol
     if (currentProfile.role === 'admin') navigate('/admin/dashboard', { replace: true });
     else if (currentProfile.role === 'local') navigate('/local/dashboard', { replace: true });
     else if (currentProfile.role === 'client') navigate('/client', { replace: true });
@@ -126,24 +121,30 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
                            window.location.hash.includes('type=recovery') ||
                            location.pathname === '/reset-password';
 
+        // --- CORRECCIÓN FINAL (Según SOLUCION-FINAL-RECUPERACION.md) ---
+        // Antes hacíamos 'return' aquí. AHORA NO.
+        // Solo logueamos y dejamos que intente obtener la sesión.
         if (isRecovery) {
-          setLoading(false);
-          return;
+           console.log('SessionContext - Recovery mode detected (Checking session anyway)');
         }
 
+        // Intentamos obtener la sesión SIEMPRE, incluso en modo recuperación.
+        // Si el link funcionó, Supabase ya tendrá la sesión en memoria/localstorage.
         const { data: { session: initialSession }, error } = await supabase.auth.getSession();
         
         if (mounted) {
           if (initialSession) {
+            console.log('SessionContext - Session found during init (User:', initialSession.user.email, ')');
             setSession(initialSession);
             setUser(initialSession.user);
             const userProfile = await fetchProfile(initialSession.user.id);
             
-            // Solo intentamos redirigir si NO estamos en la página de reset
+            // Redirigir SOLO si NO estamos en recuperación
             if (userProfile && (location.pathname === '/login' || location.pathname === '/')) {
                handleNavigation(userProfile, location.pathname);
             }
           } else {
+            console.log('SessionContext - No session found during init');
             setLoading(false);
           }
           if (!initialSession) setProfileLoaded(true);
@@ -162,23 +163,16 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
 
       console.log("Auth Event:", event);
 
-      // --- CORRECCIÓN CRÍTICA APLICADA AQUÍ ---
       if (event === 'PASSWORD_RECOVERY') {
         console.log('PASSWORD_RECOVERY - Setting session for password reset');
-        
-        // 1. Guardamos la sesión (Esto faltaba antes)
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
-        
         setLoading(false);
-        
-        // 2. Solo navegamos si no estamos ya ahí
         if (location.pathname !== '/reset-password') {
           navigate('/reset-password'); 
         }
         return;
       }
-      // ----------------------------------------
 
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
@@ -186,8 +180,6 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
       if (currentSession) {
         if (!profile || profile.id !== currentSession.user.id) {
            const newProfile = await fetchProfile(currentSession.user.id);
-           
-           // Validamos de nuevo antes de redirigir
            if (newProfile) {
              handleNavigation(newProfile, location.pathname);
            }
