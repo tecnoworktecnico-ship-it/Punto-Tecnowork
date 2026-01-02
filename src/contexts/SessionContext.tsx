@@ -92,17 +92,23 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
     }
   };
 
+  // --- LÓGICA DE NAVEGACIÓN BLINDADA ---
   const handleNavigation = (currentProfile: Profile, currentPath: string) => {
-    // BLINDAJE: Si estamos en reset-password, NUNCA redirigir a dashboard
-    if (currentPath === '/reset-password' || currentPath === '/update-password') return;
+    // 1. FRENO DE MANO: Si estamos recuperando contraseña, NO MOVERSE.
+    if (currentPath === '/reset-password' || currentPath === '/update-password') {
+      console.log("SessionContext: Usuario en recuperación. Redirección cancelada.");
+      return;
+    }
     
+    // 2. Si el usuario pidió reset manualmente, tampoco moverlo.
     if (isRequestingReset.current) return;
     
-    // Si ya estamos donde debemos estar, no hacer nada
+    // 3. Si ya está en su dashboard correspondiente, no hacer nada.
     if (currentProfile.role === 'admin' && currentPath.startsWith('/admin')) return;
     if (currentProfile.role === 'local' && currentPath.startsWith('/local')) return;
     if (currentProfile.role === 'client' && currentPath.startsWith('/client')) return;
 
+    // 4. Ejecutar redirección según rol
     if (currentProfile.role === 'admin') navigate('/admin/dashboard', { replace: true });
     else if (currentProfile.role === 'local') navigate('/local/dashboard', { replace: true });
     else if (currentProfile.role === 'client') navigate('/client', { replace: true });
@@ -133,7 +139,7 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
             setUser(initialSession.user);
             const userProfile = await fetchProfile(initialSession.user.id);
             
-            // Solo redirigir si NO estamos en recuperación
+            // Solo intentamos redirigir si NO estamos en la página de reset
             if (userProfile && (location.pathname === '/login' || location.pathname === '/')) {
                handleNavigation(userProfile, location.pathname);
             }
@@ -156,12 +162,10 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
 
       console.log("Auth Event:", event);
 
-      // --- CORRECCIÓN CLAVE AQUÍ ---
-      // Si Supabase nos dice que es una recuperación, FORZAMOS ir a /reset-password
-      // y detenemos todo lo demás.
+      // SI SUPABASE DICE QUE ES RECUPERACIÓN, FORZAMOS LA RUTA Y PARAMOS TODO
       if (event === 'PASSWORD_RECOVERY') {
         setLoading(false);
-        navigate('/reset-password'); // <--- EL SALVAVIDAS
+        navigate('/reset-password'); 
         return;
       }
 
@@ -172,11 +176,9 @@ export const SessionContextProvider = ({ children }: { children: React.ReactNode
         if (!profile || profile.id !== currentSession.user.id) {
            const newProfile = await fetchProfile(currentSession.user.id);
            
-           // Validamos de nuevo: Si estamos en /reset-password, NO redirigir al dashboard
-           if (newProfile && location.pathname !== '/reset-password') {
-             if (location.pathname === '/login' || location.pathname === '/') {
-               handleNavigation(newProfile, location.pathname);
-             }
+           // Validamos de nuevo antes de redirigir
+           if (newProfile) {
+             handleNavigation(newProfile, location.pathname);
            }
         }
         setLoading(false);
