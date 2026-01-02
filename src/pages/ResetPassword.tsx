@@ -1,76 +1,100 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { useSession } from '@/contexts/SessionContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { showError, showSuccess } from '@/utils/toast';
-import { Loader2, KeyRound, Mail, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Loader2, KeyRound, CheckCircle2, XCircle } from 'lucide-react';
 
 const ResetPassword = () => {
   const navigate = useNavigate();
-  // Recuperamos la sesión del contexto (Lógica V5: si hay sesión, es porque el token funcionó)
-  const { session } = useSession(); 
+  const location = useLocation();
   
+  // ESTADOS DE LA MÁQUINA DE RECUPERACIÓN
   const [loading, setLoading] = useState(false);
-  const [email, setEmail] = useState('');
+  const [checkingToken, setCheckingToken] = useState(true); // Estado inicial: verificando
+  const [tokenValid, setTokenValid] = useState(false);      // ¿El token es bueno?
+  const [passwordUpdated, setPasswordUpdated] = useState(false); // ¿Ya terminó?
+  
+  // Inputs del formulario
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  
-  // Estados: 'request' (pedir mail) o 'update' (cambiar clave)
-  const [view, setView] = useState<'request' | 'update'>('request');
 
+  // Ref para evitar doble ejecución en React.StrictMode
+  const hasCheckedToken = useRef(false);
+
+  // EFECTO PRINCIPAL: LEER Y PROCESAR EL HASH
   useEffect(() => {
-    // LÓGICA V5 RESTAURADA:
-    // 1. Si Supabase nos logueó automáticamente con el link, mostramos el formulario de cambio.
-    if (session) {
-      setView('update');
-    }
-
-    // 2. Escuchar el evento específico por si acaso (doble seguridad)
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setView('update');
-      }
-    });
-
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
-  }, [session]);
-
-  // --- Lógica de Envío de Correo ---
-  const handleRequestReset = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      // URL de redirección explícita
-      const redirectUrl = `${window.location.origin}/reset-password`;
+    if (hasCheckedToken.current) return;
+    
+    const checkAndSetSession = async () => {
+      hasCheckedToken.current = true;
+      console.log('ResetPassword - Iniciando verificación de token...');
       
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: redirectUrl,
-      });
+      // 1. LEER TOKENS DEL HASH (La lógica V16 que funcionaba)
+      // El hash viene como #access_token=...&type=recovery
+      const hashParams = new URLSearchParams(location.hash.substring(1));
+      const accessToken = hashParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token');
+      const type = hashParams.get('type');
+      const errorDescription = hashParams.get('error_description');
 
-      if (error) throw error;
+      // Debug
+      console.log('ResetPassword - Params:', { type, hasToken: !!accessToken, error: errorDescription });
 
-      showSuccess('Enlace enviado. Revisa tu correo.');
-      // No limpiamos el email para que el usuario vea que escribió bien
-    } catch (error: any) {
-      showError(error.message || 'Error al solicitar');
-    } finally {
-      setLoading(false);
-    }
-  };
+      // 2. VALIDACIÓN INICIAL
+      if (errorDescription) {
+        console.error('ResetPassword - Error en URL:', errorDescription);
+        showError(errorDescription);
+        setTokenValid(false);
+        setCheckingToken(false);
+        return;
+      }
 
-  // --- Lógica de Cambio de Clave ---
+      if (!accessToken || type !== 'recovery') {
+        console.warn('ResetPassword - No se encontró token de recuperación válido en el hash.');
+        // Opcional: Si el usuario ya estaba logueado por otra razón, podríamos dejarlo pasar,
+        // pero para ser estrictos con la recuperación, pediremos token.
+        setTokenValid(false);
+        setCheckingToken(false);
+        return;
+      }
+
+      try {
+        // 3. ESTABLECER LA SESIÓN MANUALMENTE
+        console.log('ResetPassword - Estableciendo sesión con token del hash...');
+        const { error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken || '',
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        console.log('ResetPassword - Sesión establecida. Usuario listo para cambiar clave.');
+        setTokenValid(true);
+        
+      } catch (err: any) {
+        console.error('ResetPassword - Error crítico estableciendo sesión:', err);
+        showError('El enlace ha expirado o es inválido.');
+        setTokenValid(false);
+      } finally {
+        setCheckingToken(false);
+      }
+    };
+
+    checkAndSetSession();
+  }, [location.hash]);
+
+  // FUNCIÓN: ACTUALIZAR CONTRASEÑA
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (newPassword.length < 6) {
-      showError('Mínimo 6 caracteres');
+      showError('La contraseña debe tener al menos 6 caracteres');
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -81,87 +105,133 @@ const ResetPassword = () => {
     setLoading(true);
 
     try {
+      // Como ya hicimos setSession arriba, el usuario está autenticado.
+      // Usamos updateUser para cambiar la clave.
       const { error } = await supabase.auth.updateUser({
         password: newPassword
       });
 
       if (error) throw error;
 
-      showSuccess('¡Contraseña actualizada!');
+      setPasswordUpdated(true);
+      showSuccess('¡Contraseña actualizada correctamente!');
       
-      // Logout forzado para que entre con la nueva clave (Seguridad)
+      // Cerrar sesión por seguridad y redirigir
       await supabase.auth.signOut();
-      navigate('/login');
+      
+      setTimeout(() => {
+        navigate('/login', { replace: true });
+      }, 3000);
 
     } catch (error: any) {
-      showError(error.message || 'Error al actualizar');
+      console.error('Error actualizando password:', error);
+      showError(error.message || 'No se pudo actualizar la contraseña');
     } finally {
       setLoading(false);
     }
   };
 
-  // --- VISTA: CAMBIAR CONTRASEÑA ---
-  if (view === 'update') {
+  // --- RENDERIZADO DE ESTADOS ---
+
+  // ESTADO 1: Verificando (Spinner)
+  if (checkingToken) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4 animate-in fade-in">
-        <Card className="w-full max-w-md shadow-lg border-t-4 border-green-500">
-          <CardHeader className="text-center">
-            <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
-              <CheckCircle2 className="w-6 h-6 text-green-600" />
-            </div>
-            <CardTitle>Nueva Contraseña</CardTitle>
-            <CardDescription>Ingresa tu nueva clave de acceso.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleUpdatePassword} className="space-y-4">
-              <div className="space-y-2">
-                <Label>Nueva Contraseña</Label>
-                <Input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required placeholder="******" />
-              </div>
-              <div className="space-y-2">
-                <Label>Confirmar Contraseña</Label>
-                <Input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required placeholder="******" />
-              </div>
-              <Button type="submit" className="w-full bg-green-600 hover:bg-green-700" disabled={loading}>
-                {loading ? <Loader2 className="animate-spin mr-2 h-4 w-4"/> : null} Actualizar
-              </Button>
-            </form>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+        <Loader2 className="h-10 w-10 text-primary-blue animate-spin mb-4" />
+        <p className="text-gray-500 font-medium">Verificando enlace de seguridad...</p>
+      </div>
+    );
+  }
+
+  // ESTADO 2: Token Inválido o Expirado
+  if (!tokenValid) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <Card className="w-full max-w-md shadow-lg border-t-4 border-red-500">
+          <CardContent className="text-center py-10">
+            <XCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-gray-800 mb-2">Enlace no válido</h2>
+            <p className="text-gray-500 mb-6">
+              Este enlace de recuperación ha expirado, ya fue utilizado o es incorrecto.
+            </p>
+            <Button onClick={() => navigate('/login')} variant="outline" className="w-full">
+              Volver al Login
+            </Button>
           </CardContent>
         </Card>
       </div>
     );
   }
 
-  // --- VISTA: SOLICITAR ENLACE ---
+  // ESTADO 3: Éxito (Contraseña Cambiada)
+  if (passwordUpdated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <Card className="w-full max-w-md shadow-lg border-t-4 border-green-500">
+          <CardContent className="text-center py-10">
+            <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-gray-800 mb-2">¡Contraseña Actualizada!</h2>
+            <p className="text-gray-500 mb-6">
+              Tu acceso ha sido restaurado correctamente. Redirigiendo al login...
+            </p>
+            <Button onClick={() => navigate('/login')} className="w-full bg-primary-blue">
+              Ir a Iniciar Sesión
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // ESTADO 4: Formulario de Nueva Contraseña (Token Válido)
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4 animate-in fade-in">
-      <Card className="w-full max-w-md shadow-lg">
-        <CardHeader className="text-center">
-          <div className="mx-auto w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+      <Card className="w-full max-w-md shadow-2xl animate-in fade-in slide-in-from-bottom-4">
+        <CardHeader className="text-center pb-2">
+          <div className="mx-auto w-12 h-12 bg-primary-blue/10 rounded-full flex items-center justify-center mb-4">
             <KeyRound className="w-6 h-6 text-primary-blue" />
           </div>
-          <CardTitle>Recuperar Contraseña</CardTitle>
-          <CardDescription>Te enviaremos un enlace mágico.</CardDescription>
+          <CardTitle className="text-xl">Establecer Nueva Contraseña</CardTitle>
+          <CardDescription>
+            Ingresa tu nueva clave para recuperar el acceso.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleRequestReset} className="space-y-4">
+          <form onSubmit={handleUpdatePassword} className="space-y-4">
             <div className="space-y-2">
-              <Label>Correo Electrónico</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="email@ejemplo.com" className="pl-10" />
-              </div>
+              <Label htmlFor="new-password">Nueva Contraseña</Label>
+              <Input
+                id="new-password"
+                type="password"
+                placeholder="Mínimo 6 caracteres"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+                className="h-11"
+              />
             </div>
-            <Button type="submit" className="w-full bg-primary-blue hover:bg-blue-700" disabled={loading}>
-              {loading ? <Loader2 className="animate-spin mr-2 h-4 w-4"/> : null} Enviar Enlace
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">Confirmar Contraseña</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                placeholder="Repite la contraseña"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                className="h-11"
+              />
+            </div>
+            <Button 
+              type="submit" 
+              className="w-full h-11 bg-primary-blue hover:bg-blue-700 text-base font-semibold" 
+              disabled={loading}
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Confirmar Cambio
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="flex justify-center pt-2">
-          <Button variant="link" onClick={() => navigate('/login')} className="text-gray-500 gap-2">
-            <ArrowLeft className="w-4 h-4" /> Volver al Login
-          </Button>
-        </CardFooter>
       </Card>
     </div>
   );
