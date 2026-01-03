@@ -1,213 +1,353 @@
+"use client";
+
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { showSuccess, showError } from '@/utils/toast';
+import { Loader2 } from 'lucide-react';
 
-// Definición de tipos para el perfil y el contexto
-type UserRole = 'admin' | 'local' | 'client';
-
-interface UserProfile {
+// Interface del perfil - DEBE coincidir con la tabla profiles de Supabase
+interface Profile {
   id: string;
-  email: string;
   first_name: string | null;
   last_name: string | null;
-  role: UserRole;
+  role: string;
+  avatar_url: string | null;
+  password_changed: boolean | null;
   phone_number: string | null;
-  password_changed?: boolean;
+  points: number | null;
+  local_id: string | null;  // Necesario para dashboards locales
 }
 
+// Interface del contexto - TODOS los campos que otros componentes usan
 interface SessionContextType {
   session: Session | null;
   user: User | null;
-  profile: UserProfile | null;
+  profile: Profile | null;
   loading: boolean;
+  profileLoaded: boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  setIsRequestingPasswordReset: (value: boolean) => void;
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
-export const SessionContextProvider = ({ children }: { children: React.ReactNode }) => {
+const PUBLIC_PATHS = ['/', '/login', '/auth-callback', '/verification-error', '/reset-password', '/debug-recovery'];
+
+// Helper para verificar si el modo de recuperación está activo
+const isRecoveryModeActive = () => {
+  // Verificar localStorage
+  const expiration = localStorage.getItem('supabase_password_recovery_mode');
+  if (expiration) {
+    const expirationTime = parseInt(expiration, 10);
+    if (Date.now() < expirationTime) {
+      return true;
+    }
+    localStorage.removeItem('supabase_password_recovery_mode');
+  }
+  
+  // Verificar URL
+  const hash = window.location.hash;
+  return hash.includes('type=recovery');
+};
+
+export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileLoaded, setProfileLoaded] = useState(false);
+  
   const navigate = useNavigate();
   const location = useLocation();
+  
+  const isInitialized = useRef(false);
+  const isSigningOut = useRef(false);
+  const isRequestingReset = useRef(false);
   const mounted = useRef(true);
 
-  // Helper para detectar flujo de recuperación en la URL
-  const isRecoveryModeActive = () => {
-    const hash = window.location.hash;
-    const search = window.location.search;
-    return (
-      hash.includes('type=recovery') ||
-      search.includes('code=') ||
-      location.pathname === '/reset-password'
-    );
+  // Función para Login.tsx - evita redirecciones durante solicitud de reset
+  const setIsRequestingPasswordReset = (value: boolean) => {
+    console.log('SessionContext - Setting isRequestingPasswordReset to:', value);
+    isRequestingReset.current = value;
   };
 
-  // Función para obtener el perfil del usuario desde la base de datos
-  const fetchProfile = async (userId: string): Promise<UserProfile | null> => {
+  // Obtener perfil del usuario
+  const fetchProfile = async (userId: string): Promise<Profile | null> => {
     try {
+      console.log('SessionContext - Fetching profile for:', userId);
+      
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('SessionContext - Error fetching profile:', error);
+        setProfileLoaded(true);
         return null;
       }
-      return data as UserProfile;
+      
+      if (data) {
+        console.log('SessionContext - Profile fetched:', data.role);
+        setProfile(data as Profile);
+        setProfileLoaded(true);
+        return data as Profile;
+      }
+      
+      setProfileLoaded(true);
+      return null;
     } catch (error) {
-      console.error('SessionContext - Unexpected error fetching profile:', error);
+      console.error('SessionContext - Unexpected error:', error);
+      setProfileLoaded(true);
       return null;
     }
   };
 
-  // Lógica de navegación basada en el rol
-  const handleNavigation = (userProfile: UserProfile, currentPath: string) => {
-    if (isRecoveryModeActive()) return; // No redirigir si estamos recuperando contraseña
-
-    // Solo redirigir si estamos en login, landing o raíz
-    if (currentPath === '/login' || currentPath === '/' || currentPath === '/auth-callback') {
-      switch (userProfile.role) {
-        case 'admin':
-          navigate('/admin/dashboard', { replace: true });
-          break;
-        case 'local':
-          navigate('/local/dashboard', { replace: true });
-          break;
-        case 'client':
-          navigate('/client', { replace: true });
-          break;
-        default:
-          navigate('/', { replace: true });
-      }
+  // Refrescar perfil manualmente
+  const refreshProfile = async () => {
+    if (user) {
+      await fetchProfile(user.id);
     }
   };
 
-  // -----------------------------------------------------------------------
-  // CORRECCIÓN PRINCIPAL: Inicialización de Sesión
-  // -----------------------------------------------------------------------
-  const initializeSession = async () => {
-    try {
-      const isRecovery = isRecoveryModeActive();
+  // Navegación basada en rol
+  const handleNavigation = (currentProfile: Profile, currentPath: string) => {
+    // NO redirigir si estamos en recuperación de contraseña
+    if (currentPath === '/reset-password' || currentPath === '/update-password') {
+      console.log('SessionContext - On reset page, skipping navigation');
+      return;
+    }
+    
+    // NO redirigir si el usuario está solicitando reset
+    if (isRequestingReset.current) {
+      console.log('SessionContext - Password reset in progress, skipping navigation');
+      return;
+    }
+    
+    // NO redirigir si ya está en la ruta correcta
+    if (currentProfile.role === 'admin' && currentPath.startsWith('/admin')) return;
+    if (currentProfile.role === 'local' && currentPath.startsWith('/local')) return;
+    if (currentProfile.role === 'client' && currentPath.startsWith('/client')) return;
 
-      if (isRecovery) {
-        console.log('SessionContext - Recovery mode detected. Proceeding to capture session from URL...');
-        // FIX: ELIMINADO EL 'return' QUE HABÍA AQUÍ.
-        // Permitimos que el código siga para que getSession() capture el token.
-      }
+    // Solo redirigir desde rutas públicas
+    if (!PUBLIC_PATHS.includes(currentPath)) return;
 
-      // getSession() es capaz de detectar tokens en la URL (#access_token o ?code)
-      // y establecer la sesión automáticamente.
-      const { data: { session: initialSession }, error } = await supabase.auth.getSession();
-
-      if (error) {
-        // Si hay error (ej. token inválido), no bloqueamos la app, solo dejamos sin sesión
-        console.error('SessionContext - Error getting session:', error);
-      }
-
-      if (mounted.current) {
-        if (initialSession) {
-          console.log('SessionContext - Session established for:', initialSession.user.email);
-          setSession(initialSession);
-          setUser(initialSession.user);
-
-          // Cargar perfil
-          const userProfile = await fetchProfile(initialSession.user.id);
-          setProfile(userProfile);
-
-          if (userProfile) {
-            handleNavigation(userProfile, location.pathname);
-          }
-        }
-      }
-    } catch (err) {
-      console.error('SessionContext - Initialization error:', err);
-    } finally {
-      if (mounted.current) {
-        setLoading(false);
-      }
+    console.log('SessionContext - Redirecting based on role:', currentProfile.role);
+    
+    if (currentProfile.role === 'admin') {
+      navigate('/admin/dashboard', { replace: true });
+    } else if (currentProfile.role === 'local') {
+      navigate('/local/dashboard', { replace: true });
+    } else if (currentProfile.role === 'client') {
+      navigate('/client', { replace: true });
     }
   };
 
   useEffect(() => {
     mounted.current = true;
-    initializeSession();
 
-    // Suscripción a cambios de autenticación
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
-      console.log('SessionContext - Auth Event:', event);
+    const initializeSession = async () => {
+      if (isInitialized.current) return;
+      isInitialized.current = true;
 
-      if (mounted.current) {
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
+      console.log('SessionContext - Initializing session...');
 
-        if (currentSession) {
-          // Manejo especial para recuperación de contraseña
-          if (event === 'PASSWORD_RECOVERY') {
-            console.log('SessionContext - PASSWORD_RECOVERY event received');
-            setLoading(false);
-            navigate('/reset-password');
-            return;
-          }
+      try {
+        const isRecovery = isRecoveryModeActive() || location.pathname === '/reset-password';
 
-          // Si iniciamos sesión y no tenemos perfil, cargarlo
-          if (!profile) {
-            const userProfile = await fetchProfile(currentSession.user.id);
-            setProfile(userProfile);
-            if (userProfile && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+        // CRÍTICO: Siempre obtener la sesión, incluso en modo recovery
+        // Supabase puede haber procesado el token antes de que React se monte
+        const { data: { session: initialSession }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('SessionContext - Error getting session:', error);
+        }
+
+        if (mounted.current) {
+          if (initialSession) {
+            console.log('SessionContext - Session found:', initialSession.user.email);
+            setSession(initialSession);
+            setUser(initialSession.user);
+            
+            // En modo recovery, solo setear sesión sin cargar perfil ni redirigir
+            if (isRecovery) {
+              console.log('SessionContext - Recovery mode, session set without redirect');
+              setLoading(false);
+              return;
+            }
+            
+            // Flujo normal: cargar perfil y redirigir
+            const userProfile = await fetchProfile(initialSession.user.id);
+            
+            if (userProfile && (location.pathname === '/login' || location.pathname === '/')) {
               handleNavigation(userProfile, location.pathname);
             }
+          } else {
+            console.log('SessionContext - No session found');
+            setProfileLoaded(true);
           }
-        } else if (event === 'SIGNED_OUT') {
-          // Limpiar estado al cerrar sesión
-          setProfile(null);
-          navigate('/login', { replace: true });
+          
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('SessionContext - Initialization error:', err);
+        if (mounted.current) {
+          setLoading(false);
+          setProfileLoaded(true);
+        }
+      }
+    };
+
+    initializeSession();
+
+    // Suscripción a eventos de autenticación
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, currentSession) => {
+        console.log('SessionContext - Auth event:', event);
+        
+        if (!mounted.current || isSigningOut.current) return;
+
+        // PASSWORD_RECOVERY: Setear sesión para que ResetPassword.tsx la detecte
+        if (event === 'PASSWORD_RECOVERY') {
+          console.log('SessionContext - PASSWORD_RECOVERY event');
+          setSession(currentSession);
+          setUser(currentSession?.user ?? null);
+          setLoading(false);
+          
+          if (location.pathname !== '/reset-password') {
+            navigate('/reset-password');
+          }
+          return;
         }
         
-        setLoading(false);
+        // INITIAL_SESSION: Manejar caso donde no hay sesión
+        if (event === 'INITIAL_SESSION') {
+          if (!currentSession && mounted.current) {
+            setLoading(false);
+            setProfileLoaded(true);
+          }
+          return;
+        }
+
+        // Ignorar eventos en página de reset excepto SIGNED_OUT
+        if (location.pathname === '/reset-password' && event !== 'SIGNED_OUT') {
+          console.log('SessionContext - On reset page, ignoring event:', event);
+          return;
+        }
+        
+        // SIGNED_IN: Cargar perfil y redirigir
+        if (event === 'SIGNED_IN' && currentSession) {
+          // Evitar procesamiento redundante
+          if (isInitialized.current && !PUBLIC_PATHS.includes(location.pathname)) {
+            return;
+          }
+          
+          // No procesar si estamos en modo recovery
+          if (isRecoveryModeActive() && PUBLIC_PATHS.includes(location.pathname)) {
+            return;
+          }
+          
+          console.log('SessionContext - User signed in');
+          setSession(currentSession);
+          setUser(currentSession.user);
+          
+          const userProfile = await fetchProfile(currentSession.user.id);
+          
+          if (userProfile && mounted.current) {
+            handleNavigation(userProfile, location.pathname);
+          }
+          
+          setLoading(false);
+          return;
+        }
+
+        // SIGNED_OUT: Limpiar estado
+        if (event === 'SIGNED_OUT') {
+          console.log('SessionContext - User signed out');
+          setSession(null);
+          setUser(null);
+          setProfile(null);
+          setProfileLoaded(false);
+          setLoading(false);
+          
+          if (!PUBLIC_PATHS.includes(location.pathname)) {
+            navigate('/login', { replace: true });
+          }
+          return;
+        }
+
+        // TOKEN_REFRESHED y USER_UPDATED: Actualizar estado
+        if ((event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') && currentSession) {
+          setSession(currentSession);
+          setUser(currentSession.user);
+          await refreshProfile();
+        }
       }
-    });
+    );
 
     return () => {
       mounted.current = false;
       subscription.unsubscribe();
     };
-  }, []); // Ejecutar solo al montar
+  }, [navigate, location.pathname]);
 
+  // Cerrar sesión
   const signOut = async () => {
-    setLoading(true);
     try {
-      await supabase.auth.signOut();
-      showSuccess('Has cerrado sesión correctamente');
-      // El evento SIGNED_OUT manejará la limpieza y redirección
-    } catch (error) {
-      console.error('Error signing out:', error);
-      showError('Error al cerrar sesión');
+      console.log('SessionContext - Signing out...');
+      isSigningOut.current = true;
+      isInitialized.current = false;
+      setLoading(true);
+      
+      setSession(null);
+      setUser(null);
+      setProfile(null);
+      setProfileLoaded(false);
+      
+      const { error } = await supabase.auth.signOut();
+      
+      if (error && error.message !== "Auth session missing!") {
+        console.error('Error signing out:', error);
+        showError(`Error al cerrar sesión: ${error.message}`);
+      } else {
+        showSuccess('Sesión cerrada correctamente.');
+      }
+      
+      navigate('/login', { replace: true });
+      
+    } catch (err) {
+      console.error('Unexpected error during sign out:', err);
+    } finally {
       setLoading(false);
+      setTimeout(() => {
+        isSigningOut.current = false;
+      }, 500);
     }
   };
 
-  const refreshProfile = async () => {
-    if (user) {
-      const updatedProfile = await fetchProfile(user.id);
-      setProfile(updatedProfile);
-    }
-  };
+  // Pantalla de carga
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <Loader2 className="h-8 w-8 text-primary-blue animate-spin mr-2" />
+        <p className="text-primary-blue text-xl">Cargando...</p>
+      </div>
+    );
+  }
 
-  const value = {
+  const value: SessionContextType = {
     session,
     user,
     profile,
     loading,
+    profileLoaded,
     signOut,
-    refreshProfile
+    refreshProfile,
+    setIsRequestingPasswordReset
   };
 
   return (
