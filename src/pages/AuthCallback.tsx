@@ -1,62 +1,135 @@
 "use client";
 
-import React, { useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { useSession } from '@/contexts/SessionContext';
-import { Loader2 } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { Loader2, CheckCircle } from 'lucide-react';
+import { showError, showSuccess } from '@/utils/toast';
 
 const AuthCallback = () => {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { session, loading, profile } = useSession();
+  const [status, setStatus] = useState<'loading' | 'creating' | 'success' | 'error'>('loading');
+  const [message, setMessage] = useState('Procesando autenticación...');
+  const hasProcessed = useRef(false);
 
   useEffect(() => {
-    const hashParams = new URLSearchParams(location.hash.substring(1));
-    const error = hashParams.get('error');
-    const errorCode = hashParams.get('error_code');
-    const type = hashParams.get('type');
-    const accessToken = hashParams.get('access_token');
-    
-    console.log('AuthCallback - Processing', { type, error, errorCode, hasToken: !!accessToken });
-    
-    // 1. Manejar errores de verificación (expiración, etc.)
-    if (error && (errorCode === 'otp_expired' || error === 'access_denied')) {
-      navigate('/verification-error', { replace: true });
-      return;
-    }
-    
-    // 2. Si es recuperación de contraseña, ir directamente a reset-password
-    if (type === 'recovery' && accessToken) {
-      console.log('AuthCallback - Recovery detected, redirecting to reset-password');
-      navigate('/reset-password' + location.hash, { replace: true });
-      return;
-    }
+    if (hasProcessed.current) return;
+    hasProcessed.current = true;
 
-    // 3. Si la sesión está cargada y es válida, redirigir al dashboard
-    if (!loading && session && profile) {
-      if (profile.role === 'admin') {
-        navigate('/admin/dashboard', { replace: true });
-      } else if (profile.role === 'local') {
-        navigate('/local/dashboard', { replace: true });
-      } else {
-        navigate('/client', { replace: true });
+    const handleCallback = async () => {
+      try {
+        console.log('AuthCallback - Starting...');
+        
+        // 1. Obtener la sesión actual (Supabase ya procesó el OAuth)
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('AuthCallback - Session error:', sessionError);
+          showError('Error al procesar la autenticación');
+          navigate('/login', { replace: true });
+          return;
+        }
+
+        if (!session) {
+          console.log('AuthCallback - No session found');
+          navigate('/login', { replace: true });
+          return;
+        }
+
+        console.log('AuthCallback - Session found for:', session.user.email);
+
+        // 2. Buscar si el usuario ya tiene perfil
+        const { data: existingProfile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .maybeSingle();
+
+        if (profileError) {
+          console.error('AuthCallback - Profile fetch error:', profileError);
+        }
+
+        let userProfile = existingProfile;
+
+        // 3. Si no tiene perfil, crear uno nuevo como "client"
+        if (!existingProfile) {
+          console.log('AuthCallback - Creating new profile for:', session.user.email);
+          setStatus('creating');
+          setMessage('Creando tu cuenta...');
+
+          // Extraer nombre del usuario de Google
+          const userMetadata = session.user.user_metadata;
+          const fullName = userMetadata?.full_name || userMetadata?.name || '';
+          const nameParts = fullName.split(' ');
+          const firstName = nameParts[0] || '';
+          const lastName = nameParts.slice(1).join(' ') || '';
+
+          const { data: newProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert({
+              id: session.user.id,
+              first_name: firstName,
+              last_name: lastName,
+              role: 'client',  // Siempre "client" para auto-registro
+              avatar_url: userMetadata?.avatar_url || userMetadata?.picture || null,
+              phone_number: null,
+              password_changed: true,  // No aplica para OAuth
+              points: 0,
+              local_id: null
+            })
+            .select()
+            .single();
+
+          if (createError) {
+            console.error('AuthCallback - Create profile error:', createError);
+            showError('Error al crear tu cuenta. Contacta al administrador.');
+            await supabase.auth.signOut();
+            navigate('/login', { replace: true });
+            return;
+          }
+
+          userProfile = newProfile;
+          console.log('AuthCallback - Profile created successfully');
+          showSuccess('¡Bienvenido! Tu cuenta ha sido creada.');
+        }
+
+        // 4. Redirigir según el rol
+        setStatus('success');
+        setMessage('¡Listo! Redirigiendo...');
+
+        console.log('AuthCallback - Redirecting based on role:', userProfile?.role);
+
+        setTimeout(() => {
+          if (userProfile?.role === 'admin') {
+            navigate('/admin/dashboard', { replace: true });
+          } else if (userProfile?.role === 'local') {
+            navigate('/local/dashboard', { replace: true });
+          } else {
+            navigate('/client', { replace: true });
+          }
+        }, 500);
+
+      } catch (error) {
+        console.error('AuthCallback - Unexpected error:', error);
+        setStatus('error');
+        setMessage('Error inesperado');
+        showError('Error inesperado. Intenta de nuevo.');
+        setTimeout(() => navigate('/login', { replace: true }), 2000);
       }
-      return;
-    }
-    
-    // 4. Si la carga finaliza y no hay sesión/perfil, ir al login
-    if (!loading && !session) {
-      navigate('/login', { replace: true });
-      return;
-    }
+    };
 
-  }, [session, loading, profile, navigate, location.hash]);
+    handleCallback();
+  }, [navigate]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
-      <div className="flex items-center text-white text-xl">
-        <Loader2 className="h-6 w-6 animate-spin mr-3" />
-        Procesando autenticación...
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600">
+      <div className="flex flex-col items-center text-white text-xl space-y-4">
+        {status === 'success' ? (
+          <CheckCircle className="h-8 w-8 text-green-400" />
+        ) : (
+          <Loader2 className="h-8 w-8 animate-spin" />
+        )}
+        <span>{message}</span>
       </div>
     </div>
   );
