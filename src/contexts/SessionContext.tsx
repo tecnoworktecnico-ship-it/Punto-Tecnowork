@@ -150,6 +150,7 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
       } catch (err) {
         console.error('SessionContext - Initialization error:', err);
       } finally {
+        // CRÍTICO: Asegurar que loading se desactive siempre al finalizar la inicialización
         if (mounted.current) {
           setLoading(false);
         }
@@ -177,30 +178,31 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           return;
         }
 
-        // SIGNED_IN: Usuario inició sesión
+        // SIGNED_IN: Usuario inició sesión (o se refrescó)
         if (event === 'SIGNED_IN' && currentSession) {
-          // Solo procesar si no tenemos sesión ya
-          if (session?.user?.id === currentSession.user.id) {
+          // Si ya estamos inicializados y tenemos el mismo usuario, no hacer nada
+          if (isInitialized.current && session?.user?.id === currentSession.user.id) {
             return;
           }
           
-          console.log('SessionContext - User signed in:', currentSession.user.email);
+          console.log('SessionContext - User signed in (via event):', currentSession.user.email);
           setSession(currentSession);
           setUser(currentSession.user);
           
-          try {
-            // No cargar perfil aquí si estamos en auth-callback
-            if (location.pathname !== '/auth-callback') {
+          // Forzar la carga del perfil y navegación si no estamos en el flujo de callback
+          if (location.pathname !== '/auth-callback') {
+            try {
               const userProfile = await fetchProfile(currentSession.user.id);
               if (userProfile && mounted.current) {
                 handleNavigation(userProfile, location.pathname);
               }
+            } catch (e) {
+              console.error('Error during SIGNED_IN profile processing:', e);
             }
-          } catch (e) {
-            console.error('Error during SIGNED_IN profile processing:', e);
-          } finally {
-            if (mounted.current) setLoading(false);
           }
+          
+          // Asegurar que loading se desactive si este evento es el que resuelve la carga
+          if (mounted.current) setLoading(false);
           
           return;
         }

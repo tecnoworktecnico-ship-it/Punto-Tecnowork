@@ -30,26 +30,25 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     detectSessionInUrl: true,
     flowType: 'pkce',
-    // CRÍTICO: Usar localStorage para que PKCE funcione entre pestañas
-    // sessionStorage NO persiste entre pestañas y causa error en recuperación de contraseña
+    // CRÍTICO: Usar sessionStorage para que la sesión se borre al cerrar la ventana/pestaña.
     storage: {
       getItem: (key) => {
         try {
-          return localStorage.getItem(key);
+          return sessionStorage.getItem(key);
         } catch {
           return null;
         }
       },
       setItem: (key, value) => {
         try {
-          localStorage.setItem(key, value);
+          sessionStorage.setItem(key, value);
         } catch {
           // Ignorar errores de storage
         }
       },
       removeItem: (key) => {
         try {
-          localStorage.removeItem(key);
+          sessionStorage.removeItem(key);
         } catch {
           // Ignorar errores de storage
         }
