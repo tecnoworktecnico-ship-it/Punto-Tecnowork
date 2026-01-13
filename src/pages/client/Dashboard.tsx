@@ -8,9 +8,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { showSuccess, showError } from '@/utils/toast';
-// CORRECCIÓN: Se agrega Loader2 al import de lucide-react
-import { Settings, LayoutDashboard, Star, Gift, ShoppingBag, Sparkles, DollarSign, Clock, Package, Loader2 } from 'lucide-react';
+import { Settings, LayoutDashboard, Star, Gift, ShoppingBag, Sparkles, DollarSign, Clock, Package, Loader2, AlertTriangle } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 
 interface ClientStats {
   points: number;
@@ -42,35 +46,43 @@ const ClientDashboard = () => {
     try {
       if (!profile) return;
 
+      // 1. Obtener estadísticas de pedidos completados
       const { data: orders, error } = await supabase
         .from('orders')
         .select('total_price, points_earned')
         .eq('client_id', profile.id)
-        .eq('status', 'completed'); // Solo contamos órdenes completadas para estadísticas
+        .eq('status', 'completed'); 
 
       if (error) throw error;
 
       const totalSpent = orders?.reduce((sum, order) => sum + (order.total_price || 0), 0) || 0;
       const totalOrders = orders?.length || 0;
       
-      // Los puntos vienen directamente del perfil, pero podemos verificar contra el historial
-      // Usaremos el perfil ya que es la fuente de la verdad para puntos actuales
+      // 2. Obtener puntos actuales del usuario (usando la tabla user_points)
+      const { data: pointsData, error: pointsError } = await supabase
+        .from('user_points')
+        .select('points')
+        .eq('user_id', profile.id)
+        .single();
+
+      if (pointsError && pointsError.code !== 'PGRST116') {
+        console.error('Error fetching user points:', pointsError);
+      }
+
       setStats({
-        points: profile.points || 0,
+        points: pointsData?.points || 0,
         total_orders: totalOrders,
         total_spent: totalSpent
       });
 
     } catch (error) {
       console.error('Error fetching stats:', error);
-      // No mostramos error invasivo aquí para no asustar al usuario en el dashboard
     } finally {
       setLoading(false);
     }
   };
 
   const getPointsProgress = () => {
-    // Lógica simple de gamificación: cada 1000 puntos es un "nivel"
     const currentPoints = stats.points;
     const nextLevel = Math.ceil((currentPoints + 1) / 1000) * 1000;
     const progress = (currentPoints % 1000) / 1000 * 100;
@@ -78,6 +90,9 @@ const ClientDashboard = () => {
   };
 
   const { progress, nextLevel, remaining } = getPointsProgress();
+  
+  // Verificar si faltan datos clave
+  const needsDataUpdate = !profile?.first_name || !profile?.phone_number;
 
   if (sessionLoading || loading) {
     return (
@@ -98,7 +113,7 @@ const ClientDashboard = () => {
                <LayoutDashboard className="h-5 w-5" />
                <span className="text-sm uppercase tracking-wider font-semibold">Panel de Cliente</span>
             </div>
-            <h1 className="text-3xl font-bold">¡Hola, {profile?.first_name}! 👋</h1>
+            <h1 className="text-3xl font-bold">¡Hola, {profile?.first_name || profile?.email}! 👋</h1>
             <p className="text-blue-100 mt-1">Bienvenido a tu centro de control de impresiones.</p>
           </div>
           <Button 
@@ -112,6 +127,25 @@ const ClientDashboard = () => {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 -mt-16 space-y-8">
+        
+        {/* Alerta de Datos Incompletos */}
+        {needsDataUpdate && (
+          <Alert className="bg-secondary-yellow/10 border-secondary-yellow text-secondary-yellow">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle className="font-bold">¡Información Incompleta!</AlertTitle>
+            <AlertDescription className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+              <span>
+                Por favor, completa tu nombre y número de teléfono en tu perfil para una mejor experiencia.
+              </span>
+              <Button 
+                onClick={() => navigate('/client/profile')} 
+                className="bg-secondary-yellow hover:bg-yellow-600 text-text-carbon ml-0 sm:ml-4 mt-2 sm:mt-0"
+              >
+                Ir a Perfil
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
         
         {/* Tarjetas de Resumen */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

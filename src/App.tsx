@@ -37,6 +37,7 @@ import NewOrder from "@/pages/client/NewOrder";
 import ClientOrders from "@/pages/client/Orders";
 import ClientRewards from "@/pages/client/Rewards";
 import ClientPoints from "@/pages/client/Points";
+import ClientProfile from "@/pages/client/Profile"; // Importar nueva página
 
 function App() {
   return (
@@ -213,6 +214,14 @@ function App() {
             element={
               <AuthGuard allowedRoles={["client"]}>
                 <ClientPoints />
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/client/profile"
+            element={
+              <AuthGuard allowedRoles={["client"]}>
+                <ClientProfile />
               </AuthGuard>
             }
           />
