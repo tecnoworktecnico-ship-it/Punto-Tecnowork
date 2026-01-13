@@ -7,8 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
-import { showSuccess, showError } from '@/utils/toast';
-import { Settings, Star, Gift, ShoppingBag, Sparkles, DollarSign, Clock, Package, Loader2, AlertTriangle, LogOut } from 'lucide-react';
+import { Settings, Star, Gift, ShoppingBag, Sparkles, DollarSign, Clock, Package, Loader2, AlertTriangle } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import {
   Alert,
@@ -25,7 +24,7 @@ interface ClientStats {
 }
 
 const ClientDashboard = () => {
-  const { profile, loading: sessionLoading } = useSession();
+  const { profile, loading: sessionLoading, refreshProfile } = useSession();
   const navigate = useNavigate();
   const [stats, setStats] = useState<ClientStats>({
     points: 0,
@@ -48,31 +47,23 @@ const ClientDashboard = () => {
     try {
       if (!profile) return;
 
-      // 1. Obtener estadísticas de pedidos completados
+      // Obtener estadísticas de pedidos completados
       const { data: orders, error } = await supabase
         .from('orders')
         .select('total_price, points_earned')
         .eq('client_id', profile.id)
         .eq('status', 'completed'); 
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching orders:', error);
+      }
 
       const totalSpent = orders?.reduce((sum, order) => sum + (order.total_price || 0), 0) || 0;
       const totalOrders = orders?.length || 0;
       
-      // 2. Obtener puntos actuales del usuario (usando la tabla user_points)
-      const { data: pointsData, error: pointsError } = await supabase
-        .from('user_points')
-        .select('points')
-        .eq('user_id', profile.id)
-        .single();
-
-      if (pointsError && pointsError.code !== 'PGRST116') {
-        console.error('Error fetching user points:', pointsError);
-      }
-
+      // Los puntos vienen del perfil (ya están cargados en el contexto)
       setStats({
-        points: pointsData?.points || 0,
+        points: profile.points || 0,
         total_orders: totalOrders,
         total_spent: totalSpent
       });
@@ -83,6 +74,16 @@ const ClientDashboard = () => {
       setLoading(false);
     }
   };
+
+  // Actualizar puntos cuando cambie el perfil
+  useEffect(() => {
+    if (profile) {
+      setStats(prev => ({
+        ...prev,
+        points: profile.points || 0
+      }));
+    }
+  }, [profile?.points]);
 
   const getPointsProgress = () => {
     const currentPoints = stats.points;
