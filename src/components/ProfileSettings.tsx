@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { showSuccess, showError } from '@/utils/toast';
-import { User, Lock, Phone } from 'lucide-react';
+import { User, Phone, Mail } from 'lucide-react';
 
 interface ProfileSettingsProps {
   onProfileUpdate: () => void;
@@ -19,8 +19,6 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ onProfileUpdate }) =>
   const [firstName, setFirstName] = useState(profile?.first_name || '');
   const [lastName, setLastName] = useState(profile?.last_name || '');
   const [phoneNumber, setPhoneNumber] = useState(profile?.phone_number || '');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleProfileUpdate = async (e: React.FormEvent) => {
@@ -66,77 +64,36 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ onProfileUpdate }) =>
     }
   };
 
-  const handlePasswordUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    if (newPassword.length < 6) {
-      showError('La contraseña debe tener al menos 6 caracteres.');
-      setLoading(false);
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      showError('Las contraseñas no coinciden.');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
-
-      if (error) {
-        // Supabase requiere que el usuario haya iniciado sesión recientemente para cambiar la contraseña.
-        if (error.message.includes('must be signed in')) {
-          showError('Tu sesión ha expirado. Por favor, cierra sesión y vuelve a iniciarla para cambiar la contraseña.');
-        } else {
-          showError(`Error al cambiar la contraseña: ${error.message}`);
-        }
-        return;
-      }
-
-      // Si el cambio de contraseña es exitoso, marcamos que ya no necesita cambiarla
-      const { error: profileUpdateError } = await supabase
-        .from('profiles')
-        .update({ 
-          password_changed: true,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', user?.id);
-
-      if (profileUpdateError) {
-        console.error('Error marking password as changed:', profileUpdateError);
-      }
-      
-      showSuccess('Contraseña actualizada correctamente. Por favor, inicia sesión de nuevo con tu nueva contraseña.');
-      await supabase.auth.signOut(); // Forzar cierre de sesión para usar la nueva contraseña
-    } catch (error) {
-      console.error('Error updating password:', error);
-      showError(error instanceof Error ? error.message : 'Error inesperado al actualizar contraseña.');
-    } finally {
-      setLoading(false);
-      setNewPassword('');
-      setConfirmPassword('');
-    }
-  };
-
   if (sessionLoading) return null;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="max-w-xl mx-auto">
       {/* Tarjeta de Actualización de Datos */}
       <Card className="bg-gray-50 shadow-md">
         <CardHeader>
           <div className="flex items-center gap-3">
             <User className="h-6 w-6 text-primary-blue" />
-            <CardTitle className="text-primary-blue">Actualizar Datos Personales</CardTitle>
+            <CardTitle className="text-primary-blue">Datos Personales</CardTitle>
           </div>
           <CardDescription>Modifica tu nombre, apellido y número de teléfono.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleProfileUpdate} className="space-y-4">
+            {/* Email (solo lectura) */}
+            <div>
+              <Label htmlFor="email" className="flex items-center gap-1">
+                <Mail className="h-4 w-4 text-gray-500" /> Email
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                value={user?.email || ''}
+                disabled
+                className="bg-gray-100 text-gray-500"
+              />
+              <p className="text-xs text-gray-400 mt-1">El email está vinculado a tu cuenta de Google.</p>
+            </div>
+            
             <div>
               <Label htmlFor="firstName">Nombre</Label>
               <Input
@@ -168,51 +125,7 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ onProfileUpdate }) =>
               />
             </div>
             <Button type="submit" disabled={loading} className="w-full">
-              {loading ? 'Guardando...' : 'Guardar Datos'}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-
-      {/* Tarjeta de Cambio de Contraseña */}
-      <Card className="bg-gray-50 shadow-md">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <Lock className="h-6 w-6 text-primary-blue" />
-            <CardTitle className="text-primary-blue">Cambiar Contraseña</CardTitle>
-          </div>
-          <CardDescription>Asegura tu cuenta con una nueva contraseña.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handlePasswordUpdate} className="space-y-4">
-            <div>
-              <Label htmlFor="newPassword">Nueva Contraseña</Label>
-              <Input
-                id="newPassword"
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Mínimo 6 caracteres"
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="confirmPassword">Confirmar Contraseña</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Repite la nueva contraseña"
-                required
-              />
-            </div>
-            <Button 
-              type="submit" 
-              disabled={loading || !newPassword || newPassword !== confirmPassword} 
-              className="w-full bg-emphasis-red hover:bg-red-700"
-            >
-              {loading ? 'Cambiando...' : 'Cambiar Contraseña'}
+              {loading ? 'Guardando...' : 'Guardar Cambios'}
             </Button>
           </form>
         </CardContent>
