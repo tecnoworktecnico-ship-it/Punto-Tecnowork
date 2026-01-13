@@ -146,14 +146,12 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
             console.log('SessionContext - No session found');
             setProfileLoaded(true);
           }
-          
-          setLoading(false);
         }
       } catch (err) {
         console.error('SessionContext - Initialization error:', err);
+      } finally {
         if (mounted.current) {
           setLoading(false);
-          setProfileLoaded(true);
         }
       }
     };
@@ -190,15 +188,20 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
           setSession(currentSession);
           setUser(currentSession.user);
           
-          // No cargar perfil aquí si estamos en auth-callback
-          if (location.pathname !== '/auth-callback') {
-            const userProfile = await fetchProfile(currentSession.user.id);
-            if (userProfile && mounted.current) {
-              handleNavigation(userProfile, location.pathname);
+          try {
+            // No cargar perfil aquí si estamos en auth-callback
+            if (location.pathname !== '/auth-callback') {
+              const userProfile = await fetchProfile(currentSession.user.id);
+              if (userProfile && mounted.current) {
+                handleNavigation(userProfile, location.pathname);
+              }
             }
+          } catch (e) {
+            console.error('Error during SIGNED_IN profile processing:', e);
+          } finally {
+            if (mounted.current) setLoading(false);
           }
           
-          if (mounted.current) setLoading(false);
           return;
         }
 
