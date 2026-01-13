@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -48,9 +48,10 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
   const isInitialized = useRef(false);
   const isSigningOut = useRef(false);
   const mounted = useRef(true);
+  const lastProcessedEvent = useRef<string | null>(null);
 
   // Obtener perfil del usuario
-  const fetchProfile = async (userId: string): Promise<Profile | null> => {
+  const fetchProfile = useCallback(async (userId: string): Promise<Profile | null> => {
     try {
       console.log('SessionContext - Fetching profile for:', userId);
       
@@ -62,11 +63,11 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
 
       if (error) {
         console.error('SessionContext - Error fetching profile:', error);
-        setProfileLoaded(true);
+        if (mounted.current) setProfileLoaded(true);
         return null;
       }
       
-      if (data) {
+      if (data && mounted.current) {
         console.log('SessionContext - Profile fetched, role:', data.role);
         setProfile(data as Profile);
         setProfileLoaded(true);
@@ -74,24 +75,24 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
       }
       
       console.log('SessionContext - No profile found');
-      setProfileLoaded(true);
+      if (mounted.current) setProfileLoaded(true);
       return null;
     } catch (error) {
       console.error('SessionContext - Unexpected error:', error);
-      setProfileLoaded(true);
+      if (mounted.current) setProfileLoaded(true);
       return null;
     }
-  };
+  }, []);
 
   // Refrescar perfil manualmente
-  const refreshProfile = async () => {
+  const refreshProfile = useCallback(async () => {
     if (user) {
       await fetchProfile(user.id);
     }
-  };
+  }, [user, fetchProfile]);
 
   // Navegación basada en rol
-  const handleNavigation = (currentProfile: Profile, currentPath: string) => {
+  const handleNavigation = useCallback((currentProfile: Profile, currentPath: string) => {
     // NO redirigir si ya está en la ruta correcta
     if (currentProfile.role === 'admin' && currentPath.startsWith('/admin')) return;
     if (currentProfile.role === 'local' && currentPath.startsWith('/local')) return;
@@ -110,7 +111,7 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
     } else if (currentProfile.role === 'client') {
       navigate('/client', { replace: true });
     }
-  };
+  }, [navigate]);
 
   useEffect(() => {
     mounted.current = true;
@@ -162,18 +163,34 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
     // Suscripción a eventos de autenticación
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
+        // Evitar procesar eventos duplicados
+        const eventKey = `${event}-${currentSession?.user?.id || 'none'}`;
+        if (lastProcessedEvent.current === eventKey) {
+          return;
+        }
+        lastProcessedEvent.current = eventKey;
+        
         console.log('SessionContext - Auth event:', event);
         
         if (!mounted.current || isSigningOut.current) return;
 
+        // Ignorar INITIAL_SESSION - ya lo manejamos en initializeSession
+        if (event === 'INITIAL_SESSION') {
+          return;
+        }
+
         // SIGNED_IN: Usuario inició sesión
         if (event === 'SIGNED_IN' && currentSession) {
+          // Solo procesar si no tenemos sesión ya
+          if (session?.user?.id === currentSession.user.id) {
+            return;
+          }
+          
           console.log('SessionContext - User signed in:', currentSession.user.email);
           setSession(currentSession);
           setUser(currentSession.user);
           
-          // No cargar perfil aquí - AuthCallback lo maneja
-          // Esto evita conflictos cuando AuthCallback está creando el perfil
+          // No cargar perfil aquí si estamos en auth-callback
           if (location.pathname !== '/auth-callback') {
             const userProfile = await fetchProfile(currentSession.user.id);
             if (userProfile && mounted.current) {
@@ -181,29 +198,29 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
             }
           }
           
-          setLoading(false);
+          if (mounted.current) setLoading(false);
           return;
         }
 
         // SIGNED_OUT: Usuario cerró sesión
         if (event === 'SIGNED_OUT') {
           console.log('SessionContext - User signed out');
-          setSession(null);
-          setUser(null);
-          setProfile(null);
-          setProfileLoaded(false);
-          setLoading(false);
-          
-          if (!PUBLIC_PATHS.includes(location.pathname)) {
-            navigate('/login', { replace: true });
+          if (mounted.current) {
+            setSession(null);
+            setUser(null);
+            setProfile(null);
+            setProfileLoaded(false);
+            setLoading(false);
           }
           return;
         }
 
         // TOKEN_REFRESHED: Actualizar sesión
         if (event === 'TOKEN_REFRESHED' && currentSession) {
-          setSession(currentSession);
-          setUser(currentSession.user);
+          if (mounted.current) {
+            setSession(currentSession);
+            setUser(currentSession.user);
+          }
         }
       }
     );
@@ -212,21 +229,26 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
       mounted.current = false;
       subscription.unsubscribe();
     };
-  }, [navigate, location.pathname]);
+  }, [fetchProfile, handleNavigation, location.pathname, session?.user?.id]);
 
   // Cerrar sesión
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     try {
       console.log('SessionContext - Signing out...');
       isSigningOut.current = true;
       isInitialized.current = false;
-      setLoading(true);
+      lastProcessedEvent.current = null;
       
+      // Limpiar estado ANTES de llamar a signOut
       setSession(null);
       setUser(null);
       setProfile(null);
       setProfileLoaded(false);
       
+      // Navegar primero para evitar problemas de componentes desmontados
+      navigate('/login', { replace: true });
+      
+      // Luego cerrar sesión en Supabase
       const { error } = await supabase.auth.signOut();
       
       if (error && error.message !== "Auth session missing!") {
@@ -236,17 +258,12 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
         showSuccess('Sesión cerrada correctamente.');
       }
       
-      navigate('/login', { replace: true });
-      
     } catch (err) {
       console.error('Unexpected error during sign out:', err);
     } finally {
-      setLoading(false);
-      setTimeout(() => {
-        isSigningOut.current = false;
-      }, 500);
+      isSigningOut.current = false;
     }
-  };
+  }, [navigate]);
 
   // Pantalla de carga inicial
   if (loading) {
