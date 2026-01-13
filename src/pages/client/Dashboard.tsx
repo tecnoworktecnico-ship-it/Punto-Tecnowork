@@ -8,13 +8,15 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { showSuccess, showError } from '@/utils/toast';
-import { Settings, LayoutDashboard, Star, Gift, ShoppingBag, Sparkles, DollarSign, Clock, Package, Loader2, AlertTriangle } from 'lucide-react';
+import { Settings, Star, Gift, ShoppingBag, Sparkles, DollarSign, Clock, Package, Loader2, AlertTriangle, LogOut } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import {
   Alert,
   AlertDescription,
   AlertTitle,
 } from "@/components/ui/alert";
+import AppHeader from '@/components/AppHeader';
+import Footer from '@/components/Footer';
 
 interface ClientStats {
   points: number;
@@ -104,29 +106,19 @@ const ClientDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
+    <div className="min-h-screen flex flex-col bg-gray-50">
+      {/* Header con AppHeader */}
+      <AppHeader title="Mi Panel" />
+
       {/* Header con gradiente */}
       <div className="bg-gradient-to-r from-primary-blue to-blue-600 text-white p-6 pb-24 shadow-lg">
-        <div className="max-w-6xl mx-auto flex justify-between items-start md:items-center flex-col md:flex-row gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-2 opacity-90">
-               <LayoutDashboard className="h-5 w-5" />
-               <span className="text-sm uppercase tracking-wider font-semibold">Panel de Cliente</span>
-            </div>
-            <h1 className="text-3xl font-bold">¡Hola, {profile?.first_name || profile?.email}! 👋</h1>
-            <p className="text-blue-100 mt-1">Bienvenido a tu centro de control de impresiones.</p>
-          </div>
-          <Button 
-            variant="secondary" 
-            className="bg-white/20 hover:bg-white/30 text-white border-none backdrop-blur-sm"
-            onClick={() => navigate('/client/profile')}
-          >
-            <Settings className="h-4 w-4 mr-2" /> Mi Perfil
-          </Button>
+        <div className="max-w-6xl mx-auto">
+          <h1 className="text-3xl font-bold">¡Hola, {profile?.first_name || 'Cliente'}! 👋</h1>
+          <p className="text-blue-100 mt-1">Bienvenido a tu centro de control de impresiones.</p>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 -mt-16 space-y-8">
+      <div className="max-w-6xl mx-auto px-4 -mt-16 space-y-8 flex-grow pb-8">
         
         {/* Alerta de Datos Incompletos */}
         {needsDataUpdate && (
@@ -246,7 +238,35 @@ const ClientDashboard = () => {
           </Card>
         </div>
 
+        {/* Acciones adicionales */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card className="hover:shadow-md transition-shadow cursor-pointer border-gray-200" onClick={() => navigate('/client/profile')}>
+            <CardContent className="p-6 flex items-center justify-between h-full">
+              <div>
+                <h3 className="text-xl font-bold text-gray-800 mb-1">Mi Perfil</h3>
+                <p className="text-gray-500 text-sm">Actualiza tus datos personales.</p>
+              </div>
+              <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center">
+                <Settings className="h-6 w-6 text-primary-blue" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-md transition-shadow cursor-pointer border-gray-200" onClick={() => navigate('/client/rewards')}>
+            <CardContent className="p-6 flex items-center justify-between h-full">
+              <div>
+                <h3 className="text-xl font-bold text-gray-800 mb-1">Canjear Puntos</h3>
+                <p className="text-gray-500 text-sm">Descubre los premios disponibles.</p>
+              </div>
+              <div className="h-12 w-12 bg-yellow-100 rounded-full flex items-center justify-center">
+                <Gift className="h-6 w-6 text-yellow-600" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
+
+      <Footer />
     </div>
   );
 };
