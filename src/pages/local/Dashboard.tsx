@@ -9,7 +9,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
 import { DollarSign, Settings, LayoutDashboard, RefreshCw, Package, Clock, BarChart, Trophy, Gift, Edit } from 'lucide-react';
 import ProfileSettings from '@/components/ProfileSettings';
-import PasswordChangeAlert from '@/components/PasswordChangeAlert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useLocalDashboardData } from '@/hooks/useDashboardData';
 import { useManagerLocalPrices } from '@/hooks/useLocalPrices';
@@ -18,7 +17,7 @@ import ClientRankingTable from '@/components/dashboard/ClientRankingTable';
 import PriceList from '@/components/PriceList';
 import { Badge } from '@/components/ui/badge';
 import Footer from '@/components/Footer';
-import AppHeader from '@/components/AppHeader'; // Importar AppHeader
+import AppHeader from '@/components/AppHeader';
 
 const LocalDashboard = () => {
   const { user, profile, signOut } = useSession();
@@ -72,8 +71,6 @@ const LocalDashboard = () => {
     // Confiar en SessionContext para recargar el perfil
   };
 
-  // Condición estricta: solo si password_changed es false (creado por admin)
-  const needsPasswordChange = profile && profile.password_changed === false;
   const pendingOrders = orderStatusStats.find(s => s.name === 'PENDING')?.value || 0;
 
   if (loadingPrices && !localInfo) {
@@ -133,17 +130,13 @@ const LocalDashboard = () => {
             Bienvenido, {profile?.first_name || user?.email}! Aquí puedes gestionar tus pedidos y configuraciones.
           </p>
 
-          {needsPasswordChange && (
-            <PasswordChangeAlert onNavigateToSettings={() => setActiveTab('settings')} />
-          )}
-
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2 md:w-1/3">
               <TabsTrigger value="dashboard" className="flex items-center gap-2">
                 <LayoutDashboard className="h-4 w-4" /> Dashboard
               </TabsTrigger>
               <TabsTrigger value="settings" className="flex items-center gap-2">
-                <Settings className="h-4 w-4" /> Configuración
+                <Settings className="h-4 w-4" /> Mi Perfil
               </TabsTrigger>
             </TabsList>
 
