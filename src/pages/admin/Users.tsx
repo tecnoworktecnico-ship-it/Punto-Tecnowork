@@ -4,9 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/contexts/SessionContext';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { 
   Select, 
@@ -17,15 +15,7 @@ import {
 } from '@/components/ui/select';
 import { showSuccess, showError } from '@/utils/toast';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, UserPlus, Trash2, RefreshCw, Mail, CheckCircle, XCircle, Phone, Loader2 } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+import { ArrowLeft, Trash2, RefreshCw, CheckCircle, Loader2, Users as UsersIcon, Store } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -35,11 +25,18 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import AppHeader from '@/components/AppHeader';
+import Footer from '@/components/Footer';
 
 interface User {
   id: string;
@@ -50,26 +47,24 @@ interface User {
   phone_number: string | null;
   manager_id?: string | null;
   local_name?: string | null;
-  email_confirmed_at?: string | null;
+  created_at?: string | null;
+}
+
+interface Local {
+  id: string;
+  name: string;
+  manager_id: string | null;
 }
 
 const Users = () => {
   const { profile, user, loading: sessionLoading } = useSession();
   const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
-  const [locals, setLocals] = useState<{id: string, name: string, manager_id: string | null}[]>([]);
+  const [locals, setLocals] = useState<Local[]>([]);
+  const [allLocals, setAllLocals] = useState<Local[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [resendingEmail, setResendingEmail] = useState<string | null>(null);
   const [updatingRole, setUpdatingRole] = useState<string | null>(null);
-  const [formData, setFormData] = useState({
-    email: '',
-    role: 'client',
-    first_name: '',
-    last_name: '',
-    phone_number: '',
-    local_id: '',
-  });
+  const [assigningLocal, setAssigningLocal] = useState<string | null>(null);
 
   useEffect(() => {
     if (!sessionLoading && profile?.role !== 'admin') {
@@ -97,8 +92,6 @@ const Users = () => {
         return;
       }
 
-      console.log('User data from RPC:', userData);
-
       // Transformar los datos a nuestro formato de usuario
       const formattedUsers = userData.map((u: any) => ({
         id: u.id,
@@ -109,7 +102,7 @@ const Users = () => {
         phone_number: u.phone_number || null,
         manager_id: u.manager_id || null,
         local_name: u.local_name || null,
-        email_confirmed_at: u.email_confirmed_at || null
+        created_at: u.created_at || null
       }));
 
       setUsers(formattedUsers);
@@ -122,6 +115,7 @@ const Users = () => {
       if (localsError) {
         console.error('Error fetching locals:', localsError);
       } else {
+        setAllLocals(localsData || []);
         // Guardar locales sin manager para asignación
         setLocals(localsData?.filter(l => !l.manager_id) || []);
       }
@@ -133,576 +127,336 @@ const Users = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      // Validar datos
-      if (!formData.email || !formData.role || !formData.first_name || !formData.last_name || !formData.phone_number) {
-        showError('Por favor completa todos los campos obligatorios.');
-        setLoading(false);
-        return;
-      }
-
-      // Crear usuario con el método estándar
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: 'TempPass123!', // Contraseña temporal
-        options: {
-          data: {
-            first_name: formData.first_name,
-            last_name: formData.last_name,
-            role: formData.role,
-            is_admin_created: true,
-            phone_number: formData.phone_number,
-          },
-          emailRedirectTo: window.location.origin + '/auth-callback',
-        }
-      });
-      
-      if (signUpError) {
-        showError(`Error al crear usuario: ${signUpError.message}`);
-        setLoading(false);
-        return;
-      }
-      
-      if (!signUpData.user) {
-        showError('No se pudo crear el usuario.');
-        setLoading(false);
-        return;
-      }
-
-      // Esperar un momento para que se cree el perfil automáticamente mediante el trigger handle_new_user
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Verificar si el perfil se creó correctamente
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', signUpData.user.id)
-        .single();
-        
-      if (profileError && profileError.code === 'PGRST116') {
-        // El perfil no existe, crearlo manualmente
-        const { error: insertError } = await supabase
-          .from('profiles')
-          .insert({
-            id: signUpData.user.id,
-            first_name: formData.first_name,
-            last_name: formData.last_name,
-            phone_number: formData.phone_number,
-            role: formData.role,
-            password_changed: false
-          });
-          
-        if (insertError) {
-          console.error('Error creating profile manually:', insertError);
-          showError('Error al crear el perfil del usuario. Intente nuevamente.');
-        }
-      } else if (profileData) {
-        // Asegurarse de que el rol sea el correcto
-        if (profileData.role !== formData.role) {
-          const { error: updateError } = await supabase
-            .from('profiles')
-            .update({ role: formData.role })
-            .eq('id', signUpData.user.id);
-            
-          if (updateError) {
-            console.error('Error updating role:', updateError);
-          }
-        }
-      }
-
-      // Si es un usuario local, asignar al local
-      if (formData.role === 'local' && formData.local_id) {
-        // Primero, desasignar el usuario de cualquier otro local (aunque es nuevo, es buena práctica)
-        await supabase
-          .from('locals')
-          .update({ manager_id: null })
-          .eq('manager_id', signUpData.user.id);
-          
-        const { error: localError } = await supabase
-          .from('locals')
-          .update({ manager_id: signUpData.user.id })
-          .eq('id', formData.local_id);
-
-        if (localError) {
-          console.error('Error assigning local:', localError);
-          showError('Error al asignar local al usuario.');
-        }
-      }
-
-      showSuccess('Usuario creado correctamente.');
-      setDialogOpen(false);
-      resetForm();
-      fetchData();
-    } catch (err) {
-      console.error('Unexpected error:', err);
-      showError('Error inesperado al crear usuario.');
-    }
-
-    setLoading(false);
-  };
-
-  const handleDelete = async (userId: string) => {
-    if (userId === user?.id) {
-      showError('No puedes eliminar tu propio usuario.');
-      return;
-    }
-
-    if (!confirm('¿Estás seguro de que deseas eliminar este usuario? Esta acción no se puede deshacer.')) return;
-
-    setLoading(true);
-    
-    try {
-      // Usar la función RPC admin_delete_user
-      const { error: deleteError } = await supabase.rpc('admin_delete_user', { 
-        target_user_id: userId 
-      });
-      
-      if (deleteError) {
-        throw new Error(`Error eliminando usuario: ${deleteError.message}`);
-      }
-
-      showSuccess('Usuario eliminado correctamente.');
-      // Actualizar la lista de usuarios localmente
-      setUsers(users.filter(u => u.id !== userId));
-      
-    } catch (err) {
-      console.error('Error deleting user:', err);
-      showError(`Error al eliminar usuario: ${err instanceof Error ? err.message : 'Error desconocido'}`);
-    }
-
-    setLoading(false);
-  };
-
-  const resetForm = () => {
-    setFormData({
-      email: '',
-      role: 'client',
-      first_name: '',
-      last_name: '',
-      phone_number: '',
-      local_id: '',
-    });
-  };
-
-  const openCreateDialog = () => {
-    resetForm();
-    setDialogOpen(true);
-  };
-
-  // Función para actualizar manualmente el rol de un usuario
   const updateUserRole = async (userId: string, newRole: string) => {
-    const userItem = users.find(u => u.id === userId);
-    if (!userItem) return;
-
-    if (newRole === 'local' && !userItem.local_name) {
-      showError('Para asignar el rol "Local", primero debes asignar un local a este usuario desde la sección de Gestión de Locales.');
-      navigate('/admin/locals');
-      return;
-    }
-
-    if (!confirm(`¿Estás seguro de que deseas cambiar el rol de ${userItem.email} a ${newRole}?`)) return;
-    
     setUpdatingRole(userId);
     
     try {
-      console.log(`Actualizando rol de usuario ${userId} a ${newRole}`);
-      
-      // Método 1: Actualizar directamente en la tabla profiles
-      const { error: directUpdateError } = await supabase
-        .from('profiles')
-        .update({ 
-          role: newRole,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', userId);
-        
-      if (directUpdateError) {
-        console.error('Error updating role directly:', directUpdateError);
-        throw new Error(`Error actualizando rol directamente: ${directUpdateError.message}`);
-      }
-      
-      // Método 2: También usar la función RPC como respaldo
-      try {
-        const { data: rpcResult, error: rpcError } = await supabase.rpc('admin_update_user_role', {
-          target_user_id: userId,
-          new_role: newRole,
-        });
-        
-        if (rpcError) {
-          console.error('Error updating role with RPC (non-critical):', rpcError);
-          // No lanzar error aquí, ya que la actualización directa funcionó
-        } else {
-          console.log('RPC result:', rpcResult);
+      // Si el usuario era 'local' y cambia a otro rol, desasignar del local
+      const currentUser = users.find(u => u.id === userId);
+      if (currentUser?.role === 'local' && newRole !== 'local') {
+        // Desasignar de cualquier local
+        const { error: unassignError } = await supabase
+          .from('locals')
+          .update({ manager_id: null })
+          .eq('manager_id', userId);
+          
+        if (unassignError) {
+          console.error('Error unassigning from local:', unassignError);
         }
-      } catch (rpcErr) {
-        console.error('Exception in RPC call (non-critical):', rpcErr);
-        // No lanzar error aquí, ya que la actualización directa funcionó
       }
-      
-      // Esperar un momento para que los cambios se propaguen
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      showSuccess(`Rol actualizado correctamente a ${newRole}. El usuario deberá volver a iniciar sesión para que el cambio surta efecto.`);
-      
-      // Actualizar la lista de usuarios localmente
-      setUsers(users.map(u => 
-        u.id === userId ? { ...u, role: newRole } : u
-      ));
-      
-      // Recargar los datos para asegurarnos de que todo está actualizado
-      setTimeout(() => {
-        fetchData();
-      }, 1000);
-      
-    } catch (err) {
-      console.error('Error updating role:', err);
-      showError(`Error al actualizar rol: ${err instanceof Error ? err.message : 'Error desconocido'}`);
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ role: newRole })
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      showSuccess('Rol actualizado correctamente.');
+      await fetchData(); // Refrescar datos
+    } catch (error) {
+      console.error('Error updating role:', error);
+      showError('Error al actualizar el rol del usuario.');
     } finally {
       setUpdatingRole(null);
     }
   };
 
-  // Función para reenviar el correo de verificación
-  const resendVerificationEmail = async (userEmail: string) => {
-    setResendingEmail(userEmail);
+  const assignLocalToManager = async (userId: string, localId: string) => {
+    setAssigningLocal(userId);
     
     try {
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email: userEmail,
-      });
-      
-      if (error) {
-        console.error('Error resending verification email:', error);
-        showError(`Error al reenviar correo: ${error.message}`);
-      } else {
-        showSuccess(`Correo de verificación reenviado a ${userEmail}`);
+      // Primero, desasignar el usuario de cualquier local anterior
+      await supabase
+        .from('locals')
+        .update({ manager_id: null })
+        .eq('manager_id', userId);
+
+      if (localId && localId !== 'none') {
+        // Asignar al nuevo local
+        const { error } = await supabase
+          .from('locals')
+          .update({ manager_id: userId })
+          .eq('id', localId);
+
+        if (error) throw error;
       }
-    } catch (err) {
-      console.error('Unexpected error:', err);
-      showError('Error inesperado al reenviar correo de verificación.');
+
+      showSuccess('Local asignado correctamente.');
+      await fetchData();
+    } catch (error) {
+      console.error('Error assigning local:', error);
+      showError('Error al asignar el local.');
     } finally {
-      setResendingEmail(null);
+      setAssigningLocal(null);
     }
+  };
+
+  const handleDelete = async (userId: string) => {
+    try {
+      // No permitir eliminar el usuario actual
+      if (userId === user?.id) {
+        showError('No puedes eliminarte a ti mismo.');
+        return;
+      }
+
+      // Desasignar de cualquier local primero
+      await supabase
+        .from('locals')
+        .update({ manager_id: null })
+        .eq('manager_id', userId);
+
+      // Eliminar perfil (esto activará cascada si está configurada)
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      showSuccess('Usuario eliminado correctamente.');
+      await fetchData();
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      showError('Error al eliminar el usuario.');
+    }
+  };
+
+  const getRoleBadgeVariant = (role: string) => {
+    switch (role) {
+      case 'admin': return 'destructive';
+      case 'local': return 'default';
+      default: return 'secondary';
+    }
+  };
+
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case 'admin': return 'Administrador';
+      case 'local': return 'Local';
+      default: return 'Cliente';
+    }
+  };
+
+  const getAvailableLocalsForUser = (userId: string) => {
+    // Mostrar locales sin manager + el local actual del usuario si tiene
+    const userLocal = allLocals.find(l => l.manager_id === userId);
+    const unassignedLocals = allLocals.filter(l => !l.manager_id);
+    
+    if (userLocal && !unassignedLocals.find(l => l.id === userLocal.id)) {
+      return [userLocal, ...unassignedLocals];
+    }
+    return unassignedLocals;
+  };
+
+  const getUserAssignedLocal = (userId: string) => {
+    return allLocals.find(l => l.manager_id === userId);
   };
 
   if (sessionLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600">
         <Loader2 className="h-8 w-8 text-white animate-spin mr-2" />
-        <p className="text-white text-xl">Cargando usuarios...</p>
+        <p className="text-white text-lg">Cargando usuarios...</p>
       </div>
     );
   }
 
-  if (profile?.role !== 'admin') {
-    return null;
-  }
-
   return (
-    <div className="min-h-screen p-4 bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
-      <div className="max-w-6xl mx-auto">
-        <Card className="bg-white rounded-lg shadow-lg">
-          <CardHeader>
-            <div className="flex items-center justify-between mb-4">
-              <Button
-                variant="ghost"
-                onClick={() => navigate('/admin/dashboard')}
-                className="flex items-center gap-2 text-text-carbon hover:text-primary-blue"
-              >
-                <ArrowLeft className="h-5 w-5" />
-                Volver al Dashboard
-              </Button>
-              <div className="flex gap-2">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
+      <AppHeader title="Gestión de Usuarios" />
+      
+      <main className="flex-grow p-4">
+        <div className="max-w-7xl mx-auto space-y-6">
+          <Button
+            variant="ghost"
+            onClick={() => navigate('/admin/dashboard')}
+            className="flex items-center gap-2 text-white hover:text-gray-200 hover:bg-white/10"
+          >
+            <ArrowLeft className="h-5 w-5" />
+            Volver al Dashboard
+          </Button>
+
+          <Card className="bg-white/95 backdrop-blur-sm shadow-lg">
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <UsersIcon className="h-8 w-8 text-primary-blue" />
+                  <div>
+                    <CardTitle className="text-3xl font-bold text-text-carbon">
+                      Usuarios del Sistema
+                    </CardTitle>
+                    <CardDescription>
+                      Los usuarios se registran automáticamente con Google. Aquí puedes gestionar sus roles.
+                    </CardDescription>
+                  </div>
+                </div>
                 <Button
                   onClick={fetchData}
+                  disabled={loading}
                   variant="outline"
                   className="flex items-center gap-2"
                 >
-                  <RefreshCw className="h-4 w-4" />
+                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                   Actualizar
                 </Button>
-                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button
-                      onClick={openCreateDialog}
-                      className="bg-primary-blue hover:bg-blue-700 text-white flex items-center gap-2"
-                    >
-                      <UserPlus className="h-5 w-5" />
-                      Nuevo Usuario
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-[500px]">
-                    <DialogHeader>
-                      <DialogTitle>Crear Nuevo Usuario</DialogTitle>
-                      <DialogDescription>
-                        Completa los datos para crear un nuevo usuario. Se enviará un correo de verificación.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                      <div>
-                        <Label htmlFor="email">Correo Electrónico *</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          value={formData.email}
-                          onChange={(e) =>
-                            setFormData({ ...formData, email: e.target.value })
-                          }
-                          required
-                          placeholder="usuario@ejemplo.com"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="first_name">Nombre *</Label>
-                        <Input
-                          id="first_name"
-                          value={formData.first_name}
-                          onChange={(e) =>
-                            setFormData({ ...formData, first_name: e.target.value })
-                          }
-                          required
-                          placeholder="Nombre"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="last_name">Apellido *</Label>
-                        <Input
-                          id="last_name"
-                          value={formData.last_name}
-                          onChange={(e) =>
-                            setFormData({ ...formData, last_name: e.target.value })
-                          }
-                          required
-                          placeholder="Apellido"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="phone_number">Número de Teléfono *</Label>
-                        <Input
-                          id="phone_number"
-                          type="tel"
-                          value={formData.phone_number}
-                          onChange={(e) =>
-                            setFormData({ ...formData, phone_number: e.target.value })
-                          }
-                          required
-                          placeholder="Ej: 555-1234"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="role">Rol *</Label>
-                        <Select
-                          value={formData.role}
-                          onValueChange={(value) =>
-                            setFormData({ ...formData, role: value })
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecciona un rol" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="client">Cliente</SelectItem>
-                            <SelectItem value="local">Local</SelectItem>
-                            <SelectItem value="admin">Administrador</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      {formData.role === 'local' && locals.length > 0 && (
-                        <div>
-                          <Label htmlFor="local_id">Asignar Local</Label>
-                          <Select
-                            value={formData.local_id}
-                            onValueChange={(value) =>
-                              setFormData({ ...formData, local_id: value })
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecciona un local" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {locals.map((local) => (
-                                <SelectItem key={local.id} value={local.id}>
-                                  {local.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-                      <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
-                        <p className="text-sm text-yellow-800">
-                          <strong>Nota:</strong> La contraseña temporal será "TempPass123!". 
-                          El usuario deberá cambiarla en su primer inicio de sesión.
-                        </p>
-                      </div>
-                      <div className="flex gap-2 justify-end">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => {
-                            setDialogOpen(false);
-                            resetForm();
-                          }}
-                        >
-                          Cancelar
-                        </Button>
-                        <Button
-                          type="submit"
-                          disabled={loading}
-                          className="bg-primary-blue hover:bg-blue-700 text-white"
-                        >
-                          {loading ? 'Creando...' : 'Crear Usuario'}
-                        </Button>
-                      </div>
-                    </form>
-                  </DialogContent>
-                </Dialog>
               </div>
-            </div>
-            <CardTitle className="text-3xl font-bold text-text-carbon">
-              Gestión de Usuarios
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {users.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                No hay usuarios registrados. Crea uno nuevo para comenzar.
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Correo</TableHead>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Teléfono</TableHead>
-                    <TableHead>Rol</TableHead>
-                    <TableHead>Verificado</TableHead>
-                    <TableHead>Local Asignado</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users.map((userItem) => (
-                    <TableRow key={userItem.id}>
-                      <TableCell className="font-medium">
-                        {userItem.email || 'Sin correo'}
-                        {userItem.id === user?.id && (
-                          <Badge variant="outline" className="ml-2 text-xs">
-                            Tú
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {userItem.first_name || userItem.last_name 
-                          ? `${userItem.first_name || ''} ${userItem.last_name || ''}`.trim()
-                          : 'Sin nombre'}
-                      </TableCell>
-                      <TableCell className="text-sm text-gray-600">
-                        {userItem.phone_number || 'N/A'}
-                      </TableCell>
-                      <TableCell>
-                        <Select
-                          value={userItem.role}
-                          onValueChange={(value) => updateUserRole(userItem.id, value)}
-                          disabled={userItem.id === user?.id || updatingRole === userItem.id}
-                        >
-                          <SelectTrigger className="w-[130px]">
-                            <SelectValue>
-                              {updatingRole === userItem.id ? (
-                                <div className="flex items-center">
-                                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                  Actualizando...
-                                </div>
-                              ) : (
-                                <Badge 
-                                  variant={
-                                    userItem.role === 'admin' 
-                                      ? 'destructive' 
-                                      : userItem.role === 'local' 
-                                      ? 'default' 
-                                      : 'secondary'
-                                  }
-                                >
-                                  {userItem.role === 'admin' 
-                                    ? 'Administrador' 
-                                    : userItem.role === 'local' 
-                                    ? 'Local' 
-                                    : 'Cliente'}
+            </CardHeader>
+            <CardContent>
+              {users.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  <UsersIcon className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                  <p className="text-lg">No hay usuarios registrados todavía.</p>
+                  <p className="text-sm mt-2">Los usuarios aparecerán aquí cuando inicien sesión con Google.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Usuario</TableHead>
+                        <TableHead>Teléfono</TableHead>
+                        <TableHead>Rol</TableHead>
+                        <TableHead>Local Asignado</TableHead>
+                        <TableHead className="text-right">Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {users.map((userItem) => (
+                        <TableRow key={userItem.id}>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="font-medium">
+                                {userItem.first_name || userItem.last_name 
+                                  ? `${userItem.first_name || ''} ${userItem.last_name || ''}`.trim()
+                                  : 'Sin nombre'}
+                              </span>
+                              <span className="text-sm text-gray-500">{userItem.email}</span>
+                              {userItem.id === user?.id && (
+                                <Badge variant="outline" className="w-fit mt-1 text-xs">
+                                  Tú
                                 </Badge>
                               )}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="client">Cliente</SelectItem>
-                            <SelectItem value="local">Local</SelectItem>
-                            <SelectItem value="admin">Administrador</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="flex items-center">
-                                {userItem.email_confirmed_at ? (
-                                  <CheckCircle className="h-5 w-5 text-success-green" />
-                                ) : (
-                                  <XCircle className="h-5 w-5 text-emphasis-red" />
-                                )}
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              {userItem.email_confirmed_at 
-                                ? `Verificado el ${new Date(userItem.email_confirmed_at).toLocaleDateString()}` 
-                                : 'Email no verificado'}
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </TableCell>
-                      <TableCell>
-                        {userItem.local_name || 'No asignado'}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex gap-2 justify-end">
-                          {!userItem.email_confirmed_at && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => resendVerificationEmail(userItem.email)}
-                              disabled={resendingEmail === userItem.email}
-                              className="text-primary-blue hover:text-blue-700"
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm text-gray-600">
+                            {userItem.phone_number || 'No registrado'}
+                          </TableCell>
+                          <TableCell>
+                            <Select
+                              value={userItem.role}
+                              onValueChange={(value) => updateUserRole(userItem.id, value)}
+                              disabled={userItem.id === user?.id || updatingRole === userItem.id}
                             >
-                              {resendingEmail === userItem.email ? (
-                                <RefreshCw className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Mail className="h-4 w-4" />
-                              )}
-                            </Button>
-                          )}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDelete(userItem.id)}
-                            disabled={userItem.id === user?.id}
-                            className="text-emphasis-red hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                              <SelectTrigger className="w-[140px]">
+                                <SelectValue>
+                                  {updatingRole === userItem.id ? (
+                                    <div className="flex items-center">
+                                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                    </div>
+                                  ) : (
+                                    <Badge variant={getRoleBadgeVariant(userItem.role)}>
+                                      {getRoleLabel(userItem.role)}
+                                    </Badge>
+                                  )}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="client">Cliente</SelectItem>
+                                <SelectItem value="local">Local (Manager)</SelectItem>
+                                <SelectItem value="admin">Administrador</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell>
+                            {userItem.role === 'local' ? (
+                              <Select
+                                value={getUserAssignedLocal(userItem.id)?.id || 'none'}
+                                onValueChange={(value) => assignLocalToManager(userItem.id, value)}
+                                disabled={assigningLocal === userItem.id}
+                              >
+                                <SelectTrigger className="w-[180px]">
+                                  <SelectValue>
+                                    {assigningLocal === userItem.id ? (
+                                      <div className="flex items-center">
+                                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                      </div>
+                                    ) : (
+                                      <span className="flex items-center gap-2">
+                                        <Store className="h-4 w-4" />
+                                        {getUserAssignedLocal(userItem.id)?.name || 'Sin asignar'}
+                                      </span>
+                                    )}
+                                  </SelectValue>
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">Sin asignar</SelectItem>
+                                  {getAvailableLocalsForUser(userItem.id).map((local) => (
+                                    <SelectItem key={local.id} value={local.id}>
+                                      {local.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <span className="text-gray-400 text-sm">N/A</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={userItem.id === user?.id}
+                                  className="text-emphasis-red hover:text-red-700 hover:bg-red-50 disabled:opacity-50"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>¿Eliminar usuario?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Esta acción no se puede deshacer. Se eliminará permanentemente a{' '}
+                                    <strong>{userItem.email}</strong> del sistema.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDelete(userItem.id)}
+                                    className="bg-emphasis-red hover:bg-red-700"
+                                  >
+                                    Eliminar
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              {/* Info Box */}
+              <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-semibold text-blue-800 mb-2">💡 ¿Cómo funciona?</h4>
+                <ul className="text-sm text-blue-700 space-y-1">
+                  <li>• Los usuarios se registran automáticamente cuando inician sesión con Google</li>
+                  <li>• Por defecto, todos los nuevos usuarios son <strong>Clientes</strong></li>
+                  <li>• Puedes cambiar el rol de cualquier usuario desde esta pantalla</li>
+                  <li>• Los usuarios con rol <strong>Local</strong> deben tener un local asignado</li>
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </main>
+      
+      <Footer />
     </div>
   );
 };
