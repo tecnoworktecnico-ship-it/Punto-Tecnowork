@@ -8,6 +8,8 @@ import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/ca
 import { ArrowLeft, Settings } from 'lucide-react';
 import ProfileSettings from '@/components/ProfileSettings';
 import { showError } from '@/utils/toast';
+import AppHeader from '@/components/AppHeader';
+import Footer from '@/components/Footer';
 
 const ClientProfile = () => {
   const { profile, loading: sessionLoading, refreshProfile } = useSession();
@@ -30,32 +32,38 @@ const ClientProfile = () => {
   }
 
   return (
-    <div className="min-h-screen p-4 bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <Button
-          variant="ghost"
-          onClick={() => navigate('/client')}
-          className="flex items-center gap-2 text-white hover:text-gray-200"
-        >
-          <ArrowLeft className="h-5 w-5" />
-          Volver al Dashboard
-        </Button>
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
+      <AppHeader title="Mi Perfil" />
+      
+      <main className="flex-grow p-4">
+        <div className="max-w-4xl mx-auto space-y-6">
+          <Button
+            variant="ghost"
+            onClick={() => navigate('/client')}
+            className="flex items-center gap-2 text-white hover:text-gray-200 hover:bg-white/10"
+          >
+            <ArrowLeft className="h-5 w-5" />
+            Volver al Dashboard
+          </Button>
 
-        <Card className="bg-white rounded-lg shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-3xl font-bold text-text-carbon flex items-center gap-2">
-              <Settings className="h-7 w-7 text-primary-blue" />
-              Mi Perfil y Configuración
-            </CardTitle>
-            <CardDescription>
-              Actualiza tus datos personales y cambia tu contraseña.
-            </CardDescription>
-          </CardHeader>
-          <div className="p-6 pt-0">
-            <ProfileSettings onProfileUpdate={handleProfileUpdate} />
-          </div>
-        </Card>
-      </div>
+          <Card className="bg-white rounded-lg shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-3xl font-bold text-text-carbon flex items-center gap-2">
+                <Settings className="h-7 w-7 text-primary-blue" />
+                Mi Perfil
+              </CardTitle>
+              <CardDescription>
+                Actualiza tus datos personales.
+              </CardDescription>
+            </CardHeader>
+            <div className="p-6 pt-0">
+              <ProfileSettings onProfileUpdate={handleProfileUpdate} />
+            </div>
+          </Card>
+        </div>
+      </main>
+      
+      <Footer />
     </div>
   );
 };
