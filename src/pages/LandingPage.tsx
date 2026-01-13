@@ -8,54 +8,32 @@ import { Button } from "@/components/ui/button";
 import BrandingDisplay from "@/components/BrandingDisplay";
 
 const LandingPage = () => {
-  const { loading, session } = useSession();
+  const { loading, session, profile } = useSession();
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
-    console.log('LandingPage - Full URL:', window.location.href);
-    console.log('LandingPage - Hash:', location.hash);
-    
-    // Si hay un hash en la URL, procesarlo
-    if (location.hash) {
-      const hashParams = new URLSearchParams(location.hash.substring(1));
-      const type = hashParams.get('type');
-      const error = hashParams.get('error');
-      const errorCode = hashParams.get('error_code');
-      const accessToken = hashParams.get('access_token');
-      
-      console.log('LandingPage - Hash detected', { type, error, errorCode, hasToken: !!accessToken });
-      
-      // Manejar errores de verificación
-      if (error && (errorCode === 'otp_expired' || error === 'access_denied')) {
-        navigate('/verification-error', { replace: true });
-        return;
-      }
-      
-      // Si es un flujo de recuperación con token, ir DIRECTAMENTE a reset-password
-      // IMPORTANTE: Preservar el hash completo
-      if (type === 'recovery' && accessToken) {
-        console.log('LandingPage - Recovery flow detected, redirecting to reset-password with hash');
-        navigate('/reset-password' + location.hash, { replace: true });
-        return;
-      }
-      
-      // Para cualquier otro tipo de autenticación con token, ir a auth-callback
-      if (accessToken && type !== 'recovery') {
-        console.log('LandingPage - Auth flow detected, redirecting to auth-callback');
-        navigate('/auth-callback' + location.hash, { replace: true });
-        return;
-      }
+    // Si hay un hash en la URL (callback de OAuth), redirigir a auth-callback
+    if (location.hash && location.hash.includes('access_token')) {
+      console.log('LandingPage - OAuth callback detected, redirecting to auth-callback');
+      navigate('/auth-callback' + location.hash, { replace: true });
+      return;
     }
   }, [location.hash, navigate]);
 
-  // Si hay sesión activa, no redirigir automáticamente desde aquí
+  // Si hay sesión activa, redirigir según rol
   useEffect(() => {
-    if (!loading && session) {
-      // Dejar que SessionContext maneje la redirección
-      return;
+    if (!loading && session && profile) {
+      console.log('LandingPage - Session found, redirecting based on role:', profile.role);
+      if (profile.role === 'admin') {
+        navigate('/admin/dashboard', { replace: true });
+      } else if (profile.role === 'local') {
+        navigate('/local/dashboard', { replace: true });
+      } else {
+        navigate('/client', { replace: true });
+      }
     }
-  }, [loading, session]);
+  }, [loading, session, profile, navigate]);
 
   if (loading) {
     return (
@@ -74,7 +52,7 @@ const LandingPage = () => {
         </div>
         <p className="text-xl text-gray-600 mb-6">Tu solución integral para gestión de pedidos y recompensas.</p>
         <Button 
-          className="bg-primary-blue hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+          className="bg-primary-blue hover:bg-blue-700 text-white font-bold py-2 px-4 rounded w-full"
           onClick={() => navigate('/login')}
         >
           Iniciar Sesión / Registrarse
