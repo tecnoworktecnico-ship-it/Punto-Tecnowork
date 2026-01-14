@@ -46,7 +46,15 @@ const AuthCallback = () => {
           .maybeSingle();
 
         if (profileError) {
-          console.error('AuthCallback - Profile fetch error:', profileError);
+          // CRÍTICO: Si hay un error al buscar el perfil (ej. error de RLS, error de servidor),
+          // asumimos un fallo de conexión/servidor y abortamos la creación.
+          console.error('AuthCallback - CRITICAL Profile fetch error:', profileError);
+          setStatus('error');
+          setMessage('Error de conexión con el servidor.');
+          showError('Error de conexión con el servidor. Intenta iniciar sesión de nuevo.');
+          await supabase.auth.signOut();
+          setTimeout(() => navigate('/login', { replace: true }), 3000);
+          return;
         }
 
         let userProfile = existingProfile;
@@ -75,7 +83,8 @@ const AuthCallback = () => {
               phone_number: null,
               password_changed: true,  // No aplica para OAuth
               points: 0,
-              local_id: null
+              local_id: null,
+              email: session.user.email, // Asegurar que el email se guarde en profiles
             })
             .select()
             .single();
