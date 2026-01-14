@@ -4,11 +4,10 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from '@/contexts/SessionContext';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { showSuccess, showError } from '@/utils/toast';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Eye, RefreshCw, FileText, Loader2 } from 'lucide-react';
+import { ArrowLeft, RefreshCw, FileText, Loader2, Store } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -38,23 +37,22 @@ interface OrderFile {
 }
 
 interface OrderWithDetails {
-  order_id: string;
+  id: string; // Usar 'id' en lugar de 'order_id' para la consulta directa
   client_id: string;
-  client_email: string;
-  client_first_name: string | null;
-  client_last_name: string | null;
   local_id: string;
-  local_name: string;
-  status: OrderStatus; // Usar OrderStatus tipado
+  status: OrderStatus;
   total_price: number;
   points_earned: number;
   created_at: string;
   updated_at: string;
-  file_count: number;
+  // Propiedad para el join de Supabase
+  locals: {
+    name: string;
+  } | null;
   files: OrderFile[]; 
 }
 
-const AdminOrders = () => {
+const ClientOrders = () => {
   const { profile, loading: sessionLoading } = useSession();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<OrderWithDetails[]>([]);
@@ -62,12 +60,12 @@ const AdminOrders = () => {
   const [filterStatus, setFilterStatus] = useState<string>('all');
 
   useEffect(() => {
-    if (!sessionLoading && profile?.role !== 'admin') {
+    if (!sessionLoading && profile?.role !== 'client') {
       showError('No tienes permiso para acceder a esta página.');
-      navigate('/admin/dashboard');
+      navigate('/client');
     }
 
-    if (!sessionLoading && profile?.role === 'admin') {
+    if (!sessionLoading && profile?.role === 'client') {
       fetchOrders();
     }
   }, [sessionLoading, profile, navigate]);
@@ -76,27 +74,39 @@ const AdminOrders = () => {
     setLoading(true);
 
     try {
-      // Usar la función RPC para obtener todos los pedidos con detalles
+      if (!profile?.id) {
+        setOrders([]);
+        setLoading(false);
+        return;
+      }
+      
+      // 1. Consultar la tabla 'orders' directamente, filtrando por client_id
       const { data: ordersData, error: ordersError } = await supabase
-        .rpc('get_all_orders_with_details');
+        .from('orders')
+        .select(`
+          *,
+          locals ( name )
+        `)
+        .eq('client_id', profile.id)
+        .order('created_at', { ascending: false });
 
       if (ordersError) {
-        console.error('Error fetching orders:', ordersError);
-        showError('Error al cargar los pedidos: ' + ordersError.message);
+        console.error('Error fetching client orders:', ordersError);
+        showError('Error al cargar tus pedidos: ' + ordersError.message);
         setLoading(false);
         return;
       }
 
-      // Para cada pedido, obtener los archivos
+      // 2. Para cada pedido, obtener los archivos
       const ordersWithFiles = await Promise.all(
         (ordersData || []).map(async (order: OrderWithDetails) => {
           const { data: filesData, error: filesError } = await supabase
             .from('order_files')
             .select('file_name, copies')
-            .eq('order_id', order.order_id);
+            .eq('order_id', order.id);
 
           if (filesError) {
-            console.error(`Error fetching files for order ${order.order_id}:`, filesError);
+            console.error(`Error fetching files for order ${order.id}:`, filesError);
           }
 
           return {
@@ -115,107 +125,6 @@ const AdminOrders = () => {
     }
   };
 
-  const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
-    // Encontrar el pedido actual para obtener client_id y points_earned
-    const currentOrder = orders.find(o => o.order_id === orderId);
-    if (!currentOrder) {
-      showError('Pedido no encontrado.');
-      return;
-    }
-    
-    // Prevenir la doble suma de puntos si ya estaba completado
-    const wasCompleted = currentOrder.status === 'completed';
-    const isCompleting = newStatus === 'completed';
-
-    setLoading(true);
-
-    try {
-      // 1. Actualizar el estado del pedido
-      const { error: updateError } = await supabase
-        .from('orders')
-        .update({ 
-          status: newStatus,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', orderId);
-
-      if (updateError) {
-        console.error('Error updating order status:', updateError);
-        showError(`Error al actualizar el estado del pedido: ${updateError.message}`);
-        setLoading(false);
-        return;
-      }
-      
-      let pointsMessage = '';
-
-      // 2. Lógica de Puntos: Sumar solo si pasa a 'completed' y no estaba completado antes
-      if (isCompleting && !wasCompleted) {
-        const points = currentOrder.points_earned;
-        const clientId = currentOrder.client_id;
-        
-        // Obtener puntos actuales del usuario desde profiles
-        const { data: profileData, error: profileFetchError } = await supabase
-          .from('profiles')
-          .select('points')
-          .eq('id', clientId)
-          .single();
-          
-        if (profileFetchError) {
-          console.error('Error fetching user profile for points update:', profileFetchError);
-          // No lanzar error, solo registrar y continuar
-        }
-        
-        const currentPoints = profileData?.points || 0;
-        const newPoints = currentPoints + points;
-        
-        // Actualizar puntos en profiles
-        const { error: pointsUpdateError } = await supabase
-          .from('profiles')
-          .update({ points: newPoints })
-          .eq('id', clientId);
-
-        if (pointsUpdateError) {
-          console.error('Error updating user points:', pointsUpdateError);
-          pointsMessage = ` (Advertencia: Error al sumar ${points} puntos)`;
-        } else {
-          pointsMessage = ` (Se sumaron ${points} puntos al cliente)`;
-        }
-      }
-      
-      // 3. Registrar en auditoría
-      await supabase.from('order_audit').insert({
-        order_id: orderId,
-        user_id: profile?.id,
-        action: 'status_change_admin',
-        details: { new_status: newStatus }
-      });
-
-      showSuccess(`Estado del pedido actualizado a ${newStatus.replace('_', ' ')}.${pointsMessage}`);
-      
-      // 4. Recargar datos
-      fetchOrders();
-      
-    } catch (error) {
-      console.error('Unexpected error:', error);
-      showError('Error inesperado al actualizar el estado.');
-    } finally {
-      // El loading se maneja dentro de fetchOrders, pero lo aseguramos aquí si hay un error temprano
-      if (loading) setLoading(false);
-    }
-  };
-
-  const getClientDisplayName = (order: OrderWithDetails) => {
-    const firstName = order.client_first_name || '';
-    const lastName = order.client_last_name || '';
-    const fullName = `${firstName} ${lastName}`.trim();
-    
-    if (fullName) {
-      return fullName;
-    }
-    
-    return order.client_email || 'Cliente desconocido';
-  };
-  
   const renderFilesList = (files: OrderFile[]) => {
     if (files.length === 0) return 'Sin archivos';
     
@@ -264,12 +173,12 @@ const AdminOrders = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
         <Loader2 className="h-8 w-8 text-white animate-spin mr-2" />
-        <p className="text-white text-xl">Cargando pedidos...</p>
+        <p className="text-white text-xl">Cargando tus pedidos...</p>
       </div>
     );
   }
 
-  if (profile?.role !== 'admin') {
+  if (profile?.role !== 'client') {
     return null;
   }
 
@@ -281,7 +190,7 @@ const AdminOrders = () => {
             <div className="flex items-center justify-between mb-4">
               <Button
                 variant="ghost"
-                onClick={() => navigate('/admin/dashboard')}
+                onClick={() => navigate('/client')}
                 className="flex items-center gap-2 text-text-carbon hover:text-primary-blue"
               >
                 <ArrowLeft className="h-5 w-5" />
@@ -313,14 +222,17 @@ const AdminOrders = () => {
               </div>
             </div>
             <CardTitle className="text-3xl font-bold text-text-carbon">
-              Gestión de Pedidos (Administrador)
+              Mis Pedidos
             </CardTitle>
+            <CardDescription>
+              Revisa el estado y los detalles de tus pedidos de impresión.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {filteredOrders.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 {filterStatus === 'all' 
-                  ? 'No hay pedidos registrados.'
+                  ? 'No tienes pedidos registrados.'
                   : 'No hay pedidos con este estado.'}
               </div>
             ) : (
@@ -328,32 +240,23 @@ const AdminOrders = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>ID Pedido</TableHead>
-                    <TableHead>Cliente</TableHead>
                     <TableHead>Local</TableHead>
                     <TableHead>Archivos</TableHead>
                     <TableHead>Total</TableHead>
+                    <TableHead>Puntos</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead>Fecha</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredOrders.map((order) => (
-                    <TableRow key={order.order_id}>
+                    <TableRow key={order.id}>
                       <TableCell className="font-mono text-sm">
-                        {order.order_id.substring(0, 8)}...
+                        {order.id.substring(0, 8)}...
                       </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="font-medium text-text-carbon">
-                            {getClientDisplayName(order)}
-                          </span>
-                          <span className="text-xs text-gray-500">
-                            {order.client_email}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {order.local_name || 'Local Eliminado'}
+                      <TableCell className="font-medium flex items-center gap-1">
+                        <Store className="h-4 w-4 text-gray-500" />
+                        {order.locals?.name || 'Local Eliminado'}
                       </TableCell>
                       <TableCell>
                         {renderFilesList(order.files)}
@@ -361,23 +264,11 @@ const AdminOrders = () => {
                       <TableCell className="font-bold text-success-green">
                         ${order.total_price.toFixed(2)}
                       </TableCell>
+                      <TableCell className="text-secondary-yellow font-medium">
+                        {order.points_earned} pts
+                      </TableCell>
                       <TableCell>
-                        <Select
-                          value={order.status}
-                          onValueChange={(value) => handleStatusChange(order.order_id, value as OrderStatus)}
-                          disabled={loading}
-                        >
-                          <SelectTrigger className="w-[140px]">
-                            {getStatusBadge(order.status)}
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pending">Pendiente</SelectItem>
-                            <SelectItem value="processing">En Proceso</SelectItem>
-                            <SelectItem value="ready">Listo</SelectItem>
-                            <SelectItem value="completed">Completado</SelectItem>
-                            <SelectItem value="cancelled">Cancelado</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        {getStatusBadge(order.status)}
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col">
@@ -404,4 +295,4 @@ const AdminOrders = () => {
   );
 };
 
-export default AdminOrders;
+export default ClientOrders;
