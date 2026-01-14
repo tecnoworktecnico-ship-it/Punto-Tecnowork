@@ -35,8 +35,9 @@ const GlobalPriceAdjuster: React.FC = () => {
   const handleAdjustPrices = async () => {
     const percentValue = parseFloat(percentage);
 
+    // La validación de 0 o NaN ya se maneja en el botón de trigger, pero la repetimos por seguridad
     if (isNaN(percentValue) || percentValue === 0) {
-      showError('Por favor, ingresa un porcentaje válido (ej: 10 para un aumento del 10%).');
+      showError('Por favor, ingresa un porcentaje válido (ej: 10 o -5).');
       return;
     }
 
@@ -62,7 +63,8 @@ const GlobalPriceAdjuster: React.FC = () => {
       const multiplier = 1 + percentValue / 100;
       const updates = prices.map((price: GlobalPrice) => ({
         id: price.id,
-        base_price: price.base_price * multiplier,
+        // Redondear a 2 decimales para evitar problemas de coma flotante en la DB
+        base_price: parseFloat((price.base_price * multiplier).toFixed(2)),
       }));
       
       // 3. Guardar los nuevos precios usando upsert
@@ -93,7 +95,8 @@ const GlobalPriceAdjuster: React.FC = () => {
     <Card className="shadow-md bg-white">
       <CardHeader className="pb-3 border-b border-gray-100">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-green-100 rounded-lg text-success-green"><DollarSign className="w-6 h-6" /></div>
+          {/* Icono Percent añadido aquí */}
+          <div className="p-2 bg-green-100 rounded-lg text-success-green"><Percent className="w-6 h-6" /></div>
           <div>
             <CardTitle className="text-lg font-bold text-gray-800">Ajuste Masivo de Precios</CardTitle>
             <CardDescription>Aplica un porcentaje de cambio a todos los precios globales.</CardDescription>
@@ -124,6 +127,7 @@ const GlobalPriceAdjuster: React.FC = () => {
           <AlertDialogTrigger asChild>
             <Button 
               className={`w-full ${actionColor} text-white`} 
+              // Deshabilitar si está cargando, si no es un número, o si es 0
               disabled={loading || isNaN(percentValue) || percentValue === 0}
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : `${actionText} Precios Globales`}
