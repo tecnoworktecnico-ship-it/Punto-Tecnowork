@@ -54,12 +54,13 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
   const fetchProfile = useCallback(async (userId: string): Promise<Profile | null> => {
     try {
       console.log('SessionContext - Fetching profile for:', userId);
+      console.log('QUERY_CHECK:', userId); // <-- LOG DE DEPURACIÓN AÑADIDO
       
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select('*') // <-- Asegurado que use select('*')
         .eq('id', userId)
-        .maybeSingle();
+        .maybeSingle(); // Usamos maybeSingle para robustez
 
       if (error) {
         console.error('SessionContext - Error fetching profile:', error);
