@@ -57,18 +57,8 @@ const ClientPoints = () => {
   const fetchData = async () => {
     setLoading(true);
 
-    // Obtener puntos actuales
-    const { data: pointsData, error: pointsError } = await supabase
-      .from('user_points')
-      .select('points')
-      .eq('user_id', profile?.id)
-      .single();
-
-    if (pointsError && pointsError.code !== 'PGRST116') {
-      console.error('Error fetching user points:', pointsError);
-    } else {
-      setUserPoints(pointsData?.points || 0);
-    }
+    // Obtener puntos del perfil del usuario (ya los tenemos en profile.points)
+    setUserPoints(profile?.points || 0);
 
     // Obtener recompensas canjeadas
     const { data: rewardsData, error: rewardsError } = await supabase
