@@ -63,7 +63,7 @@ const LocalOrderDetail = () => {
         // 2.1 Obtener el perfil del cliente
         const { data: clientProfileData } = await supabase
           .from('profiles')
-          .select('first_name, last_name')
+          .select('*') // <-- CORREGIDO: Usar select('*')
           .eq('id', orderData.client_id)
           .single();
 

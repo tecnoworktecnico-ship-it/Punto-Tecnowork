@@ -182,14 +182,15 @@ export default function StorageCleaner() {
       let profilesMap: Record<string, any> = {};
       
       if (clientIds.length > 0) {
-        const { data: profiles } = await supabase.from('profiles').select('id, first_name, last_name').in('id', clientIds);
+        // CORREGIDO: Usar select('*') para evitar errores 406
+        const { data: profiles } = await supabase.from('profiles').select('*').in('id', clientIds);
         if (profiles) profiles.forEach(p => profilesMap[p.id] = p);
       }
 
       const enrichedFiles = activeFiles.map((f: any) => ({
         ...f,
         client_name: f.orders?.client_id && profilesMap[f.orders.client_id] 
-          ? `${profilesMap[f.orders.client_id].first_name} ${profilesMap[f.orders.client_id].last_name}`
+          ? `${profilesMap[f.orders.client_id].first_name || ''} ${profilesMap[f.orders.client_id].last_name || ''}`.trim()
           : 'Desconocido'
       }));
 
