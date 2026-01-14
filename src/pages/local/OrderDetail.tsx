@@ -63,9 +63,9 @@ const LocalOrderDetail = () => {
         // 2.1 Obtener el perfil del cliente
         const { data: clientProfileData } = await supabase
           .from('profiles')
-          .select('*') // <-- CORREGIDO: Usar select('*')
+          .select('*') // Consulta corregida
           .eq('id', orderData.client_id)
-          .maybeSingle(); // <-- Usar maybeSingle para evitar 406 si el perfil no existe
+          .maybeSingle(); // Usar maybeSingle para evitar 406 si el perfil no existe
 
         // Asegurar que order_audit esté ordenado por created_at
         const sortedAudit = (orderData.order_audit || []).sort((a: any, b: any) => 
