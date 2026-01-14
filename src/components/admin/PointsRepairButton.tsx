@@ -46,19 +46,16 @@ const PointsRepairButton: React.FC = () => {
       const clientIdsToUpdate = Object.keys(pointsByClient);
       let updatedUsersCount = 0;
       
-      // 3. Recorrer cada cliente y actualizar su campo points en la tabla user_points
-      // Nota: La tabla de puntos es 'user_points', no 'profiles'.
+      // 3. Recorrer cada cliente y actualizar su campo points en la tabla profiles
       
       for (const userId of clientIdsToUpdate) {
         const newPoints = pointsByClient[userId];
         
-        // Intentar actualizar (si existe) o insertar (si no existe)
+        // Actualizar puntos en profiles
         const { error: updateError } = await supabase
-          .from('user_points')
-          .upsert(
-            { user_id: userId, points: newPoints, updated_at: new Date().toISOString() },
-            { onConflict: 'user_id' }
-          );
+          .from('profiles')
+          .update({ points: newPoints })
+          .eq('id', userId);
 
         if (updateError) {
           console.error(`Error al actualizar puntos para el usuario ${userId}:`, updateError);
