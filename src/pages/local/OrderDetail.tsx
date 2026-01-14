@@ -70,6 +70,16 @@ const LocalOrderDetail = () => {
         // LOG DE DEPURACIÓN AÑADIDO
         console.log('DEBUG_DATA:', { id: orderData.client_id, perfil: clientProfileData });
 
+        // Determinar el nombre de respaldo si el perfil está incompleto o nulo
+        let fallbackName = 'Cliente Desconocido';
+        if (clientProfileData?.email) {
+          fallbackName = clientProfileData.email;
+        } else if (orderData.client_id) {
+          // Si no hay email en profiles, usar el ID truncado como último recurso (aunque se pidió evitarlo, 
+          // si no hay email, es el único identificador seguro)
+          fallbackName = `ID: ${orderData.client_id.substring(0, 8)}...`;
+        }
+
         // Asegurar que order_audit esté ordenado por created_at
         const sortedAudit = (orderData.order_audit || []).sort((a: any, b: any) => 
           new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
@@ -79,8 +89,8 @@ const LocalOrderDetail = () => {
           ...orderData,
           order_audit: sortedAudit,
           profiles: clientProfileData || {
-            first_name: "Cliente",
-            last_name: orderData.client_id.substring(0, 8) + "..."
+            first_name: fallbackName,
+            last_name: null // Aseguramos que last_name sea nulo si usamos el fallback
           }
         };
         
