@@ -1,9 +1,10 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppHeader from '@/components/AppHeader';
-import Footer from '@/components/Footer'; // <--- ESTA ERA LA LÍNEA QUE FALTABA
+import Footer from '@/components/Footer';
 import PointsRepairButton from '@/components/admin/PointsRepairButton';
 import StorageCleaner from '@/components/admin/StorageCleaner';
+import GlobalPriceAdjuster from '@/components/admin/GlobalPriceAdjuster'; // Importar nuevo componente
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Clock, ShieldAlert, Wrench, HardDrive } from 'lucide-react';
@@ -14,12 +15,12 @@ export default function MaintenancePage() {
 
   const handleExtendTime = () => {
      // Instrucciones simples para el administrador
-     alert('PARA EXTENDER LA SESIÓN:\n\n1. Ve a tu proyecto en Supabase.\n2. Auth > Settings > Email.\n3. Cambia "Email Link Expiration" a 1800 (30 mins).');
+     alert('PARA EXTENDER LA SESIÓN:\n\n1. Ve a tu proyecto en Supabase.\n2. Auth > Settings > Email.\n3. Cambia "Email Link Expiration" a 1800 segundos (30 minutos).');
      showSuccess('Instrucciones mostradas en pantalla.');
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col font-sans text-gray-900">
+    <div className="min-h-screen flex flex-col bg-gray-50 font-sans text-gray-900">
       <AppHeader title="Mantenimiento del Sistema" />
       
       <main className="flex-grow p-4 md:p-6">
@@ -45,13 +46,8 @@ export default function MaintenancePage() {
               {/* Herramienta de Puntos */}
               <PointsRepairButton />
               
-              {/* Espacio reservado para Ajuste de Precios en el futuro */}
-              <Card className="border-dashed border-2 border-gray-200 bg-gray-50/50 shadow-none">
-                <CardContent className="flex flex-col items-center justify-center h-32 text-gray-400 text-sm gap-2">
-                  <Wrench className="w-8 h-8 opacity-20" />
-                  <span>Próximamente: Ajuste Global de Precios</span>
-                </CardContent>
-              </Card>
+              {/* Herramienta de Ajuste de Precios */}
+              <GlobalPriceAdjuster />
             </div>
 
             {/* COLUMNA 2: Almacenamiento y Configuración */}
