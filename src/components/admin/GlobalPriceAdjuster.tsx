@@ -35,7 +35,6 @@ const GlobalPriceAdjuster: React.FC = () => {
   const handleAdjustPrices = async () => {
     const percentValue = parseFloat(percentage);
 
-    // La validación de 0 o NaN ya se maneja en el botón de trigger, pero la repetimos por seguridad
     if (isNaN(percentValue) || percentValue === 0) {
       showError('Por favor, ingresa un porcentaje válido (ej: 10 o -5).');
       return;
@@ -46,9 +45,10 @@ const GlobalPriceAdjuster: React.FC = () => {
 
     try {
       // 1. Obtener todos los precios globales
+      // Seleccionamos todos los campos para el upsert
       const { data: prices, error: fetchError } = await supabase
         .from('global_prices')
-        .select('id, service_name, base_price');
+        .select('*');
 
       if (fetchError) {
         throw new Error(`Error al obtener precios: ${fetchError.message}`);
@@ -59,13 +59,19 @@ const GlobalPriceAdjuster: React.FC = () => {
         return;
       }
 
-      // 2. Calcular los nuevos precios
+      // 2. Calcular los nuevos precios y aplicar redondeo
       const multiplier = 1 + percentValue / 100;
-      const updates = prices.map((price: GlobalPrice) => ({
-        id: price.id,
-        // Redondear a 2 decimales para evitar problemas de coma flotante en la DB
-        base_price: parseFloat((price.base_price * multiplier).toFixed(2)),
-      }));
+      
+      const updates = prices.map((price: GlobalPrice) => {
+        const newPrice = price.base_price * multiplier;
+        // Redondeo a 2 decimales
+        const roundedPrice = Math.round(newPrice * 100) / 100; 
+        
+        return {
+          ...price, // Incluir todos los campos originales
+          base_price: roundedPrice,
+        };
+      });
       
       // 3. Guardar los nuevos precios usando upsert
       const { error: updateError } = await supabase
