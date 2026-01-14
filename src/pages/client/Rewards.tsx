@@ -32,7 +32,7 @@ interface UserPoints {
 }
 
 const ClientRewards = () => {
-  const { profile, loading: sessionLoading } = useSession();
+  const { profile, loading: sessionLoading, refreshProfile } = useSession();
   const navigate = useNavigate();
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [userPoints, setUserPoints] = useState<number>(0);
@@ -54,18 +54,8 @@ const ClientRewards = () => {
   const fetchData = async () => {
     setLoading(true);
 
-    // Obtener puntos del usuario
-    const { data: pointsData, error: pointsError } = await supabase
-      .from('user_points')
-      .select('points')
-      .eq('user_id', profile?.id)
-      .single();
-
-    if (pointsError && pointsError.code !== 'PGRST116') {
-      console.error('Error fetching user points:', pointsError);
-    } else {
-      setUserPoints(pointsData?.points || 0);
-    }
+    // Obtener puntos del perfil del usuario (ya los tenemos en profile.points)
+    setUserPoints(profile?.points || 0);
 
     // Obtener recompensas activas
     const { data: rewardsData, error: rewardsError } = await supabase
@@ -114,12 +104,12 @@ const ClientRewards = () => {
         return;
       }
 
-      // Actualizar puntos del usuario
+      // Actualizar puntos del usuario en profiles
       const newPoints = userPoints - selectedReward.points_cost;
       const { error: updateError } = await supabase
-        .from('user_points')
+        .from('profiles')
         .update({ points: newPoints })
-        .eq('user_id', profile?.id);
+        .eq('id', profile?.id);
 
       if (updateError) {
         console.error('Error updating points:', updateError);
@@ -131,6 +121,9 @@ const ClientRewards = () => {
       showSuccess(`¡Recompensa canjeada! Te quedan ${newPoints} puntos.`);
       setDialogOpen(false);
       setSelectedReward(null);
+      
+      // Refrescar el perfil para actualizar los puntos en el contexto
+      await refreshProfile();
       fetchData();
     } catch (error) {
       console.error('Unexpected error:', error);
