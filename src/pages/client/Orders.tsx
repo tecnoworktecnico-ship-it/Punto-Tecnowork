@@ -190,11 +190,11 @@ const ClientOrders = () => {
             <div className="flex items-center justify-between mb-4">
               <Button
                 variant="ghost"
-                onClick={() => navigate('/client')}
+                onClick={() => navigate(-1)}
                 className="flex items-center gap-2 text-text-carbon hover:text-primary-blue"
               >
                 <ArrowLeft className="h-5 w-5" />
-                Volver al Dashboard
+                Volver
               </Button>
               <div className="flex items-center gap-2">
                 <Button

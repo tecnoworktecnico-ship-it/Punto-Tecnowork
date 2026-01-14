@@ -292,11 +292,11 @@ const NewOrder = () => {
             <div className="flex items-center justify-between mb-4">
               <Button
                 variant="ghost"
-                onClick={() => navigate('/client')}
+                onClick={() => navigate(-1)}
                 className="flex items-center gap-2 text-text-carbon hover:text-primary-blue"
               >
                 <ArrowLeft className="h-5 w-5" />
-                Volver al Dashboard
+                Volver
               </Button>
             </div>
             <CardTitle className="text-3xl font-bold text-text-carbon">
@@ -361,7 +361,7 @@ const NewOrder = () => {
                     title="Precios del Local"
                     description={
                       localInfo?.can_edit_prices 
-                        ? "Precios personalizados de tu local"
+                        ? "Precios personalizados de tu local (los marcados como 'Global' usan el precio base)"
                         : "Precios estándar"
                     }
                     showCustomBadge={false}
