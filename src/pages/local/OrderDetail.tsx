@@ -174,13 +174,14 @@ const LocalOrderDetail = () => {
   return (
     <div className="min-h-screen p-4 bg-gradient-to-br from-primary-blue to-purple-600 animate-gradient-move">
       <div className="max-w-6xl mx-auto space-y-6">
+        {/* Botón de Volver añadido aquí */}
         <Button
           variant="ghost"
-          onClick={() => navigate('/local/orders')}
-          className="flex items-center gap-2 text-white hover:text-gray-200"
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-2 text-white hover:text-gray-200 hover:bg-white/10"
         >
           <ArrowLeft className="h-5 w-5" />
-          Volver a la Lista de Pedidos
+          Volver
         </Button>
 
         <OrderDetailsCard order={order} />

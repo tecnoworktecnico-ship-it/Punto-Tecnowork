@@ -28,10 +28,10 @@ export default function MaintenancePage() {
           {/* Botón Volver */}
           <Button 
             variant="ghost" 
-            onClick={() => navigate('/admin/dashboard')} 
+            onClick={() => navigate(-1)} 
             className="gap-2 text-gray-600 hover:text-gray-900 hover:bg-gray-200 transition-colors"
           >
-            <ArrowLeft className="w-4 h-4" /> Volver al Dashboard
+            <ArrowLeft className="w-4 h-4" /> Volver
           </Button>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
