@@ -65,7 +65,7 @@ const LocalOrderDetail = () => {
           .from('profiles')
           .select('*') // <-- CORREGIDO: Usar select('*')
           .eq('id', orderData.client_id)
-          .single();
+          .maybeSingle(); // <-- Usar maybeSingle para evitar 406 si el perfil no existe
 
         // Asegurar que order_audit esté ordenado por created_at
         const sortedAudit = (orderData.order_audit || []).sort((a: any, b: any) => 
