@@ -67,6 +67,9 @@ const LocalOrderDetail = () => {
           .eq('id', orderData.client_id)
           .maybeSingle(); // Usar maybeSingle para evitar 406 si el perfil no existe
 
+        // LOG DE DEPURACIÓN AÑADIDO
+        console.log('DEBUG_DATA:', { id: orderData.client_id, perfil: clientProfileData });
+
         // Asegurar que order_audit esté ordenado por created_at
         const sortedAudit = (orderData.order_audit || []).sort((a: any, b: any) => 
           new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
